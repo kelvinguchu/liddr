@@ -42,7 +42,7 @@ defmodule Liddr.MixProject do
       {:phoenix, "~> 1.8.4"},
       {:phoenix_ecto, "~> 4.5"},
       {:ecto_sql, "~> 3.13"},
-      {:postgrex, ">= 0.0.0"},
+      {:postgrex, "~> 0.22"},
       {:phoenix_live_dashboard, "~> 0.8.3"},
       {:swoosh, "~> 1.16"},
       {:req, "~> 0.5"},
@@ -52,7 +52,9 @@ defmodule Liddr.MixProject do
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
-      {:oban, "~> 2.19"}
+      {:oban, "~> 2.19"},
+      {:resend, "~> 0.4.0"},
+      {:redix, "~> 1.5"}
     ]
   end
 

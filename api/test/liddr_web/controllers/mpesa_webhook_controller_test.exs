@@ -264,6 +264,18 @@ defmodule LiddrWeb.MpesaWebhookControllerTest do
     assert %{"error" => %{"code" => "INVALID_CALLBACK_TOKEN"}} = json_response(conn, 401)
   end
 
+  test "POST /api/payments/mpesa/stk-callback fails closed when callback token config is missing",
+       %{conn: conn} do
+    System.delete_env("MPESA_CALLBACK_TOKEN")
+
+    %{payment: payment} = create_pending_subscription_payment!()
+    payload = stk_callback_payload(payment.checkout_request_id, payment.merchant_request_id, 0)
+
+    conn = post(conn, "/api/payments/mpesa/stk-callback?token=#{@callback_token}", payload)
+
+    assert %{"error" => %{"code" => "MISSING_CALLBACK_TOKEN_CONFIG"}} = json_response(conn, 503)
+  end
+
   test "POST /api/payments/mpesa/c2b-validation accepts valid callback token", %{conn: conn} do
     conn = post(conn, "/api/payments/mpesa/c2b-validation?token=#{@callback_token}", %{})
     assert %{"ResultCode" => 0, "ResultDesc" => "Accepted"} = json_response(conn, 200)

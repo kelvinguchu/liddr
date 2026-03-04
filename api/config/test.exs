@@ -1,6 +1,9 @@
 import Config
 
-postgres_db = System.get_env("POSTGRES_DB") || "liddr"
+postgres_db = System.fetch_env!("POSTGRES_DB")
+postgres_user = System.fetch_env!("POSTGRES_USER")
+postgres_password = System.fetch_env!("POSTGRES_PASSWORD")
+postgres_host = System.get_env("POSTGRES_HOST") || "localhost"
 test_partition = System.get_env("MIX_TEST_PARTITION")
 test_db_name = "#{postgres_db}_test#{test_partition}"
 
@@ -10,9 +13,9 @@ test_db_name = "#{postgres_db}_test#{test_partition}"
 # to provide built-in test partitioning in CI environment.
 # Run `mix help test` for more information.
 config :liddr, Liddr.Repo,
-  username: System.get_env("POSTGRES_USER") || "postgres",
-  password: System.get_env("POSTGRES_PASSWORD") || "postgres",
-  hostname: System.get_env("POSTGRES_HOST") || "localhost",
+  username: postgres_user,
+  password: postgres_password,
+  hostname: postgres_host,
   database: test_db_name,
   pool: Ecto.Adapters.SQL.Sandbox,
   pool_size: System.schedulers_online() * 2
@@ -32,6 +35,7 @@ config :liddr, Oban, testing: :manual
 
 # Test-only helper to assert OTP challenge flow without SMS/email integration.
 config :liddr, :auth_debug_otp, true
+config :liddr, :rides_dispatch_async, false
 config :liddr, :malware_scan_enabled, false
 config :liddr, :ocr_enabled, false
 config :liddr, :ocr_pdf_enabled, false

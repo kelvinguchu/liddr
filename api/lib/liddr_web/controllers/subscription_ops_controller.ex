@@ -110,6 +110,15 @@ defmodule LiddrWeb.SubscriptionOpsController do
         "MPESA_CALLBACK_BASE_URL is not configured"
       )
 
+  defp render_error(conn, :missing_callback_token_config),
+    do:
+      error_response(
+        conn,
+        :unprocessable_entity,
+        "MISSING_CALLBACK_TOKEN_CONFIG",
+        "MPESA_CALLBACK_TOKEN is not configured"
+      )
+
   defp render_error(conn, {:missing_mpesa_env, key}),
     do:
       error_response(

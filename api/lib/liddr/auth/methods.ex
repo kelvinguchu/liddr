@@ -12,12 +12,6 @@ defmodule Liddr.Auth.Methods do
       allowed_for: ["rider", "driver"],
       requires_secret: false
     },
-    %{
-      method: "email_password",
-      label: "Email + Password",
-      allowed_for: ["rider", "driver", "ops", "admin"],
-      requires_secret: true
-    },
     %{method: "google", label: "Google", allowed_for: ["rider"], requires_secret: true},
     %{method: "apple", label: "Apple", allowed_for: ["rider"], requires_secret: false},
     %{

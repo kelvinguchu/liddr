@@ -13,6 +13,10 @@ defmodule LiddrWeb.Router do
     plug LiddrWeb.Plugs.RequireAnyRole, roles: ["rider", "driver"]
   end
 
+  pipeline :require_rider do
+    plug LiddrWeb.Plugs.RequireAnyRole, roles: ["rider"]
+  end
+
   pipeline :require_driver do
     plug LiddrWeb.Plugs.RequireAnyRole, roles: ["driver"]
   end
@@ -63,6 +67,23 @@ defmodule LiddrWeb.Router do
     pipe_through [:api, :api_auth, :require_rider_or_driver]
 
     post "/reports", ReportController, :create
+    get "/ride-notifications", RideNotificationController, :index
+    post "/ride-notifications/:id/ack", RideNotificationController, :ack
+    get "/ratings/me/pending", RatingController, :pending
+    post "/rides/:ride_id/rate", RatingController, :rate
+    post "/rides/:ride_id/rate/skip", RatingController, :skip
+  end
+
+  scope "/api", LiddrWeb do
+    pipe_through [:api, :api_auth, :require_rider]
+
+    post "/rides/quote", RideController, :quote
+    post "/rides/requests", RideController, :request
+    get "/rides/:ride_id/pickup-health", RideController, :pickup_health
+    post "/rides/:ride_id/reassign", RideController, :reassign
+    post "/rides/:ride_id/cancel", RideController, :rider_cancel
+    post "/rides/:ride_id/destination-change-requests", RideDestinationChangeController, :request
+    get "/rides/history/rider", RideController, :rider_history
   end
 
   scope "/api", LiddrWeb do
@@ -70,6 +91,7 @@ defmodule LiddrWeb.Router do
 
     post "/drivers/me/online", DriverAvailabilityController, :online
     post "/drivers/me/offline", DriverAvailabilityController, :offline
+    post "/drivers/me/location", DriverLocationController, :upsert
     post "/verification/applications", VerificationController, :start_application
     post "/verification/uploads/presign", VerificationController, :presign_upload
     post "/verification/documents", VerificationController, :submit_document
@@ -77,6 +99,25 @@ defmodule LiddrWeb.Router do
     get "/subscriptions/me", SubscriptionController, :current
     post "/subscriptions/pay", SubscriptionController, :pay
     get "/subscriptions/me/history", SubscriptionController, :history
+    get "/rides/offers", RideController, :driver_offers
+    post "/rides/offers/:offer_id/accept", RideController, :accept_offer
+    post "/rides/offers/:offer_id/reject", RideController, :reject_offer
+    post "/rides/:ride_id/driver-arriving", RideController, :driver_arriving
+    post "/rides/:ride_id/arrived", RideController, :driver_arrived
+    post "/rides/:ride_id/start", RideController, :start_trip
+    post "/rides/:ride_id/complete", RideController, :complete
+    post "/rides/:ride_id/driver-cancel", RideController, :driver_cancel
+    post "/rides/:ride_id/no-show", RideController, :rider_no_show
+
+    post "/rides/:ride_id/destination-change-requests/:id/accept",
+         RideDestinationChangeController,
+         :accept
+
+    post "/rides/:ride_id/destination-change-requests/:id/reject",
+         RideDestinationChangeController,
+         :reject
+
+    get "/rides/history/driver", RideController, :driver_history
   end
 
   scope "/api", LiddrWeb do
@@ -93,6 +134,11 @@ defmodule LiddrWeb.Router do
     post "/ops/mpesa/payments/checkout/:checkout_request_id/query-tx-status",
          SubscriptionOpsController,
          :query_tx_status
+
+    get "/ops/rides/integrity/users/:user_id", RideOpsController, :integrity_lookup
+    post "/ops/rides/integrity/reconcile-prepay-modes", RideOpsController, :reconcile_prepay_modes
+    get "/ops/rides/pickup-watchdog/summary", RideOpsController, :pickup_watchdog_summary
+    get "/ops/rides/:ride_id/notifications", RideOpsController, :ride_notifications
 
     get "/moderation/verification/applications", VerificationOpsController, :list_applications
     get "/moderation/verification/documents", VerificationOpsController, :list_documents
@@ -119,6 +165,21 @@ defmodule LiddrWeb.Router do
     post "/moderation/enforcements/reconcile-expired",
          ModerationController,
          :reconcile_enforcements
+
+    get "/ops/ratings", RatingOpsController, :index
+    get "/ops/ratings/excluded", RatingOpsController, :excluded
+    get "/ops/ratings/users/:rated_user_id/guardrails", RatingOpsController, :guardrails
+    post "/ops/ratings/:id/nullify", RatingOpsController, :nullify
+    post "/ops/ratings/:id/reinstate", RatingOpsController, :reinstate
+  end
+
+  scope "/api", LiddrWeb do
+    pipe_through [:api, :api_auth, :require_rider_or_driver]
+
+    get "/rides/integrity/me", RideIntegrityController, :me
+    get "/rides/:ride_id/events", RideController, :events
+    get "/rides/:ride_id/incidents", RideController, :incidents
+    get "/rides/:ride_id", RideController, :show
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

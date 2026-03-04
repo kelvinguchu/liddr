@@ -78,8 +78,15 @@ defmodule Liddr.Moderation.Query do
 
   def normalize_text(value), do: value |> to_string() |> normalize_text()
 
-  def normalize_applies_to("driver"), do: "driver"
-  def normalize_applies_to("passenger"), do: "passenger"
+  def normalize_applies_to(value) when is_binary(value) do
+    case String.downcase(String.trim(value)) do
+      "driver" -> "driver"
+      "rider" -> "passenger"
+      "passenger" -> "passenger"
+      _ -> nil
+    end
+  end
+
   def normalize_applies_to(_value), do: nil
 
   def unwrap_transaction_result({:ok, payload}), do: {:ok, payload}

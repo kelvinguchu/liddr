@@ -1,11 +1,16 @@
 import Config
 
+postgres_db = System.fetch_env!("POSTGRES_DB")
+postgres_user = System.fetch_env!("POSTGRES_USER")
+postgres_password = System.fetch_env!("POSTGRES_PASSWORD")
+postgres_host = System.get_env("POSTGRES_HOST") || "localhost"
+
 # Configure your database
 config :liddr, Liddr.Repo,
-  username: "postgres",
-  password: "postgres",
-  hostname: "localhost",
-  database: "liddr_dev",
+  username: postgres_user,
+  password: postgres_password,
+  hostname: postgres_host,
+  database: postgres_db,
   stacktrace: true,
   show_sensitive_data_on_connection_error: true,
   pool_size: 10

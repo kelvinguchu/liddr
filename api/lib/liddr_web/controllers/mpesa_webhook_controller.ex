@@ -71,6 +71,17 @@ defmodule LiddrWeb.MpesaWebhookController do
     |> json(%{error: %{code: "INVALID_CALLBACK_TOKEN", message: "Invalid callback token"}})
   end
 
+  defp render_error(conn, :missing_callback_token_config) do
+    conn
+    |> put_status(:service_unavailable)
+    |> json(%{
+      error: %{
+        code: "MISSING_CALLBACK_TOKEN_CONFIG",
+        message: "M-Pesa callback token is not configured"
+      }
+    })
+  end
+
   defp render_error(conn, :invalid_stk_callback_payload) do
     conn
     |> put_status(:unprocessable_entity)

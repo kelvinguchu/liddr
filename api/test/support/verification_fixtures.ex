@@ -4,6 +4,7 @@ defmodule Liddr.VerificationFixtures do
   alias Decimal, as: D
   alias Liddr.Accounts.Driver
   alias Liddr.Accounts.User
+  alias Liddr.Location.DriverLocation
   alias Liddr.Repo
   alias Liddr.Verification.VerificationApplication
   alias Liddr.Verification.VerificationDocument
@@ -34,7 +35,6 @@ defmodule Liddr.VerificationFixtures do
         base_fee_kes: D.new("20.00"),
         price_per_km_kes: D.new("20.00"),
         price_per_min_kes: D.new("3.00"),
-        booking_fee_kes: D.new("10.00"),
         min_fare_kes: D.new("120.00"),
         weekly_sub_kes: 800,
         is_active: true,
@@ -78,6 +78,22 @@ defmodule Liddr.VerificationFixtures do
 
     %Driver{}
     |> Driver.create_changeset(attrs)
+    |> Repo.insert!()
+  end
+
+  def create_driver_location!(driver_id, attrs \\ %{}) do
+    now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
+    attrs_map = if is_list(attrs), do: Map.new(attrs), else: attrs
+
+    %DriverLocation{}
+    |> DriverLocation.create_changeset(%{
+      "driver_id" => driver_id,
+      "lat" => Map.get(attrs_map, :lat, D.new("-1.2921000")),
+      "lng" => Map.get(attrs_map, :lng, D.new("36.8219000")),
+      "captured_at" => Map.get(attrs_map, :captured_at, now),
+      "s2_cell_token" => Map.get(attrs_map, :s2_cell_token),
+      "metadata" => Map.get(attrs_map, :metadata, %{})
+    })
     |> Repo.insert!()
   end
 

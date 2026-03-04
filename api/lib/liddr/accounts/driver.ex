@@ -8,6 +8,7 @@ defmodule Liddr.Accounts.Driver do
   @subscription_statuses ~w(inactive active grace suspended)
   @account_statuses ~w(pending active suspended deactivated)
   @verification_statuses ~w(unverified pending under_review approved rejected suspended)
+  @dispatch_statuses ~w(idle heading_to_pickup at_pickup on_trip)
 
   schema "drivers" do
     field :license_no, :string
@@ -23,6 +24,8 @@ defmodule Liddr.Accounts.Driver do
     field :last_online_at, :utc_datetime_usec
     field :activated_at, :utc_datetime_usec
     field :suspended_at, :utc_datetime_usec
+    field :current_ride_id, :id
+    field :dispatch_status, :string
 
     belongs_to :user, Liddr.Accounts.User, define_field: false
 
@@ -45,18 +48,23 @@ defmodule Liddr.Accounts.Driver do
       :last_seen_at,
       :last_online_at,
       :activated_at,
-      :suspended_at
+      :suspended_at,
+      :current_ride_id,
+      :dispatch_status
     ])
     |> validate_required([:user_id, :vehicle_category_id, :subscription_status])
     |> validate_inclusion(:subscription_status, @subscription_statuses)
     |> validate_inclusion(:account_status, @account_statuses)
     |> validate_inclusion(:verification_status, @verification_statuses)
+    |> validate_inclusion(:dispatch_status, @dispatch_statuses)
     |> unique_constraint(:plate_no)
     |> foreign_key_constraint(:user_id)
     |> foreign_key_constraint(:vehicle_category_id)
+    |> foreign_key_constraint(:current_ride_id)
     |> check_constraint(:subscription_status, name: :drivers_subscription_status_valid)
     |> check_constraint(:account_status, name: :drivers_account_status_valid)
     |> check_constraint(:verification_status, name: :drivers_verification_status_valid)
+    |> check_constraint(:dispatch_status, name: :drivers_dispatch_status_valid)
     |> check_constraint(:vehicle_year, name: :drivers_vehicle_year_range)
   end
 end

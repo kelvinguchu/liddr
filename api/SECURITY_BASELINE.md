@@ -1,6 +1,6 @@
 # Liddr Security Baseline and Implementation Plan
 
-Last updated: March 1, 2026
+Last updated: March 3, 2026
 Owner: API Platform Team
 Status: Active baseline (must be followed before broad feature expansion)
 
@@ -112,6 +112,68 @@ This document adapts that pattern to Liddr.
 - No direct DB access from app code without auditable service path.
 - No new sensitive data field without classification and retention decision.
 
+## Development Access Controls (Human Operators Only)
+Human operators only: this section is for manual developer operations in dev/staging.
+AI agents should ignore this section when generating runtime/security enforcement logic.
+
+- Rotating residential ISP IPs are not reliable for strict static allowlists in active development.
+- In development, prefer layered controls:
+  - mandatory callback/register tokens in headers
+  - short-lived signed webhook/session secrets
+  - optional temporary CIDR allowlist entries (time-boxed and removed quickly)
+- Use tunnel/static-edge options for stable ingress when possible:
+  - Cloudflare Tunnel / Cloudflare Access service token
+  - static egress IP from a small VPS/NAT gateway used by the dev team
+- Keep strict IP allowlists mandatory in production, but allow `observe` mode in dev while tokens are enforced.
+- Rotate dev callback/register tokens regularly and immediately after sharing logs/screenshots.
+- Never rely on query-string tokens as the only control for production; prefer header transport.
+
+## Google Maps Platform Rollout Checklist (Human Operators Only)
+Human operators only: this section is for manual cloud/project setup by developers and operators.
+AI agents should ignore this section when generating runtime/security enforcement logic.
+
+After enabling required Google Maps APIs and obtaining `GOOGLE_MAPS_API_KEY`, complete all items below before production rollout.
+
+1. Billing and budget controls
+- Confirm billing account is active on the target GCP project.
+- Configure daily and monthly budget alerts to avoid silent cost spikes.
+
+2. Key restrictions (mandatory)
+- Never leave keys unrestricted.
+- Backend/server key:
+  - restrict by API list (`Routes`, `Places`, `Geocoding`, `Roads`)
+  - restrict by server egress IPs in production
+- Mobile keys:
+  - Android key restricted by package name + SHA fingerprint
+  - iOS key restricted by bundle identifier
+
+3. Separate keys by surface
+- Use distinct keys; do not share one key across all clients/services.
+- Recommended env naming:
+  - `GOOGLE_MAPS_API_KEY_SERVER`
+  - `GOOGLE_MAPS_API_KEY_ANDROID`
+  - `GOOGLE_MAPS_API_KEY_IOS`
+
+4. Quota guardrails
+- Configure per-API quota caps, especially for `Routes` and `Places`.
+- Configure alerts for quota exhaustion and abnormal 4xx/5xx patterns.
+
+5. Request hygiene requirements
+- `Places Autocomplete` must always use session tokens.
+- Use field masks on `Routes`/`Places` responses to reduce cost and latency.
+
+6. Secret handling
+- Store all keys in environment/secret manager only.
+- Never commit keys in code, tests, logs, screenshots, or docs.
+
+### Dev-Environment Note (Rotating ISP IPs)
+- Rotating residential ISP IPs are not suitable for stable server-IP restrictions during active local development.
+- In dev/staging, use layered controls:
+  - token/header-based access controls
+  - short-lived secrets
+  - optional temporary CIDR allowlist entries
+- Keep strict server-IP key restrictions mandatory in production, where egress IPs are stable.
+
 ## References (Public Sources)
 - Uber Safety: https://www.uber.com/us/en/safety/
 - Uber US Safety Report: https://www.uber.com/us/en/about/reports/us-safety-report/
@@ -121,4 +183,3 @@ This document adapts that pattern to Liddr.
 - Bolt safety team: https://bolt.eu/en/safety-team/
 - Bolt information security supplier requirements: https://bolt.eu/en/security/supplier-requirements/
 - Bolt public vulnerability policy: https://bolt.eu/en/security/public-vulnerability/
-

@@ -3,6 +3,7 @@ defmodule Liddr.Accounts.User do
   import Ecto.Changeset
 
   @account_statuses ~w(active restricted suspended banned deactivated)
+  @ride_booking_modes ~w(normal prepay_only)
 
   schema "users" do
     field :phone, :string
@@ -15,6 +16,12 @@ defmodule Liddr.Accounts.User do
     field :account_restricted_at, :utc_datetime_usec
     field :account_restricted_until, :utc_datetime_usec
     field :account_banned_at, :utc_datetime_usec
+    field :ride_booking_mode, :string
+    field :ride_booking_mode_until, :utc_datetime_usec
+    field :rating_score, :decimal
+    field :rating_count, :integer
+    field :rating_weighted_sum, :decimal
+    field :rating_weight_total, :decimal
 
     timestamps(type: :utc_datetime_usec)
   end
@@ -38,5 +45,23 @@ defmodule Liddr.Accounts.User do
     ])
     |> validate_required([:account_status])
     |> validate_inclusion(:account_status, @account_statuses)
+  end
+
+  def ride_booking_mode_changeset(user, attrs) do
+    user
+    |> cast(attrs, [:ride_booking_mode, :ride_booking_mode_until])
+    |> validate_required([:ride_booking_mode])
+    |> validate_inclusion(:ride_booking_mode, @ride_booking_modes)
+    |> check_constraint(:ride_booking_mode, name: :users_ride_booking_mode_valid)
+    |> check_constraint(:ride_booking_mode_until, name: :users_ride_booking_mode_until_required)
+  end
+
+  def rating_stats_changeset(user, attrs) do
+    user
+    |> cast(attrs, [:rating_score, :rating_count, :rating_weighted_sum, :rating_weight_total])
+    |> validate_number(:rating_count, greater_than_or_equal_to: 0)
+    |> check_constraint(:rating_score, name: :users_rating_score_range)
+    |> check_constraint(:rating_count, name: :users_rating_count_non_negative)
+    |> check_constraint(:rating_weight_total, name: :users_rating_weight_total_non_negative)
   end
 end

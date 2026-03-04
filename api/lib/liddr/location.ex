@@ -6,6 +6,7 @@ defmodule Liddr.Location do
   alias Liddr.Location.DriverLocation
   alias Liddr.Location.SupplyIndex
   alias Liddr.Repo
+  alias Liddr.Rides.SharedRides.LocationEtaRefresh
   alias Liddr.Subscriptions.PaymentUtils
 
   def upsert_driver_location(driver_user_id, attrs \\ %{}) do
@@ -51,6 +52,7 @@ defmodule Liddr.Location do
       |> case do
         {:ok, _location} = result ->
           _ = sync_driver_supply(driver_user_id)
+          _ = LocationEtaRefresh.maybe_refresh_for_driver(driver_user_id, lat, lng, now)
           result
 
         {:error, _changeset} = error ->

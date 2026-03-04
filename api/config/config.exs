@@ -16,7 +16,18 @@ config :liddr, :google_routes_client, Liddr.Maps.RoutesClient
 config :liddr, :ride_market_multiplier, Liddr.Rides.MarketMultiplier
 config :liddr, :auth_debug_otp, false
 config :liddr, :auth_debug_otp_targets, []
+config :liddr, :otp_sms_client, Liddr.Auth.OtpDelivery.HostPinnacle
 config :liddr, :ride_supply_index, Liddr.Location.SupplyIndex
+config :liddr, :ride_push_client, Liddr.Rides.PushClient.FCM
+
+config :liddr, Liddr.Auth.ChallengeRateLimiter,
+  cooldown_seconds: 30,
+  identity_window_seconds: 900,
+  identity_max_requests: 5,
+  ip_window_seconds: 900,
+  ip_max_requests: 60,
+  device_window_seconds: 900,
+  device_max_requests: 40
 
 config :liddr, Liddr.Location.Cells, cell_size_deg: 0.01
 
@@ -58,6 +69,19 @@ config :liddr, Liddr.Rides.Integrity.Policy,
   pickup_auto_cancel_after_seconds: 900,
   pickup_auto_cancel_min_reassign_count: 1,
   pickup_watchdog_limit: 100
+
+config :liddr, Liddr.Rides.SharedRides.DetourGuard,
+  max_extra_detour_m: 2_000.0,
+  max_extra_detour_ratio: 0.6
+
+config :liddr, Liddr.Rides.SharedRides.StopEta,
+  google_enabled: false,
+  fallback_speed_kph: 28.0,
+  min_leg_seconds: 60,
+  max_leg_seconds: 7_200
+
+config :liddr, Liddr.Rides.SharedRides.LocationEtaRefresh, min_interval_seconds: 15
+config :liddr, Liddr.Rides.PushClient.FCM, timeout_ms: 10_000
 
 config :liddr, Liddr.Rides.NotificationRetry,
   limit: 100,

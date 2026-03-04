@@ -85,6 +85,7 @@ defmodule Liddr.Rides.Ride do
     |> foreign_key_constraint(:cancelled_by_user_id)
     |> foreign_key_constraint(:quote_id)
     |> foreign_key_constraint(:vehicle_category_id)
+    |> unique_constraint(:driver_id, name: :rides_unique_active_driver_idx)
     |> check_constraint(:status, name: :rides_status_valid)
     |> check_constraint(:product_type, name: :rides_product_type_valid)
     |> check_constraint(:pickup_lat, name: :rides_pickup_lat_range)

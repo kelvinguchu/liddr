@@ -6,6 +6,7 @@ defmodule Liddr.Rides.DispatchWorker do
   alias Decimal, as: D
   alias Liddr.Repo
   alias Liddr.Rides.CandidateSelection
+  alias Liddr.Rides.DriverOfferLock
   alias Liddr.Rides.Events
   alias Liddr.Rides.Realtime
   alias Liddr.Rides.Ride
@@ -164,34 +165,55 @@ defmodule Liddr.Rides.DispatchWorker do
 
   defp create_offers!(ride_id, driver_ids, now, offer_ttl_seconds) do
     expires_at = DateTime.add(now, offer_ttl_seconds, :second)
-    normalized_driver_ids = normalize_driver_ids(driver_ids)
 
-    rows =
-      Enum.map(normalized_driver_ids, fn driver_id ->
-        %{
-          ride_id: ride_id,
-          driver_id: driver_id,
-          status: "offered",
-          offered_at: now,
-          expires_at: expires_at,
-          inserted_at: now,
-          updated_at: now
-        }
-      end)
-
-    {_, returning_rows} =
-      Repo.insert_all(RideOffer, rows,
-        on_conflict: :nothing,
-        conflict_target: [:ride_id, :driver_id],
-        returning: [:id, :ride_id, :driver_id, :status, :offered_at, :expires_at, :inserted_at]
+    lock_result =
+      DriverOfferLock.acquire_many(driver_ids, ride_id, offer_ttl_seconds,
+        source: "dispatch_wave"
       )
 
-    returning_rows
-    |> normalize_rows()
-    |> Enum.map(fn
-      %RideOffer{} = offer -> offer
-      row when is_map(row) -> struct(RideOffer, row)
-    end)
+    selected_driver_ids = normalize_driver_ids(lock_result.selected_driver_ids)
+    locked_driver_ids = normalize_driver_ids(lock_result.locked_driver_ids)
+
+    if selected_driver_ids == [] do
+      []
+    else
+      rows =
+        Enum.map(selected_driver_ids, fn driver_id ->
+          %{
+            ride_id: ride_id,
+            driver_id: driver_id,
+            status: "offered",
+            offered_at: now,
+            expires_at: expires_at,
+            inserted_at: now,
+            updated_at: now
+          }
+        end)
+
+      {_, returning_rows} =
+        Repo.insert_all(RideOffer, rows,
+          on_conflict: :nothing,
+          conflict_target: [:ride_id, :driver_id],
+          returning: [:id, :ride_id, :driver_id, :status, :offered_at, :expires_at, :inserted_at]
+        )
+
+      offers =
+        returning_rows
+        |> normalize_rows()
+        |> Enum.map(fn
+          %RideOffer{} = offer -> offer
+          row when is_map(row) -> struct(RideOffer, row)
+        end)
+
+      inserted_driver_ids = offers |> Enum.map(& &1.driver_id) |> MapSet.new()
+
+      locked_driver_ids
+      |> Enum.reject(&MapSet.member?(inserted_driver_ids, &1))
+      |> Enum.map(&{&1, ride_id})
+      |> DriverOfferLock.release_many(source: "dispatch_insert_conflict")
+
+      offers
+    end
   end
 
   defp expire_stale_offers!(ride_id, now) do
@@ -213,6 +235,7 @@ defmodule Liddr.Rides.DispatchWorker do
 
       record_offer_events!(ride_id, "offer_expired", expired_offers, now)
       record_offer_events!(ride_id, "offer_missed", expired_offers, now)
+      DriverOfferLock.release_many(expired_offers, source: "dispatch_expire")
     end
 
     Enum.map(expired_offers, fn offer ->

@@ -1,11 +1,14 @@
 defmodule Liddr.Rides.Lifecycle do
   import Ecto.Query
 
+  alias Ecto.Changeset
   alias Liddr.Accounts.Driver
   alias Liddr.Accounts.User
   alias Liddr.Auth.Policy
   alias Liddr.Location
   alias Liddr.Repo
+  alias Liddr.Rides.ActiveRides
+  alias Liddr.Rides.DriverOfferLock
   alias Liddr.Rides.Dispatcher
   alias Liddr.Rides.Events
   alias Liddr.Rides.Integrity.AcceptanceTelemetry
@@ -36,6 +39,7 @@ defmodule Liddr.Rides.Lifecycle do
 
     record_offer_events!("offer_expired", expired_offers, now)
     record_offer_events!("offer_missed", expired_offers, now)
+    DriverOfferLock.release_many(expired_offers, source: "driver_offer_list_expire")
 
     offers =
       Repo.all(
@@ -147,6 +151,7 @@ defmodule Liddr.Rides.Lifecycle do
         }
       end)
       |> unwrap_transaction_result()
+      |> normalize_accept_error()
 
     case result do
       {:ok,
@@ -157,6 +162,14 @@ defmodule Liddr.Rides.Lifecycle do
          competing_driver_offers: competing_driver_offers
        } = payload} ->
         _ = Location.remove_driver_from_supply(driver_user_id)
+
+        DriverOfferLock.release_many(
+          [
+            accepted_offer | competing_ride_offers ++ competing_driver_offers
+          ],
+          source: "offer_accept"
+        )
+
         Realtime.broadcast_ride_assigned(ride, accepted_offer)
 
         Enum.each(
@@ -206,6 +219,7 @@ defmodule Liddr.Rides.Lifecycle do
 
     case result do
       {:ok, %{ride: ride, offer: rejected_offer} = payload} ->
+        DriverOfferLock.release_many([rejected_offer], source: "offer_reject")
         Realtime.broadcast_offer_withdrawn(ride.id, rejected_offer, "driver_rejected")
         _ = Dispatcher.ensure_started(ride.id)
         :ok = Dispatcher.dispatch_now(ride.id)
@@ -280,12 +294,26 @@ defmodule Liddr.Rides.Lifecycle do
       ) || Repo.rollback(:driver_profile_not_found)
 
     cond do
-      driver.account_status != "active" -> Repo.rollback(:driver_account_not_active)
-      driver.verification_status != "approved" -> Repo.rollback(:driver_not_verified)
-      driver.subscription_status != "active" -> Repo.rollback(:driver_subscription_not_active)
-      driver.is_available != true -> Repo.rollback(:driver_not_available)
-      not is_nil(driver.current_ride_id) -> Repo.rollback(:driver_has_active_ride)
-      true -> driver
+      driver.account_status != "active" ->
+        Repo.rollback(:driver_account_not_active)
+
+      driver.verification_status != "approved" ->
+        Repo.rollback(:driver_not_verified)
+
+      driver.subscription_status != "active" ->
+        Repo.rollback(:driver_subscription_not_active)
+
+      not is_nil(driver.current_ride_id) ->
+        Repo.rollback(:driver_has_active_ride)
+
+      ActiveRides.driver_has_active_ride?(driver_user_id) ->
+        Repo.rollback(:driver_has_active_ride)
+
+      driver.is_available != true ->
+        Repo.rollback(:driver_not_available)
+
+      true ->
+        driver
     end
   end
 
@@ -333,4 +361,21 @@ defmodule Liddr.Rides.Lifecycle do
   defp unwrap_transaction_result({:error, reason}), do: {:error, reason}
   defp unwrap_or_rollback({:ok, value}), do: value
   defp unwrap_or_rollback({:error, changeset}), do: Repo.rollback(changeset)
+
+  defp normalize_accept_error({:error, %Changeset{} = changeset}) do
+    if active_driver_conflict_changeset?(changeset),
+      do: {:error, :driver_has_active_ride},
+      else: {:error, changeset}
+  end
+
+  defp normalize_accept_error(result), do: result
+
+  defp active_driver_conflict_changeset?(changeset) do
+    changeset.errors
+    |> Keyword.get_values(:driver_id)
+    |> Enum.any?(fn {_message, opts} ->
+      Keyword.get(opts, :constraint) == :unique and
+        Keyword.get(opts, :constraint_name) == "rides_unique_active_driver_idx"
+    end)
+  end
 end

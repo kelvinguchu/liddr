@@ -78,6 +78,9 @@ defmodule Liddr.Rides.PickupWatchdog do
 
         :auto_reassigned
 
+      {:error, reason} when reason in [:ride_not_reassignable, :reassign_not_recommended] ->
+        :skipped
+
       {:error, _reason} ->
         :failed
     end
@@ -93,6 +96,9 @@ defmodule Liddr.Rides.PickupWatchdog do
           )
 
         :auto_cancelled
+
+      {:error, reason} when reason in [:ride_not_cancellable, :ride_not_assigned_to_rider] ->
+        :skipped
 
       {:error, _reason} ->
         :failed

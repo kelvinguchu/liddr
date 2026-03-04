@@ -69,6 +69,15 @@ defmodule LiddrWeb.Router do
     post "/reports", ReportController, :create
     get "/ride-notifications", RideNotificationController, :index
     post "/ride-notifications/:id/ack", RideNotificationController, :ack
+    post "/push-tokens", PushTokenController, :upsert
+    delete "/push-tokens", PushTokenController, :revoke
+
+    post "/send/rides/:ride_id/recipient-confirm",
+         SendDeliveryController,
+         :confirm_recipient_in_app
+
+    get "/rides/:ride_id/shared", SharedRideController, :show
+
     get "/ratings/me/pending", RatingController, :pending
     post "/rides/:ride_id/rate", RatingController, :rate
     post "/rides/:ride_id/rate/skip", RatingController, :skip
@@ -79,9 +88,13 @@ defmodule LiddrWeb.Router do
 
     post "/rides/quote", RideController, :quote
     post "/rides/requests", RideController, :request
+    post "/send/quote", SendController, :quote
+    post "/send/requests", SendController, :request
+    get "/send/history/sender", SendController, :sender_history
     get "/rides/:ride_id/pickup-health", RideController, :pickup_health
     post "/rides/:ride_id/reassign", RideController, :reassign
     post "/rides/:ride_id/cancel", RideController, :rider_cancel
+    post "/rides/:ride_id/shared/members/:member_id/cancel", SharedRideController, :cancel_member
     post "/rides/:ride_id/destination-change-requests", RideDestinationChangeController, :request
     get "/rides/history/rider", RideController, :rider_history
   end
@@ -109,6 +122,22 @@ defmodule LiddrWeb.Router do
     post "/rides/:ride_id/driver-cancel", RideController, :driver_cancel
     post "/rides/:ride_id/no-show", RideController, :rider_no_show
 
+    post "/rides/:ride_id/shared/members/:member_id/no-show",
+         SharedRideController,
+         :mark_member_no_show
+
+    post "/rides/:ride_id/shared/members/:member_id/arrive-pickup",
+         SharedRideController,
+         :arrive_member_pickup
+
+    post "/rides/:ride_id/shared/members/:member_id/picked-up",
+         SharedRideController,
+         :mark_member_picked_up
+
+    post "/rides/:ride_id/shared/members/:member_id/dropped-off",
+         SharedRideController,
+         :mark_member_dropped_off
+
     post "/rides/:ride_id/destination-change-requests/:id/accept",
          RideDestinationChangeController,
          :accept
@@ -117,6 +146,9 @@ defmodule LiddrWeb.Router do
          RideDestinationChangeController,
          :reject
 
+    post "/send/rides/:ride_id/pickup-proof", SendDeliveryController, :pickup_proof
+    post "/send/rides/:ride_id/dropoff-proof", SendDeliveryController, :dropoff_proof
+    get "/send/history/courier", SendController, :courier_history
     get "/rides/history/driver", RideController, :driver_history
   end
 

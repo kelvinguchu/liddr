@@ -201,6 +201,18 @@ defmodule LiddrWeb.SubscriptionOpsControllerTest do
     assert is_map(updated_payment.status_query_payload)
   end
 
+  test "POST /api/ops/mpesa/c2b/register-urls returns 503 when callback token config is missing",
+       %{conn: _conn} do
+    System.delete_env("MPESA_CALLBACK_TOKEN")
+
+    %{auth_conn: auth_conn} =
+      AuthFixtures.authenticate_ops!("ops-missing-callback-token@example.com")
+
+    conn = post(auth_conn, "/api/ops/mpesa/c2b/register-urls", %{})
+
+    assert %{"error" => %{"code" => "MISSING_CALLBACK_TOKEN_CONFIG"}} = json_response(conn, 503)
+  end
+
   defp create_pending_subscription_payment! do
     now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
     category_id = VerificationFixtures.insert_vehicle_category!(%{weekly_sub_kes: 1000})

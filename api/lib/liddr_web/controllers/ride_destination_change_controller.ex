@@ -23,11 +23,23 @@ defmodule LiddrWeb.RideDestinationChangeController do
     destination_change_already_pending:
       {:conflict, "DESTINATION_CHANGE_ALREADY_PENDING",
        "A destination change request is already pending"},
+    destination_change_cooldown_active:
+      {:too_many_requests, "DESTINATION_CHANGE_COOLDOWN_ACTIVE",
+       "Please wait before requesting another destination change"},
     destination_change_not_found:
       {:not_found, "DESTINATION_CHANGE_NOT_FOUND", "Destination change request was not found"},
+    destination_change_request_stale:
+      {:conflict, "DESTINATION_CHANGE_REQUEST_STALE",
+       "Destination change request expired. Ask rider to request again"},
     destination_change_same_as_current:
       {:unprocessable_entity, "DESTINATION_CHANGE_SAME_AS_CURRENT",
        "New destination must differ from current dropoff"},
+    destination_change_window_elapsed:
+      {:unprocessable_entity, "DESTINATION_CHANGE_WINDOW_ELAPSED",
+       "Destination change window has elapsed for this ride"},
+    destination_change_origin_stale:
+      {:conflict, "DESTINATION_CHANGE_ORIGIN_STALE",
+       "Driver location is stale. Retry after refreshing location"},
     invalid_destination_coordinates:
       {:unprocessable_entity, "INVALID_DESTINATION_COORDINATES",
        "new_dropoff_lat/new_dropoff_lng must be valid coordinates"},

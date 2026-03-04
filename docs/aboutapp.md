@@ -1045,8 +1045,21 @@ POST	/subscriptions/pay	Initiate M-Pesa STK Push for subscription	Yes — Driver
 GET	/subscriptions/me/history	Past subscription payments	Yes — Driver
 
 27.8 Send (Delivery) Endpoints
-The dedicated /send route family is planned but not yet exposed in the current API router.
-Send/delivery behavior is currently represented through ride/product-type flows.
+Method	Endpoint	Description	Auth Required
+POST	/send/quote	Quote a Send delivery fare	Yes — Rider
+POST	/send/requests	Create a Send delivery request	Yes — Rider
+GET	/send/history/sender	Sender delivery history	Yes — Rider
+GET	/send/history/courier	Courier delivery history	Yes — Driver
+POST	/send/rides/:ride_id/pickup-proof	Capture package pickup proof photo reference	Yes — Driver
+POST	/send/rides/:ride_id/dropoff-proof	Capture dropoff proof and issue recipient confirmation link	Yes — Driver
+POST	/send/recipient-confirmations/:token	Recipient confirms delivery via one-time link	No
+
+Send request payload currently supports:
+•	Core delivery contacts: sender_name, sender_phone (optional fallback to rider phone), recipient_name, recipient_phone
+•	Parcel details: item_description, item_size (small|medium|large), item_value_kes, special_instructions
+•	Payment controls: payer (sender|recipient), payment_timing (before|after)
+•	Safety policy: prohibited-item matching (warn/block), liability_acknowledged required for warned-item submissions
+•	Delivery completion policy: Send rides cannot start before pickup proof; completion requires dropoff proof plus recipient confirmation or timeout window
 
 27.9 Verification Endpoints
 Method	Endpoint	Description	Auth Required

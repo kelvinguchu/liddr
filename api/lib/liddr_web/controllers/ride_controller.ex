@@ -13,6 +13,9 @@ defmodule LiddrWeb.RideController do
        "vehicle_category_id must be a positive integer"},
     invalid_product_type:
       {:unprocessable_entity, "INVALID_PRODUCT_TYPE", "product_type must be solo or shared"},
+    shared_not_supported_for_category:
+      {:unprocessable_entity, "SHARED_NOT_SUPPORTED_FOR_CATEGORY",
+       "Shared rides are not available for this vehicle category"},
     vehicle_category_not_found:
       {:unprocessable_entity, "VEHICLE_CATEGORY_NOT_FOUND",
        "Vehicle category is missing or inactive"},
@@ -23,6 +26,9 @@ defmodule LiddrWeb.RideController do
     ride_quote_vehicle_category_mismatch:
       {:unprocessable_entity, "RIDE_QUOTE_VEHICLE_CATEGORY_MISMATCH",
        "Ride quote vehicle category does not match request"},
+    ride_quote_product_type_mismatch:
+      {:unprocessable_entity, "RIDE_QUOTE_PRODUCT_TYPE_MISMATCH",
+       "Ride quote product_type does not match request"},
     ride_offer_not_found: {:not_found, "RIDE_OFFER_NOT_FOUND", "Ride offer was not found"},
     offer_not_for_driver:
       {:forbidden, "OFFER_NOT_FOR_DRIVER", "Ride offer does not belong to this driver"},
@@ -72,6 +78,17 @@ defmodule LiddrWeb.RideController do
        "Driver must be near dropoff location before completing the ride"},
     ride_not_startable:
       {:unprocessable_entity, "RIDE_NOT_STARTABLE", "Ride cannot be started from current status"},
+    send_pickup_proof_required:
+      {:unprocessable_entity, "SEND_PICKUP_PROOF_REQUIRED",
+       "Pickup proof is required before starting this Send ride"},
+    send_dropoff_proof_required:
+      {:unprocessable_entity, "SEND_DROPOFF_PROOF_REQUIRED",
+       "Dropoff proof is required before completing this Send ride"},
+    send_recipient_confirmation_pending:
+      {:unprocessable_entity, "SEND_RECIPIENT_CONFIRMATION_PENDING",
+       "Wait for recipient confirmation or timeout before completing this Send ride"},
+    send_ride_required:
+      {:unprocessable_entity, "SEND_RIDE_REQUIRED", "This action is only valid for Send rides"},
     ride_not_reassignable:
       {:unprocessable_entity, "RIDE_NOT_REASSIGNABLE",
        "Ride cannot be reassigned from current status"},

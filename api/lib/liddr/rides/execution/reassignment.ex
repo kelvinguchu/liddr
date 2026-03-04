@@ -5,6 +5,7 @@ defmodule Liddr.Rides.Execution.Reassignment do
 
   alias Liddr.Repo
   alias Liddr.Location
+  alias Liddr.Rides.DriverOfferLock
   alias Liddr.Rides.Dispatcher
   alias Liddr.Rides.Events
   alias Liddr.Rides.Execution.PickupHealth
@@ -89,8 +90,15 @@ defmodule Liddr.Rides.Execution.Reassignment do
     case result do
       {:ok, payload} ->
         _ = Location.sync_driver_supply(payload.previous_driver_id)
+        DriverOfferLock.release_many([payload.withdrawn_offer], source: "rider_reassign")
         maybe_broadcast_offer_withdrawn(payload.ride.id, payload.withdrawn_offer)
-        Realtime.broadcast_ride_reassigned(payload.ride, payload.health)
+
+        Realtime.broadcast_ride_reassigned(
+          payload.ride,
+          payload.health,
+          payload.previous_driver_id
+        )
+
         _ = Dispatcher.ensure_started(payload.ride.id)
         :ok = Dispatcher.dispatch_now(payload.ride.id)
         {:ok, payload.ride}

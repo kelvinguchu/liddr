@@ -50,7 +50,18 @@ defmodule LiddrWeb.RideCancellationIntegrityControllerTest do
              })
              |> json_response(422)
 
-    assert %{"data" => %{"ride" => %{"status" => "cancelled"}}} =
+    assert %{
+             "data" => %{
+               "ride" => %{
+                 "status" => "cancelled",
+                 "cancellation_outcome" => %{
+                   "chargeable" => false,
+                   "waiver_code" => "driver_justified_reason",
+                   "reason_code" => "emergency"
+                 }
+               }
+             }
+           } =
              post(driver_conn, "/api/rides/#{ride_id}/driver-cancel", %{"reason" => "emergency"})
              |> json_response(200)
   end
@@ -70,7 +81,12 @@ defmodule LiddrWeb.RideCancellationIntegrityControllerTest do
              "data" => %{
                "ride" => %{
                  "status" => "cancelled",
-                 "cancellation_reason_code" => "rider_changed_mind"
+                 "cancellation_reason_code" => "rider_changed_mind",
+                 "cancellation_outcome" => %{
+                   "chargeable" => false,
+                   "waiver_code" => "rider_free_cancel_window",
+                   "reason_code" => "rider_changed_mind"
+                 }
                }
              }
            } =
@@ -116,7 +132,18 @@ defmodule LiddrWeb.RideCancellationIntegrityControllerTest do
     %{"data" => %{"ride" => %{"id" => ride_id}, "offers" => [%{"id" => _offer_id}]}} =
       request_and_accept_ride!(rider_conn, driver_conn, category_id)
 
-    assert %{"data" => %{"ride" => %{"status" => "cancelled"}}} =
+    assert %{
+             "data" => %{
+               "ride" => %{
+                 "status" => "cancelled",
+                 "cancellation_outcome" => %{
+                   "chargeable" => true,
+                   "reason_code" => "cannot_contact_rider",
+                   "action" => %{"type" => "driver_temporary_suspension"}
+                 }
+               }
+             }
+           } =
              post(driver_conn, "/api/rides/#{ride_id}/driver-cancel", %{
                "reason" => "cannot_contact_rider"
              })

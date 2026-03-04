@@ -17,6 +17,9 @@ defmodule LiddrWeb.AuthController do
     challenge_rate_limited:
       {:too_many_requests, "CHALLENGE_RATE_LIMITED",
        "Please wait before requesting another challenge"},
+    otp_delivery_unavailable:
+      {:service_unavailable, "OTP_DELIVERY_UNAVAILABLE",
+       "OTP delivery is temporarily unavailable"},
     missing_challenge_id:
       {:unprocessable_entity, "MISSING_CHALLENGE_ID", "challenge_id is required for verification"},
     missing_code: {:unprocessable_entity, "MISSING_CODE", "code is required for verification"},

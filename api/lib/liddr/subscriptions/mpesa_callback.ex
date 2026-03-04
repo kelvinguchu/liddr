@@ -16,14 +16,14 @@ defmodule Liddr.Subscriptions.MpesaCallback do
 
   def callback_token_transport do
     case normalize_text(System.get_env("MPESA_CALLBACK_TOKEN_TRANSPORT")) do
-      nil -> "query_or_header"
+      nil -> "header"
       value -> String.downcase(value)
     end
     |> case do
       "header" -> "header"
       "query_or_header" -> "query_or_header"
       "query" -> "query"
-      _ -> "query_or_header"
+      _ -> "header"
     end
   end
 

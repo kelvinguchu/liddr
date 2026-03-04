@@ -107,7 +107,18 @@ defmodule LiddrWeb.RideExecutionControllerTest do
 
     _ = post(driver_conn, "/api/rides/offers/#{offer_id}/accept", %{}) |> json_response(200)
 
-    assert %{"data" => %{"ride" => %{"id" => ^ride_id, "status" => "cancelled"}}} =
+    assert %{
+             "data" => %{
+               "ride" => %{
+                 "id" => ^ride_id,
+                 "status" => "cancelled",
+                 "cancellation_outcome" => %{
+                   "chargeable" => false,
+                   "waiver_code" => "rider_free_cancel_window"
+                 }
+               }
+             }
+           } =
              post(rider_conn, "/api/rides/#{ride_id}/cancel", %{"reason" => "rider_changed_mind"})
              |> json_response(200)
 
@@ -165,7 +176,17 @@ defmodule LiddrWeb.RideExecutionControllerTest do
         set: [arrived_at: arrived_at]
       )
 
-    assert %{"data" => %{"ride" => %{"status" => "cancelled"}}} =
+    assert %{
+             "data" => %{
+               "ride" => %{
+                 "status" => "cancelled",
+                 "cancellation_outcome" => %{
+                   "chargeable" => true,
+                   "reason_code" => "rider_no_show"
+                 }
+               }
+             }
+           } =
              post(driver_conn, "/api/rides/#{ride_id}/no-show", %{}) |> json_response(200)
   end
 

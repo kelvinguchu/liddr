@@ -1,11 +1,15 @@
 defmodule LiddrWeb.RideSerializer do
+  alias Liddr.Rides.CancellationOutcome
   alias Liddr.Ratings.Snapshot
 
   def quote_payload(quote) do
+    product_type = provider_value(quote, "product_type") || "solo"
+
     %{
       id: quote.id,
       rider_id: quote.rider_id,
       vehicle_category_id: quote.vehicle_category_id,
+      product_type: product_type,
       pickup: %{lat: quote.pickup_lat, lng: quote.pickup_lng},
       dropoff: %{lat: quote.dropoff_lat, lng: quote.dropoff_lng},
       route: %{
@@ -29,6 +33,7 @@ defmodule LiddrWeb.RideSerializer do
         demand_ratio: provider_value(quote, "demand_ratio"),
         available_driver_count: provider_value(quote, "available_driver_count"),
         active_request_count: provider_value(quote, "active_request_count"),
+        shared_pricing: provider_value(quote, "shared_pricing"),
         subtotal_kes: quote.subtotal_kes,
         base_fare_kes: quote.base_fare_kes,
         discount_percent: quote.discount_percent,
@@ -48,11 +53,16 @@ defmodule LiddrWeb.RideSerializer do
         payload.ride.driver_id | Enum.map(payload.offers, & &1.driver_id)
       ])
 
-    %{
+    base = %{
       ride: ride_payload(payload.ride, snapshot_index),
       offers: Enum.map(payload.offers, &offer_payload(&1, snapshot_index, payload.ride.rider_id)),
       offers_count: length(payload.offers)
     }
+
+    case Map.get(payload, :shared_join) do
+      %{} = shared_join -> Map.put(base, :shared_join, shared_join)
+      _ -> base
+    end
   end
 
   def accept_payload(payload) do
@@ -119,6 +129,7 @@ defmodule LiddrWeb.RideSerializer do
       completion_distance_m: ride.completion_distance_m,
       cancelled_at: ride.cancelled_at,
       cancellation_reason_code: ride.cancellation_reason_code,
+      cancellation_outcome: CancellationOutcome.from_ride(ride),
       cancelled_by_user_id: ride.cancelled_by_user_id,
       no_show_marked_at: ride.no_show_marked_at,
       completed_at: ride.completed_at,

@@ -94,6 +94,14 @@ parse_float_env = fn value, default, min, max ->
   if parsed < min or parsed > max, do: default, else: parsed
 end
 
+push_client =
+  case String.downcase(System.get_env("RIDE_PUSH_CLIENT") || "fcm") do
+    "noop" -> Liddr.Rides.PushClient.Noop
+    _ -> Liddr.Rides.PushClient.FCM
+  end
+
+config :liddr, :ride_push_client, push_client
+
 config :liddr, Liddr.Location.Redis, url: System.get_env("REDIS_URL")
 
 config :liddr, Liddr.Location.Cells,
@@ -106,6 +114,21 @@ config :liddr, Liddr.Location.SupplyIndex,
     parse_int_env.(System.get_env("RIDE_SUPPLY_DRIVER_TTL_SECONDS"), 180, 30, 86_400),
   lookup_cell_limit:
     parse_int_env.(System.get_env("RIDE_SUPPLY_LOOKUP_CELL_LIMIT"), 225, 9, 2_500)
+
+config :liddr, Liddr.Auth.ChallengeRateLimiter,
+  cooldown_seconds: parse_int_env.(System.get_env("AUTH_CHALLENGE_COOLDOWN_SECONDS"), 30, 1, 900),
+  identity_window_seconds:
+    parse_int_env.(System.get_env("AUTH_CHALLENGE_IDENTITY_WINDOW_SECONDS"), 900, 60, 86_400),
+  identity_max_requests:
+    parse_int_env.(System.get_env("AUTH_CHALLENGE_IDENTITY_MAX_REQUESTS"), 5, 1, 500),
+  ip_window_seconds:
+    parse_int_env.(System.get_env("AUTH_CHALLENGE_IP_WINDOW_SECONDS"), 900, 60, 86_400),
+  ip_max_requests:
+    parse_int_env.(System.get_env("AUTH_CHALLENGE_IP_MAX_REQUESTS"), 60, 1, 10_000),
+  device_window_seconds:
+    parse_int_env.(System.get_env("AUTH_CHALLENGE_DEVICE_WINDOW_SECONDS"), 900, 60, 86_400),
+  device_max_requests:
+    parse_int_env.(System.get_env("AUTH_CHALLENGE_DEVICE_MAX_REQUESTS"), 40, 1, 10_000)
 
 parse_csv_env = fn value ->
   case value do
@@ -252,6 +275,38 @@ config :liddr, Liddr.Rides.Integrity.Policy,
     parse_int_env.(System.get_env("RIDE_PICKUP_AUTO_CANCEL_MIN_REASSIGN_COUNT"), 1, 0, 10),
   pickup_watchdog_limit:
     parse_int_env.(System.get_env("RIDE_PICKUP_WATCHDOG_LIMIT"), 100, 1, 1_000)
+
+config :liddr, Liddr.Rides.SharedRides.DetourGuard,
+  max_extra_detour_m:
+    parse_float_env.(System.get_env("RIDE_SHARED_MAX_EXTRA_DETOUR_M"), 2_000.0, 100.0, 20_000.0),
+  max_extra_detour_ratio:
+    parse_float_env.(
+      System.get_env("RIDE_SHARED_MAX_EXTRA_DETOUR_RATIO"),
+      0.6,
+      0.05,
+      5.0
+    )
+
+config :liddr, Liddr.Rides.SharedRides.StopEta,
+  google_enabled: parse_bool_env.(System.get_env("RIDE_SHARED_ETA_GOOGLE_ENABLED"), false),
+  fallback_speed_kph:
+    parse_float_env.(System.get_env("RIDE_SHARED_ETA_FALLBACK_SPEED_KPH"), 28.0, 5.0, 120.0),
+  min_leg_seconds:
+    parse_int_env.(System.get_env("RIDE_SHARED_ETA_MIN_LEG_SECONDS"), 60, 5, 3_600),
+  max_leg_seconds:
+    parse_int_env.(System.get_env("RIDE_SHARED_ETA_MAX_LEG_SECONDS"), 7_200, 60, 21_600)
+
+config :liddr, Liddr.Rides.SharedRides.LocationEtaRefresh,
+  min_interval_seconds:
+    parse_int_env.(
+      System.get_env("RIDE_SHARED_ETA_REFRESH_MIN_INTERVAL_SECONDS"),
+      15,
+      1,
+      300
+    )
+
+config :liddr, Liddr.Rides.PushClient.FCM,
+  timeout_ms: parse_int_env.(System.get_env("FCM_TIMEOUT_MS"), 10_000, 1_000, 60_000)
 
 config :liddr, Liddr.Ratings.Policy,
   rating_window_hours: parse_int_env.(System.get_env("RATING_WINDOW_HOURS"), 24, 1, 168),

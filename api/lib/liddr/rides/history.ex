@@ -3,18 +3,18 @@ defmodule Liddr.Rides.History do
 
   alias Liddr.Repo
   alias Liddr.Rides.Ride
+  alias Liddr.Rides.SharedRides.Access
   alias Liddr.Subscriptions.PaymentUtils
 
   def rider_history(rider_user_id, attrs \\ %{}) do
     limit = resolve_limit(attrs)
 
     rides =
-      Repo.all(
-        from r in Ride,
-          where: r.rider_id == ^rider_user_id,
-          order_by: [desc: r.inserted_at],
-          limit: ^limit
-      )
+      Ride
+      |> Access.rider_scope(rider_user_id)
+      |> order_by([r], desc: r.inserted_at)
+      |> limit(^limit)
+      |> Repo.all()
 
     {:ok, rides}
   end

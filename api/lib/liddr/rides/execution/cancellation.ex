@@ -1,5 +1,6 @@
 defmodule Liddr.Rides.Execution.Cancellation do
   alias Liddr.Location
+  alias Liddr.Rides.CancellationOutcome
   alias Liddr.Rides.Events
   alias Liddr.Rides.Execution.Geofence
   alias Liddr.Rides.Execution.GeoPolicy
@@ -47,6 +48,9 @@ defmodule Liddr.Rides.Execution.Cancellation do
               integrity = Classifier.classify_rider_cancel(ride, reason, now)
               cancelled_ride = cancel_ride!(ride, "rider", reason, now, integrity)
               enforcement = Enforcement.apply_after_cancellation!(cancelled_ride, integrity, now)
+
+              cancelled_ride =
+                persist_cancellation_outcome!(cancelled_ride, integrity, enforcement)
 
               _ =
                 record_cancel_event(cancelled_ride.id, now, rider_user_id, %{
@@ -118,6 +122,9 @@ defmodule Liddr.Rides.Execution.Cancellation do
               integrity = Classifier.classify_driver_cancel(ride, reason, now)
               cancelled_ride = cancel_ride!(ride, "driver", reason, now, integrity)
               enforcement = Enforcement.apply_after_cancellation!(cancelled_ride, integrity, now)
+
+              cancelled_ride =
+                persist_cancellation_outcome!(cancelled_ride, integrity, enforcement)
 
               _ =
                 record_cancel_event(cancelled_ride.id, now, driver_user_id, %{
@@ -196,6 +203,9 @@ defmodule Liddr.Rides.Execution.Cancellation do
               integrity = Classifier.classify_rider_no_show(ride, now, no_show_signals)
               cancelled_ride = cancel_ride!(ride, "driver", reason, now, integrity)
               enforcement = Enforcement.apply_after_cancellation!(cancelled_ride, integrity, now)
+
+              cancelled_ride =
+                persist_cancellation_outcome!(cancelled_ride, integrity, enforcement)
 
               _ =
                 record_cancel_event(cancelled_ride.id, now, driver_user_id, %{
@@ -299,6 +309,11 @@ defmodule Liddr.Rides.Execution.Cancellation do
       "no_show_marked_at" => if(reason == @rider_no_show_reason_code, do: now, else: nil),
       "metadata" => metadata
     })
+  end
+
+  defp persist_cancellation_outcome!(ride, integrity, enforcement) do
+    metadata = CancellationOutcome.enrich_metadata(ride.metadata, integrity, enforcement)
+    Shared.update_ride!(ride, %{"metadata" => metadata})
   end
 
   defp actor_user_id("rider", ride), do: ride.rider_id

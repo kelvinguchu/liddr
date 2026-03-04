@@ -1,8 +1,9 @@
 package com.liddr.app.ui.launch
 
 import androidx.compose.ui.graphics.vector.ImageVector
+import compose.icons.SimpleIcons
 import compose.icons.TablerIcons
-import compose.icons.tablericons.BrandApple
+import compose.icons.simpleicons.Apple
 import compose.icons.tablericons.BrandGoogle
 import compose.icons.tablericons.Lock
 import compose.icons.tablericons.Mail
@@ -38,7 +39,7 @@ val allOnboardingMethods =
                 ),
                 AuthMethodUi(
                         method = "email_password",
-                        label = "Email & password",
+                        label = "Email & Password",
                         icon = TablerIcons.Lock
                 ),
                 AuthMethodUi(
@@ -50,7 +51,7 @@ val allOnboardingMethods =
                 AuthMethodUi(
                         method = "apple",
                         label = "Apple",
-                        icon = TablerIcons.BrandApple,
+                        icon = SimpleIcons.Apple,
                         allowedRoles = setOf(AccountRoleUi.RIDER)
                 )
         )

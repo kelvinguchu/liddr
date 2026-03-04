@@ -114,7 +114,7 @@ defmodule LiddrWeb.SubscriptionOpsController do
     do:
       error_response(
         conn,
-        :unprocessable_entity,
+        :service_unavailable,
         "MISSING_CALLBACK_TOKEN_CONFIG",
         "MPESA_CALLBACK_TOKEN is not configured"
       )

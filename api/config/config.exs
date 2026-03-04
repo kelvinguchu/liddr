@@ -12,8 +12,72 @@ config :liddr,
   generators: [timestamp_type: :utc_datetime]
 
 config :liddr, :mpesa_client, Liddr.Payments.Mpesa.Client
+config :liddr, :google_routes_client, Liddr.Maps.RoutesClient
+config :liddr, :ride_market_multiplier, Liddr.Rides.MarketMultiplier
 config :liddr, :auth_debug_otp, false
 config :liddr, :auth_debug_otp_targets, []
+config :liddr, :ride_supply_index, Liddr.Location.SupplyIndex
+
+config :liddr, Liddr.Location.Cells, cell_size_deg: 0.01
+
+config :liddr, Liddr.Location.SupplyIndex,
+  zone_ttl_seconds: 180,
+  driver_ttl_seconds: 180,
+  lookup_cell_limit: 225
+
+config :liddr, Liddr.Rides.Execution.GeoPolicy,
+  pickup_arrival_radius_m: 120,
+  dropoff_completion_radius_m: 180,
+  location_freshness_seconds: 120,
+  no_show_wait_seconds: 300,
+  require_geofence_on_arrive: true,
+  require_geofence_on_complete: true
+
+config :liddr, Liddr.Rides.Integrity.Policy,
+  rolling_window_days: 7,
+  rider_chargeable_threshold: 5,
+  rider_chargeable_escalation_threshold: 8,
+  rider_prepay_only_days: 7,
+  rider_prepay_only_escalation_days: 14,
+  driver_chargeable_threshold: 5,
+  driver_chargeable_escalation_threshold: 8,
+  driver_temp_suspension_days: 1,
+  driver_temp_suspension_escalation_days: 3,
+  rider_free_cancel_grace_seconds: 120,
+  rider_driver_late_waiver_seconds: 300,
+  rider_driver_location_stale_seconds: 120,
+  rider_no_progress_elapsed_seconds: 180,
+  rider_no_progress_delta_m: 100,
+  rider_moving_away_elapsed_seconds: 120,
+  rider_moving_away_delta_m: 300,
+  rider_pickup_far_distance_m: 2_000,
+  rider_prepay_payment_mode: "in_app_mpesa",
+  pickup_auto_reassign_enabled: true,
+  pickup_auto_reassign_after_seconds: 420,
+  pickup_auto_cancel_enabled: true,
+  pickup_auto_cancel_after_seconds: 900,
+  pickup_auto_cancel_min_reassign_count: 1,
+  pickup_watchdog_limit: 100
+
+config :liddr, Liddr.Rides.NotificationRetry,
+  limit: 100,
+  max_attempts: 3,
+  retry_interval_seconds: 30
+
+config :liddr, Liddr.Ratings.Policy,
+  rating_window_hours: 24,
+  rating_decay_per_day: 0.01,
+  smoothing_prior_mean: 4.8,
+  smoothing_prior_weight: 20,
+  enforcement_recent_window_days: 30,
+  enforcement_min_recent_ratings: 20,
+  non_attributable_reason_tags: [
+    "traffic",
+    "app_issue",
+    "gps_issue",
+    "wrong_pickup_pin",
+    "co_rider_behavior"
+  ]
 
 config :liddr, Liddr.Subscriptions.ReconciliationPolicy,
   limit: 50,
@@ -58,6 +122,9 @@ config :liddr, Oban,
        {"*/5 * * * *", Liddr.Subscriptions.ReconciliationWorker},
        {"*/15 * * * *", Liddr.Subscriptions.MonitorWorker},
        {"*/5 * * * *", Liddr.Moderation.EnforcementLifecycleWorker},
+       {"*/10 * * * *", Liddr.Rides.Integrity.ModeLifecycleWorker},
+       {"* * * * *", Liddr.Rides.PickupWatchdogWorker},
+       {"* * * * *", Liddr.Rides.NotificationRetryWorker},
        {"30 1 * * *", Liddr.Verification.ExpiryMonitorWorker}
      ]}
   ],

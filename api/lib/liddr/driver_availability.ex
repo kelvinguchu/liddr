@@ -4,28 +4,43 @@ defmodule Liddr.DriverAvailability do
   import Ecto.Query
 
   alias Liddr.Accounts.Driver
+  alias Liddr.Location
   alias Liddr.Repo
   alias Liddr.Verification.DriverActivityEvent
 
   def go_online(driver_user_id) do
     now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
 
-    Repo.transaction(fn ->
-      driver = fetch_driver_for_update!(driver_user_id)
-      ensure_driver_online_eligible!(driver)
-      update_driver_availability!(driver, true, now)
-    end)
-    |> unwrap_transaction_result()
+    case Repo.transaction(fn ->
+           driver = fetch_driver_for_update!(driver_user_id)
+           ensure_driver_online_eligible!(driver)
+           update_driver_availability!(driver, true, now)
+         end)
+         |> unwrap_transaction_result() do
+      {:ok, driver} = ok ->
+        _ = Location.sync_driver_supply(driver.user_id)
+        ok
+
+      error ->
+        error
+    end
   end
 
   def go_offline(driver_user_id) do
     now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
 
-    Repo.transaction(fn ->
-      driver = fetch_driver_for_update!(driver_user_id)
-      update_driver_availability!(driver, false, now)
-    end)
-    |> unwrap_transaction_result()
+    case Repo.transaction(fn ->
+           driver = fetch_driver_for_update!(driver_user_id)
+           update_driver_availability!(driver, false, now)
+         end)
+         |> unwrap_transaction_result() do
+      {:ok, driver} = ok ->
+        _ = Location.remove_driver_from_supply(driver.user_id)
+        ok
+
+      error ->
+        error
+    end
   end
 
   defp fetch_driver_for_update!(driver_user_id) do
@@ -47,6 +62,9 @@ defmodule Liddr.DriverAvailability do
       driver.subscription_status != "active" ->
         Repo.rollback(:driver_subscription_not_active)
 
+      not is_nil(driver.current_ride_id) ->
+        Repo.rollback(:driver_has_active_ride)
+
       true ->
         :ok
     end
@@ -59,6 +77,7 @@ defmodule Liddr.DriverAvailability do
     attrs =
       %{
         "is_available" => is_available,
+        "dispatch_status" => if(is_available, do: "idle", else: driver.dispatch_status || "idle"),
         "last_seen_at" => now
       }
       |> maybe_put_last_online_at(is_available, now, driver.last_online_at)

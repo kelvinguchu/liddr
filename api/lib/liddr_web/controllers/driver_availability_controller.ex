@@ -35,6 +35,8 @@ defmodule LiddrWeb.DriverAvailabilityController do
       account_status: driver.account_status,
       verification_status: driver.verification_status,
       is_available: driver.is_available,
+      dispatch_status: driver.dispatch_status,
+      current_ride_id: driver.current_ride_id,
       last_online_at: driver.last_online_at,
       last_seen_at: driver.last_seen_at
     }
@@ -74,6 +76,15 @@ defmodule LiddrWeb.DriverAvailabilityController do
         :forbidden,
         "DRIVER_SUBSCRIPTION_NOT_ACTIVE",
         "Driver subscription must be active before going online"
+      )
+
+  defp render_error(conn, :driver_has_active_ride),
+    do:
+      error_response(
+        conn,
+        :forbidden,
+        "DRIVER_HAS_ACTIVE_RIDE",
+        "Driver cannot go online while an active ride is in progress"
       )
 
   defp render_error(conn, %Changeset{} = changeset) do

@@ -15,6 +15,7 @@ defmodule LiddrWeb.AuthControllerTest do
     assert %{"data" => %{"methods" => methods}} = json_response(conn, 200)
     assert Enum.any?(methods, fn method -> method["method"] == "phone_otp" end)
     assert Enum.any?(methods, fn method -> method["method"] == "google" end)
+    refute Enum.any?(methods, fn method -> method["method"] == "email_password" end)
   end
 
   test "POST /api/auth/register/rider creates passenger identity and rider role", %{conn: conn} do

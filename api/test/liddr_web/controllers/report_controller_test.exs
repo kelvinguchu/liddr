@@ -17,7 +17,23 @@ defmodule LiddrWeb.ReportControllerTest do
     assert %{"data" => %{"categories" => categories}} = json_response(conn, 200)
     slugs = Enum.map(categories, & &1["slug"])
 
-    assert slugs == ["driver_only", "both_scope"]
+    assert "driver_only" in slugs
+    assert "both_scope" in slugs
+    refute "inactive_driver" in slugs
+    refute "passenger_only" in slugs
+  end
+
+  test "GET /api/reports/categories treats applies_to=rider as passenger", %{conn: conn} do
+    insert_category!("passenger_only", "passenger", true, 10)
+    insert_category!("driver_only", "driver", true, 20)
+
+    conn = get(conn, "/api/reports/categories?applies_to=rider")
+
+    assert %{"data" => %{"categories" => categories}} = json_response(conn, 200)
+    slugs = Enum.map(categories, & &1["slug"])
+
+    assert "passenger_only" in slugs
+    refute "driver_only" in slugs
   end
 
   test "POST /api/reports requires bearer token", %{conn: conn} do

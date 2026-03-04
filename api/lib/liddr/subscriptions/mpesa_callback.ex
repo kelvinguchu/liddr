@@ -5,30 +5,25 @@ defmodule Liddr.Subscriptions.MpesaCallback do
   @tx_status_callback_path "/api/payments/tx-status-callback"
 
   def verify_callback_token(token) do
-    expected =
-      System.get_env("MPESA_CALLBACK_TOKEN") || System.get_env("MPESA_REGISTER_TOKEN")
-
-    case normalize_text(expected) do
-      nil ->
+    with {:ok, expected} <- fetch_callback_token() do
+      if normalize_text(token) == expected do
         :ok
-
-      expected_value ->
-        if normalize_text(token) == expected_value,
-          do: :ok,
-          else: {:error, :invalid_callback_token}
+      else
+        {:error, :invalid_callback_token}
+      end
     end
   end
 
   def callback_token_transport do
     case normalize_text(System.get_env("MPESA_CALLBACK_TOKEN_TRANSPORT")) do
-      nil -> "query"
+      nil -> "query_or_header"
       value -> String.downcase(value)
     end
     |> case do
       "header" -> "header"
       "query_or_header" -> "query_or_header"
       "query" -> "query"
-      _ -> "query"
+      _ -> "query_or_header"
     end
   end
 
@@ -70,18 +65,19 @@ defmodule Liddr.Subscriptions.MpesaCallback do
   end
 
   def callback_url_for_path(path) when is_binary(path) do
-    with {:ok, base} <- callback_base_url() do
+    with {:ok, base} <- callback_base_url(),
+         {:ok, token} <- fetch_callback_token() do
       url = String.trim_trailing(base, "/") <> path
 
-      token =
-        normalize_text(
-          System.get_env("MPESA_CALLBACK_TOKEN") || System.get_env("MPESA_REGISTER_TOKEN")
-        )
+      case callback_token_transport() do
+        "header" ->
+          {:ok, url}
 
-      case {token, callback_token_transport()} do
-        {nil, _transport} -> {:ok, url}
-        {_token, "header"} -> {:ok, url}
-        {value, _transport} -> {:ok, url <> "?token=" <> URI.encode_www_form(value)}
+        "query" ->
+          {:ok, url <> "?token=" <> URI.encode_www_form(token)}
+
+        "query_or_header" ->
+          {:ok, url <> "?token=" <> URI.encode_www_form(token)}
       end
     end
   end
@@ -92,6 +88,11 @@ defmodule Liddr.Subscriptions.MpesaCallback do
       |> normalize_text()
 
     if is_nil(base), do: {:error, :missing_mpesa_callback_base_url}, else: {:ok, base}
+  end
+
+  defp fetch_callback_token do
+    token = System.get_env("MPESA_CALLBACK_TOKEN") |> normalize_text()
+    if is_nil(token), do: {:error, :missing_callback_token_config}, else: {:ok, token}
   end
 
   defp get_value(attrs, key) when is_map(attrs),

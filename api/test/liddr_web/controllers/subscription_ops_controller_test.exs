@@ -65,11 +65,15 @@ defmodule LiddrWeb.SubscriptionOpsControllerTest do
     previous_security_mode = System.get_env("SECURITY_MODE")
     previous_ops_ip_allowlist = System.get_env("OPS_IP_ALLOWLIST")
     previous_callback_base_url = System.get_env("MPESA_CALLBACK_BASE_URL")
+    previous_callback_token = System.get_env("MPESA_CALLBACK_TOKEN")
+    previous_callback_transport = System.get_env("MPESA_CALLBACK_TOKEN_TRANSPORT")
 
     Application.put_env(:liddr, :mpesa_client, FakeOpsMpesaClient)
     System.put_env("SECURITY_MODE", "observe")
     System.delete_env("OPS_IP_ALLOWLIST")
     System.put_env("MPESA_CALLBACK_BASE_URL", "https://api.example.com")
+    System.put_env("MPESA_CALLBACK_TOKEN", "ops-callback-token")
+    System.put_env("MPESA_CALLBACK_TOKEN_TRANSPORT", "query_or_header")
 
     on_exit(fn ->
       if previous_client do
@@ -81,6 +85,8 @@ defmodule LiddrWeb.SubscriptionOpsControllerTest do
       restore_env("SECURITY_MODE", previous_security_mode)
       restore_env("OPS_IP_ALLOWLIST", previous_ops_ip_allowlist)
       restore_env("MPESA_CALLBACK_BASE_URL", previous_callback_base_url)
+      restore_env("MPESA_CALLBACK_TOKEN", previous_callback_token)
+      restore_env("MPESA_CALLBACK_TOKEN_TRANSPORT", previous_callback_transport)
     end)
 
     :ok

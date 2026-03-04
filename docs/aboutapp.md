@@ -1,6 +1,6 @@
 SYSTEM DESIGN DOCUMENT
 Liddr — Ride & Delivery Platform
-Kenya Market | Version 1.1
+Kenya Market | Version 1.3
 
 
 1. Product Overview
@@ -66,21 +66,12 @@ The benefit is not technical — it is operational. One git repository, one plac
 
 2.3 Full Repository Structure
 liddr/                                ← monorepo root
-  ├── api/                            ← Elixir/Phoenix backend (Umbrella app)
-  │     ├── apps/
-  │     │     ├── liddr_web/          ← Phoenix — HTTP endpoints, Channels, Presence
-  │     │     ├── liddr_auth/         ← OTP/Google Sign-In, JWT, sessions
-  │     │     ├── liddr_rides/        ← ride & delivery lifecycle, state machine
-  │     │     ├── liddr_dispatch/     ← category-aware matching engine
-  │     │     ├── liddr_pricing/      ← dynamic fare calculation, surge engine
-  │     │     ├── liddr_location/     ← GPS ingestion, S2 cells, Redis writes
-  │     │     ├── liddr_payments/     ← Daraja M-Pesa wrapper, subscriptions
-  │     │     ├── liddr_notifications/← FCM push, Africa's Talking SMS
-  │     │     ├── liddr_verification/ ← KYC pipeline, document AI, review queue
-  │     │     ├── liddr_categories/   ← vehicle category registry and config
-  │     │     ├── liddr_send/         ← delivery flow, prohibited items
-  │     │     └── liddr_ratings/      ← weighted scores, manipulation detection
-  │     ├── config/
+  ├── api/                            ← Elixir/Phoenix backend (single app)
+  │     ├── lib/
+  │     │     ├── liddr_web/          ← Phoenix HTTP endpoints, Channels, Plugs
+  │     │     └── liddr/              ← Domain modules (rides, auth, ratings, verification, etc.)
+  │     ├── priv/repo/migrations/     ← PostgreSQL schema migrations
+  │     ├── config/                   ← Runtime + env configuration
   │     ├── mix.exs                   ← Elixir project root
   │     └── README.md
   │
@@ -194,7 +185,7 @@ verification	KYC document pipeline, AI checks, human review queue, vehicle valid
 4. Data Flow: Full Ride Lifecycle
 Step 1 — Passenger Opens App
 •	App opens WebSocket connection to Location Service
-•	Passenger's H3 cell ID is calculated from their GPS coordinates
+•	Passenger's S2 cell ID is calculated from their GPS coordinates
 •	Nearby available drivers fetched from Redis using cell ID — not PostgreSQL
 •	Driver markers rendered on map in real time
 
@@ -208,7 +199,7 @@ Step 2 — Passenger Requests Ride
 
 Step 3 — Dispatch Engine Activates
 •	Ride record created in PostgreSQL with status: PENDING
-•	Request pushed to Redis matching queue for that H3 zone
+•	Request pushed to Redis matching queue for that S2 zone
 •	Dispatch Engine queries Redis for available drivers within radius
 •	Drivers ranked by actual road ETA (not straight-line distance)
 •	Ride request notification sent to closest driver first
@@ -992,57 +983,60 @@ Recalculation
 This section is the source of truth between the backend and both mobile platforms. Every endpoint, WebSocket channel, and request/response shape is defined here. Mobile engineers build against this contract — not against assumptions or reverse-engineered behaviour. When the contract changes, this document is updated first.
 
 27.1 Base URL & Versioning
-Production:   https://api.liddr.app/v1
-Staging:      https://api-staging.liddr.app/v1
-Local:        http://localhost:4000/v1
-All endpoints are versioned under /v1 from day one. This allows breaking changes in future versions without forcing all clients to update simultaneously.
+Production:   https://api.liddr.app/api
+Staging:      https://api-staging.liddr.app/api
+Local:        http://localhost:4000/api
+Current backend routes are mounted under /api.
 
 27.2 Authentication
 All protected endpoints require a Bearer token in the Authorization header:
 Authorization: Bearer <jwt_token>
-Tokens expire after 24 hours. Clients must refresh using the refresh token endpoint. Unauthenticated requests return HTTP 401.
+Access tokens expire after 15 minutes. Refresh tokens are rotated and expire after 30 days. Unauthenticated requests return HTTP 401.
 
 27.3 Standard Response Shape
-All API responses follow a consistent envelope:
+All API responses use a JSON envelope:
 // Success
 {
-  "data": { ... },
-  "meta": { "timestamp": "2025-01-01T00:00:00Z" }
+  "data": { ... }
 }
 
 // Error
 {
   "error": {
     "code": "RIDE_NOT_FOUND",
-    "message": "The requested ride does not exist",
-    "field": null
+    "message": "The requested ride does not exist"
   }
 }
 
 27.4 Auth Endpoints
 Method	Endpoint	Description	Auth Required
-POST	/auth/driver/request-otp	Send OTP to driver phone number	No
-POST	/auth/driver/verify-otp	Verify OTP, returns JWT + refresh token	No
-POST	/auth/passenger/google	Exchange Google ID token for JWT	No
+GET	/auth/methods	List supported auth methods	No
+POST	/auth/register/rider	Register rider identity	No
+POST	/auth/register/driver	Register driver identity	No
+POST	/auth/challenges	Request OTP/auth challenge	No
+POST	/auth/challenges/verify	Verify challenge and create session	No
 POST	/auth/refresh	Refresh expired JWT using refresh token	No
-DELETE	/auth/logout	Invalidate current session	Yes
+POST	/auth/logout	Invalidate current session	No (requires refresh token payload)
 
 27.5 Ride Endpoints
 Method	Endpoint	Description	Auth Required
-POST	/rides	Create a new ride request	Yes — Passenger
-GET	/rides/:id	Get ride details by ID	Yes
-PATCH	/rides/:id/cancel	Cancel a ride	Yes
-POST	/rides/:id/rate	Submit rating after completion	Yes
-GET	/rides/history	Paginated ride history for current user	Yes
+POST	/rides/quote	Quote fare before booking	Yes — Rider
+POST	/rides/requests	Create a new ride request	Yes — Rider
+POST	/rides/:ride_id/cancel	Rider cancel before trip start	Yes — Rider
+GET	/rides/history/rider	Rider ride history	Yes — Rider
+GET	/rides/history/driver	Driver ride history	Yes — Driver
+GET	/rides/:ride_id	Get ride details	Yes — Rider/Driver
+POST	/rides/:ride_id/rate	Submit rating after completion	Yes — Rider/Driver
+POST	/rides/:ride_id/rate/skip	Skip rating action	Yes — Rider/Driver
 
 27.6 Driver Endpoints
 Method	Endpoint	Description	Auth Required
-GET	/drivers/me	Get current driver profile	Yes — Driver
-PATCH	/drivers/me	Update driver profile	Yes — Driver
 POST	/drivers/me/online	Go online — start receiving requests	Yes — Driver
 POST	/drivers/me/offline	Go offline	Yes — Driver
-GET	/drivers/me/earnings	Weekly earnings summary	Yes — Driver
-GET	/drivers/:id	Get public driver profile (for passenger)	Yes
+POST	/drivers/me/location	Upsert latest driver GPS point	Yes — Driver
+GET	/rides/offers	List active ride offers	Yes — Driver
+POST	/rides/offers/:offer_id/accept	Accept ride offer	Yes — Driver
+POST	/rides/offers/:offer_id/reject	Reject ride offer	Yes — Driver
 
 27.7 Subscription Endpoints
 Method	Endpoint	Description	Auth Required
@@ -1051,14 +1045,13 @@ POST	/subscriptions/pay	Initiate M-Pesa STK Push for subscription	Yes — Driver
 GET	/subscriptions/me/history	Past subscription payments	Yes — Driver
 
 27.8 Send (Delivery) Endpoints
-Method	Endpoint	Description	Auth Required
-POST	/send	Create a delivery request	Yes — Passenger
-GET	/send/:id	Get delivery details	Yes
-POST	/send/:id/confirm-delivery	Recipient confirms delivery via SMS link	No — token-based
-PATCH	/send/:id/cancel	Cancel delivery (sender only, before pickup)	Yes — Passenger
+The dedicated /send route family is planned but not yet exposed in the current API router.
+Send/delivery behavior is currently represented through ride/product-type flows.
 
 27.9 Verification Endpoints
 Method	Endpoint	Description	Auth Required
+POST	/verification/applications	Start verification application	Yes — Driver
+POST	/verification/uploads/presign	Request signed upload URL	Yes — Driver
 POST	/verification/documents	Upload KYC document	Yes — Driver
 GET	/verification/status	Get current verification status	Yes — Driver
 
@@ -1067,37 +1060,30 @@ WebSocket connection is established at:
 ws://localhost:4000/socket/websocket?token=<jwt_token>
 
 Channel	Who Joins	Events Sent	Events Received
-ride:{ride_id}	Passenger + Driver	ride_updated, driver_location, ride_completed, ride_cancelled	N/A — read only
-driver:lobby	Driver only	ride_offer (new request offered to driver)	accept_offer, reject_offer
-location:updates	Driver only	N/A	location_ping (GPS coordinates every 4s)
-user:{user_id}	Passenger + Driver	notification, subscription_expiring, account_suspended	N/A — read only
+ride:{ride_id}	Rider + Driver	ride lifecycle + timeline events	timeline.sync
+driver:{driver_id}	Driver only	offer + assignment + lifecycle events	none (unsupported)
+Driver location updates are sent via HTTP endpoint POST /drivers/me/location, not via a dedicated location socket topic.
 
 27.11 WebSocket Message Shapes
-// Driver sends location ping
+// Client requests missing timeline events after reconnect
 {
-  "topic": "location:updates",
-  "event": "location_ping",
+  "topic": "ride:12345",
+  "event": "timeline.sync",
   "payload": {
-    "lat": -1.2921,
-    "lng": 36.8219,
-    "bearing": 180,
-    "speed_kmh": 32,
-    "timestamp": "2025-01-01T08:00:00Z"
+    "since": "2025-01-01T08:00:00Z",
+    "limit": 100
   }
 }
 
-// Server pushes ride offer to driver
+// Server pushes new offer to specific driver topic
 {
-  "topic": "driver:lobby",
-  "event": "ride_offer",
+  "topic": "driver:42",
+  "event": "ride_offer_created",
   "payload": {
-    "ride_id": "rid_abc123",
-    "category": "motorbike",
-    "pickup": { "lat": -1.2900, "lng": 36.8200, "address": "Westlands, Nairobi" },
-    "dropoff": { "lat": -1.3000, "lng": 36.8300, "address": "CBD, Nairobi" },
-    "distance_km": 3.2,
-    "quoted_fare": 280,
-    "expires_in_seconds": 15
+    "ride": { "id": 12345, "status": "offering" },
+    "offer": { "id": 991, "status": "offered", "expires_at": "2025-01-01T08:00:15Z" },
+    "reason_code": "dispatch_offer_created",
+    "emitted_at": "2025-01-01T08:00:00Z"
   }
 }
 
@@ -1163,14 +1149,14 @@ config :liddr, :africastalking_api_key, "your_at_key"
 
 Android — android/local.properties (gitignored)
 MAPS_API_KEY=your_google_maps_key
-API_BASE_URL=http://10.0.2.2:4000/v1
+API_BASE_URL=http://10.0.2.2:4000/api
 WS_BASE_URL=ws://10.0.2.2:4000/socket/websocket
 
 Note: 10.0.2.2 is Android emulator's alias for localhost on the host machine.
 
 iOS — ios/Liddr/Config.xcconfig (gitignored)
 MAPS_API_KEY = your_google_maps_key
-API_BASE_URL = http://localhost:4000/v1
+API_BASE_URL = http://localhost:4000/api
 WS_BASE_URL = ws://localhost:4000/socket/websocket
 
 28.4 Running The Full Stack Locally
@@ -1302,14 +1288,7 @@ This document covers the full system design for Liddr v1.0. It should be treated
 
 Field	Value
 Product	Liddr
-Version	1.2
+Version	1.3
 Market	Kenya (Nairobi first)
 Target Launch	Phase 1 MVP
 Document Status	Draft — Active Development
-
-POSTGRES_DB=liddr_rides
-POSTGRES_USER=liddr_api
-POSTGRES_PASSWORD=
-DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-REDIS_PASSWORD=
-REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379

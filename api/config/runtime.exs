@@ -69,6 +69,44 @@ parse_bool_env = fn value, default ->
   end
 end
 
+parse_float_env = fn value, default, min, max ->
+  parsed =
+    case value do
+      nil ->
+        default
+
+      float when is_float(float) ->
+        float
+
+      int when is_integer(int) ->
+        int * 1.0
+
+      binary when is_binary(binary) ->
+        case Float.parse(String.trim(binary)) do
+          {float, ""} -> float
+          _ -> default
+        end
+
+      _ ->
+        default
+    end
+
+  if parsed < min or parsed > max, do: default, else: parsed
+end
+
+config :liddr, Liddr.Location.Redis, url: System.get_env("REDIS_URL")
+
+config :liddr, Liddr.Location.Cells,
+  cell_size_deg: parse_float_env.(System.get_env("RIDE_SUPPLY_CELL_SIZE_DEG"), 0.01, 0.001, 0.1)
+
+config :liddr, Liddr.Location.SupplyIndex,
+  zone_ttl_seconds:
+    parse_int_env.(System.get_env("RIDE_SUPPLY_ZONE_TTL_SECONDS"), 180, 30, 86_400),
+  driver_ttl_seconds:
+    parse_int_env.(System.get_env("RIDE_SUPPLY_DRIVER_TTL_SECONDS"), 180, 30, 86_400),
+  lookup_cell_limit:
+    parse_int_env.(System.get_env("RIDE_SUPPLY_LOOKUP_CELL_LIMIT"), 225, 9, 2_500)
+
 parse_csv_env = fn value ->
   case value do
     nil ->
@@ -99,6 +137,137 @@ config :liddr, Liddr.Subscriptions.ReconciliationPolicy,
     parse_backoff_env.(
       System.get_env("SUBSCRIPTION_RECON_BACKOFF_SECONDS"),
       [30, 60, 120, 180, 300]
+    )
+
+config :liddr, Liddr.Rides.Execution.GeoPolicy,
+  pickup_arrival_radius_m:
+    parse_int_env.(System.get_env("RIDE_PICKUP_ARRIVAL_RADIUS_M"), 120, 20, 2_000),
+  dropoff_completion_radius_m:
+    parse_int_env.(System.get_env("RIDE_DROPOFF_COMPLETION_RADIUS_M"), 180, 20, 2_000),
+  location_freshness_seconds:
+    parse_int_env.(System.get_env("RIDE_LOCATION_FRESHNESS_SECONDS"), 120, 10, 3_600),
+  no_show_wait_seconds:
+    parse_int_env.(System.get_env("RIDE_NO_SHOW_WAIT_SECONDS"), 300, 30, 3_600),
+  require_geofence_on_arrive:
+    parse_bool_env.(System.get_env("RIDE_REQUIRE_GEOFENCE_ON_ARRIVE"), true),
+  require_geofence_on_complete:
+    parse_bool_env.(System.get_env("RIDE_REQUIRE_GEOFENCE_ON_COMPLETE"), true)
+
+config :liddr, Liddr.Rides.Integrity.Policy,
+  rolling_window_days:
+    parse_int_env.(System.get_env("RIDE_INTEGRITY_ROLLING_WINDOW_DAYS"), 7, 1, 60),
+  rider_chargeable_threshold:
+    parse_int_env.(System.get_env("RIDE_INTEGRITY_RIDER_CHARGEABLE_THRESHOLD"), 5, 1, 20),
+  rider_chargeable_escalation_threshold:
+    parse_int_env.(
+      System.get_env("RIDE_INTEGRITY_RIDER_CHARGEABLE_ESCALATION_THRESHOLD"),
+      8,
+      1,
+      30
+    ),
+  rider_prepay_only_days:
+    parse_int_env.(System.get_env("RIDE_INTEGRITY_RIDER_PREPAY_ONLY_DAYS"), 7, 1, 60),
+  rider_prepay_only_escalation_days:
+    parse_int_env.(
+      System.get_env("RIDE_INTEGRITY_RIDER_PREPAY_ONLY_ESCALATION_DAYS"),
+      14,
+      1,
+      90
+    ),
+  driver_chargeable_threshold:
+    parse_int_env.(System.get_env("RIDE_INTEGRITY_DRIVER_CHARGEABLE_THRESHOLD"), 5, 1, 20),
+  driver_chargeable_escalation_threshold:
+    parse_int_env.(
+      System.get_env("RIDE_INTEGRITY_DRIVER_CHARGEABLE_ESCALATION_THRESHOLD"),
+      8,
+      1,
+      30
+    ),
+  driver_temp_suspension_days:
+    parse_int_env.(System.get_env("RIDE_INTEGRITY_DRIVER_TEMP_SUSPENSION_DAYS"), 1, 1, 60),
+  driver_temp_suspension_escalation_days:
+    parse_int_env.(
+      System.get_env("RIDE_INTEGRITY_DRIVER_TEMP_SUSPENSION_ESCALATION_DAYS"),
+      3,
+      1,
+      90
+    ),
+  rider_free_cancel_grace_seconds:
+    parse_int_env.(
+      System.get_env("RIDE_INTEGRITY_RIDER_FREE_CANCEL_GRACE_SECONDS"),
+      120,
+      0,
+      1_800
+    ),
+  rider_driver_late_waiver_seconds:
+    parse_int_env.(
+      System.get_env("RIDE_INTEGRITY_RIDER_DRIVER_LATE_WAIVER_SECONDS"),
+      300,
+      0,
+      7_200
+    ),
+  rider_driver_location_stale_seconds:
+    parse_int_env.(
+      System.get_env("RIDE_INTEGRITY_RIDER_DRIVER_LOCATION_STALE_SECONDS"),
+      120,
+      10,
+      3_600
+    ),
+  rider_no_progress_elapsed_seconds:
+    parse_int_env.(
+      System.get_env("RIDE_INTEGRITY_RIDER_NO_PROGRESS_ELAPSED_SECONDS"),
+      180,
+      10,
+      7_200
+    ),
+  rider_no_progress_delta_m:
+    parse_int_env.(System.get_env("RIDE_INTEGRITY_RIDER_NO_PROGRESS_DELTA_M"), 100, 10, 5_000),
+  rider_moving_away_elapsed_seconds:
+    parse_int_env.(
+      System.get_env("RIDE_INTEGRITY_RIDER_MOVING_AWAY_ELAPSED_SECONDS"),
+      120,
+      10,
+      7_200
+    ),
+  rider_moving_away_delta_m:
+    parse_int_env.(System.get_env("RIDE_INTEGRITY_RIDER_MOVING_AWAY_DELTA_M"), 300, 10, 5_000),
+  rider_pickup_far_distance_m:
+    parse_int_env.(
+      System.get_env("RIDE_INTEGRITY_RIDER_PICKUP_FAR_DISTANCE_M"),
+      2_000,
+      100,
+      20_000
+    ),
+  rider_prepay_payment_mode:
+    System.get_env("RIDE_INTEGRITY_RIDER_PREPAY_PAYMENT_MODE") || "in_app_mpesa",
+  pickup_auto_reassign_enabled:
+    parse_bool_env.(System.get_env("RIDE_PICKUP_AUTO_REASSIGN_ENABLED"), true),
+  pickup_auto_reassign_after_seconds:
+    parse_int_env.(System.get_env("RIDE_PICKUP_AUTO_REASSIGN_AFTER_SECONDS"), 420, 60, 7_200),
+  pickup_auto_cancel_enabled:
+    parse_bool_env.(System.get_env("RIDE_PICKUP_AUTO_CANCEL_ENABLED"), true),
+  pickup_auto_cancel_after_seconds:
+    parse_int_env.(System.get_env("RIDE_PICKUP_AUTO_CANCEL_AFTER_SECONDS"), 900, 120, 21_600),
+  pickup_auto_cancel_min_reassign_count:
+    parse_int_env.(System.get_env("RIDE_PICKUP_AUTO_CANCEL_MIN_REASSIGN_COUNT"), 1, 0, 10),
+  pickup_watchdog_limit:
+    parse_int_env.(System.get_env("RIDE_PICKUP_WATCHDOG_LIMIT"), 100, 1, 1_000)
+
+config :liddr, Liddr.Ratings.Policy,
+  rating_window_hours: parse_int_env.(System.get_env("RATING_WINDOW_HOURS"), 24, 1, 168),
+  rating_decay_per_day: parse_float_env.(System.get_env("RATING_DECAY_PER_DAY"), 0.01, 0.0, 2.0),
+  smoothing_prior_mean:
+    parse_float_env.(System.get_env("RATING_SMOOTHING_PRIOR_MEAN"), 4.8, 1.0, 5.0),
+  smoothing_prior_weight:
+    parse_int_env.(System.get_env("RATING_SMOOTHING_PRIOR_WEIGHT"), 20, 0, 1000),
+  enforcement_recent_window_days:
+    parse_int_env.(System.get_env("RATING_ENFORCEMENT_RECENT_WINDOW_DAYS"), 30, 1, 365),
+  enforcement_min_recent_ratings:
+    parse_int_env.(System.get_env("RATING_ENFORCEMENT_MIN_RECENT_RATINGS"), 20, 1, 1000),
+  non_attributable_reason_tags:
+    parse_csv_env.(
+      System.get_env("RATING_NON_ATTRIBUTABLE_REASON_TAGS") ||
+        "traffic,app_issue,gps_issue,wrong_pickup_pin,co_rider_behavior"
     )
 
 if config_env() != :test do

@@ -43,7 +43,7 @@ defmodule Liddr.Ratings.Snapshot do
         Map.put(
           base,
           :is_new_rider,
-          base.rating_count < DispatchPolicy.new_driver_min_rated_rides()
+          base.rating_count < DispatchPolicy.new_user_min_rated_rides()
         )
 
       _ ->
@@ -72,7 +72,7 @@ defmodule Liddr.Ratings.Snapshot do
   defp confidence_band(count) do
     cond do
       count >= @medium_confidence_min_count -> "high"
-      count >= DispatchPolicy.new_driver_min_rated_rides() -> "medium"
+      count >= DispatchPolicy.new_user_min_rated_rides() -> "medium"
       true -> "low"
     end
   end

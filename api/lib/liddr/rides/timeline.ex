@@ -5,6 +5,7 @@ defmodule Liddr.Rides.Timeline do
   alias Liddr.Rides.Events
   alias Liddr.Rides.RideEvent
   alias Liddr.Rides.Ride
+  alias Liddr.Rides.SharedRides.Access
   alias Liddr.Subscriptions.PaymentUtils
 
   @default_incident_limit 50
@@ -16,6 +17,10 @@ defmodule Liddr.Rides.Timeline do
     offer_expired
     offer_missed
     offer_withdrawn
+    driver_delayed
+    driver_offline_detected
+    reassigning_driver
+    new_driver_found
     driver_arriving
     driver_arrived
     trip_started
@@ -72,11 +77,11 @@ defmodule Liddr.Rides.Timeline do
   end
 
   defp fetch_accessible_ride(user_id, ride_id) do
-    Repo.one(
-      from r in Ride,
-        where: r.id == ^ride_id and (r.rider_id == ^user_id or r.driver_id == ^user_id),
-        limit: 1
-    )
+    Ride
+    |> Access.scope_for_user(user_id)
+    |> where([r], r.id == ^ride_id)
+    |> limit(1)
+    |> Repo.one()
   end
 
   defp parse_positive_integer(value) when is_integer(value) and value > 0, do: value

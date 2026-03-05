@@ -4,9 +4,13 @@ defmodule Liddr.Rides.Quotes do
   alias Decimal, as: D
   alias Liddr.Accounts.User
   alias Liddr.Repo
+  alias Liddr.Rides.ProductType
   alias Liddr.Rides.RoutePricing
   alias Liddr.Rides.RideQuote
+  alias Liddr.Rides.SharedEligibility
+  alias Liddr.Rides.SharedPricing
   alias Liddr.Rides.VehicleCategory
+  alias Liddr.Rides.WomenOnly
   alias Liddr.Subscriptions.PaymentUtils
 
   @default_quote_ttl_seconds 180
@@ -15,11 +19,15 @@ defmodule Liddr.Rides.Quotes do
   def create_quote(rider_user_id, attrs \\ %{}) do
     now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
 
-    with {:ok, _rider} <- fetch_rider(rider_user_id),
+    with {:ok, rider} <- fetch_rider(rider_user_id),
+         {:ok, product_type} <- ProductType.resolve(attrs),
          {:ok, category} <- fetch_vehicle_category(attrs),
+         :ok <- WomenOnly.ensure_rider_eligible(rider, category),
+         :ok <- SharedEligibility.ensure_supported_for_category(product_type, category),
          {:ok, origin} <- fetch_point(attrs, :pickup),
          {:ok, destination} <- fetch_point(attrs, :dropoff),
          {:ok, estimate} <- RoutePricing.estimate(category, origin, destination, now) do
+      priced = maybe_apply_shared_pricing(product_type, category, estimate.pricing, attrs)
       expires_at = DateTime.add(now, quote_ttl_seconds(attrs), :second)
 
       params = %{
@@ -32,19 +40,20 @@ defmodule Liddr.Rides.Quotes do
         "distance_m" => estimate.route.distance_m,
         "duration_s" => estimate.route.duration_s,
         "static_duration_s" => estimate.route.static_duration_s,
-        "base_amount_kes" => estimate.pricing.base_amount_kes,
-        "distance_amount_kes" => estimate.pricing.distance_amount_kes,
-        "time_amount_kes" => estimate.pricing.time_amount_kes,
-        "min_fare_kes" => estimate.pricing.min_fare_kes,
-        "surge_multiplier" => estimate.pricing.surge_multiplier,
-        "subtotal_kes" => estimate.pricing.subtotal_kes,
-        "base_fare_kes" => estimate.pricing.base_fare_kes,
-        "discount_percent" => estimate.pricing.discount_percent,
-        "discount_amount_kes" => estimate.pricing.discount_amount_kes,
-        "final_fare_kes" => estimate.pricing.final_fare_kes,
+        "base_amount_kes" => priced.pricing.base_amount_kes,
+        "distance_amount_kes" => priced.pricing.distance_amount_kes,
+        "time_amount_kes" => priced.pricing.time_amount_kes,
+        "min_fare_kes" => priced.pricing.min_fare_kes,
+        "surge_multiplier" => priced.pricing.surge_multiplier,
+        "subtotal_kes" => priced.pricing.subtotal_kes,
+        "base_fare_kes" => priced.pricing.base_fare_kes,
+        "discount_percent" => priced.pricing.discount_percent,
+        "discount_amount_kes" => priced.pricing.discount_amount_kes,
+        "final_fare_kes" => priced.pricing.final_fare_kes,
         "currency" => "KES",
         "provider" => "google_routes",
         "provider_payload" => %{
+          "product_type" => product_type,
           "polyline" => estimate.route.polyline,
           "travel_mode" => estimate.routing.travel_mode,
           "routing_preference" => estimate.routing.routing_preference,
@@ -57,7 +66,8 @@ defmodule Liddr.Rides.Quotes do
             RoutePricing.decimal_to_string(estimate.multipliers.market_multiplier),
           "demand_ratio" => RoutePricing.decimal_to_string(estimate.multipliers.demand_ratio),
           "available_driver_count" => estimate.multipliers.available_driver_count,
-          "active_request_count" => estimate.multipliers.active_request_count
+          "active_request_count" => estimate.multipliers.active_request_count,
+          "shared_pricing" => priced.metadata
         },
         "expires_at" => expires_at
       }
@@ -69,6 +79,12 @@ defmodule Liddr.Rides.Quotes do
       {:error, reason} -> {:error, reason}
     end
   end
+
+  defp maybe_apply_shared_pricing("shared", category, pricing, attrs),
+    do: SharedPricing.apply_to_pricing(category, pricing, attrs)
+
+  defp maybe_apply_shared_pricing(_product_type, _category, pricing, _attrs),
+    do: %{pricing: pricing, metadata: nil}
 
   defp fetch_rider(rider_user_id) do
     case Repo.get(User, rider_user_id) do

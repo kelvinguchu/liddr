@@ -3,6 +3,7 @@ defmodule Liddr.Rides.DestinationChanges do
   alias Liddr.Repo
   alias Liddr.Rides.Events
   alias Liddr.Rides.Execution.Shared
+  alias Liddr.Rides.DestinationChanges.Payloads
   alias Liddr.Rides.Realtime
   alias Liddr.Rides.RideDestinationChange
   alias Liddr.Rides.DestinationChanges.Support
@@ -24,15 +25,17 @@ defmodule Liddr.Rides.DestinationChanges do
         ride = Shared.fetch_ride_for_update!(ride_id)
         Shared.ensure_rider_owns_ride!(ride, rider_user_id)
         Support.ensure_destination_change_allowed!(ride)
+        Support.ensure_destination_change_window!(ride, now)
         Support.ensure_destination_change_quota!(ride.id)
         Support.ensure_no_open_change!(ride.id)
+        Support.ensure_destination_change_cooldown!(ride.id, now)
 
         reason_code = Support.resolve_reason_code!(attrs, @request_reason_codes)
         notes = Support.resolve_notes(attrs)
         destination = Support.fetch_new_dropoff!(attrs)
         Support.ensure_destination_changed!(ride, destination)
         category = Support.fetch_vehicle_category!(ride.vehicle_category_id)
-        origin = Support.current_origin_point(ride)
+        origin = Support.current_origin_point!(ride, now)
         old_fare = Support.current_planned_fare(ride)
         estimate = Support.estimate_route_pricing!(category, origin, destination, now)
 
@@ -56,7 +59,7 @@ defmodule Liddr.Rides.DestinationChanges do
             "reason_code" => reason_code,
             "notes" => notes,
             "requested_at" => now,
-            "pricing_payload" => Support.pricing_payload(estimate)
+            "pricing_payload" => Payloads.pricing_payload(estimate)
           })
           |> Repo.insert()
           |> Shared.unwrap_or_rollback()
@@ -64,7 +67,7 @@ defmodule Liddr.Rides.DestinationChanges do
         _ =
           Events.record_event(ride.id, "destination_change_requested", now,
             actor_user_id: rider_user_id,
-            payload: Support.destination_change_event_payload(change)
+            payload: Payloads.event_payload(change)
           )
           |> Shared.unwrap_or_rollback()
 
@@ -91,6 +94,7 @@ defmodule Liddr.Rides.DestinationChanges do
         Shared.ensure_driver_owns_ride!(ride, driver_user_id)
         Support.ensure_destination_change_allowed!(ride)
         change = Support.fetch_open_change_for_update!(ride.id, change_id, driver_user_id)
+        Support.ensure_change_request_fresh!(change, now)
 
         accepted_change =
           change
@@ -105,13 +109,13 @@ defmodule Liddr.Rides.DestinationChanges do
           Shared.update_ride!(ride, %{
             "dropoff_lat" => accepted_change.new_dropoff_lat,
             "dropoff_lng" => accepted_change.new_dropoff_lng,
-            "metadata" => Support.destination_change_metadata(ride.metadata, accepted_change)
+            "metadata" => Payloads.metadata(ride.metadata, accepted_change)
           })
 
         _ =
           Events.record_event(updated_ride.id, "destination_change_accepted", now,
             actor_user_id: driver_user_id,
-            payload: Support.destination_change_event_payload(accepted_change)
+            payload: Payloads.event_payload(accepted_change)
           )
           |> Shared.unwrap_or_rollback()
 
@@ -139,6 +143,7 @@ defmodule Liddr.Rides.DestinationChanges do
           Shared.ensure_driver_owns_ride!(ride, driver_user_id)
           Support.ensure_destination_change_allowed!(ride)
           change = Support.fetch_open_change_for_update!(ride.id, change_id, driver_user_id)
+          Support.ensure_change_request_fresh!(change, now)
 
           rejected_change =
             change
@@ -154,7 +159,7 @@ defmodule Liddr.Rides.DestinationChanges do
           _ =
             Events.record_event(ride.id, "destination_change_rejected", now,
               actor_user_id: driver_user_id,
-              payload: Support.destination_change_event_payload(rejected_change)
+              payload: Payloads.event_payload(rejected_change)
             )
             |> Shared.unwrap_or_rollback()
 

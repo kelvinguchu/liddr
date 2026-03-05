@@ -57,7 +57,7 @@ defmodule Liddr.Rides.Execution.PickupHealth do
       "flags" => flags,
       "recommend_reassign" => Enum.any?(Map.values(flags), &(&1 == true)),
       "recommendation_reason_code" => reason,
-      "timeouts" => timeout_signals(accepted_elapsed_seconds, reassign_count)
+      "timeouts" => timeout_signals(accepted_elapsed_seconds, reassign_count, flags)
     }
   end
 
@@ -117,17 +117,25 @@ defmodule Liddr.Rides.Execution.PickupHealth do
     end
   end
 
-  defp timeout_signals(accepted_elapsed_seconds, reassign_count) do
+  defp timeout_signals(accepted_elapsed_seconds, reassign_count, flags) do
     reassign_after = Policy.pickup_auto_reassign_after_seconds()
+    fast_reassign_after = Policy.pickup_fast_reassign_after_seconds()
     cancel_after = Policy.pickup_auto_cancel_after_seconds()
     min_reassign_count = Policy.pickup_auto_cancel_min_reassign_count()
 
     elapsed = if is_integer(accepted_elapsed_seconds), do: accepted_elapsed_seconds, else: -1
+    fast_reassign_applicable = fast_reassign_applicable?(flags)
 
     %{
       "auto_reassign_enabled" => Policy.pickup_auto_reassign_enabled(),
       "auto_reassign_after_seconds" => reassign_after,
       "auto_reassign_due" => Policy.pickup_auto_reassign_enabled() and elapsed >= reassign_after,
+      "fast_reassign_enabled" => Policy.pickup_fast_reassign_enabled(),
+      "fast_reassign_after_seconds" => fast_reassign_after,
+      "fast_reassign_applicable" => fast_reassign_applicable,
+      "fast_reassign_due" =>
+        Policy.pickup_fast_reassign_enabled() and fast_reassign_applicable and
+          elapsed >= fast_reassign_after,
       "auto_cancel_enabled" => Policy.pickup_auto_cancel_enabled(),
       "auto_cancel_after_seconds" => cancel_after,
       "auto_cancel_min_reassign_count" => min_reassign_count,
@@ -136,4 +144,11 @@ defmodule Liddr.Rides.Execution.PickupHealth do
           reassign_count >= min_reassign_count
     }
   end
+
+  defp fast_reassign_applicable?(%{} = flags) do
+    flags["driver_location_stale"] == true or flags["driver_no_progress"] == true or
+      flags["driver_moving_away"] == true
+  end
+
+  defp fast_reassign_applicable?(_flags), do: false
 end

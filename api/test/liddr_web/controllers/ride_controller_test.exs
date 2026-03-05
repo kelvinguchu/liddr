@@ -47,6 +47,26 @@ defmodule LiddrWeb.RideControllerTest do
     assert %{"error" => %{"code" => "ACCOUNT_BANNED"}} = json_response(conn, 403)
   end
 
+  test "POST /api/rides/requests blocks shared product_type for two-wheel categories", %{
+    conn: conn
+  } do
+    %{auth_conn: rider_conn} = AuthFixtures.authenticate_rider!(conn)
+    motorbike_id = VerificationFixtures.insert_vehicle_category!(%{slug: "motorbike"})
+
+    conn =
+      post(rider_conn, "/api/rides/requests", %{
+        "vehicle_category_id" => motorbike_id,
+        "product_type" => "shared",
+        "pickup_lat" => "-1.2921",
+        "pickup_lng" => "36.8219",
+        "dropoff_lat" => "-1.3000",
+        "dropoff_lng" => "36.8000"
+      })
+
+    assert %{"error" => %{"code" => "SHARED_NOT_SUPPORTED_FOR_CATEGORY"}} =
+             json_response(conn, 422)
+  end
+
   test "POST /api/rides/requests creates offers for eligible drivers and GET /api/rides/offers lists them",
        %{
          conn: conn
@@ -248,6 +268,119 @@ defmodule LiddrWeb.RideControllerTest do
     assert Enum.any?(statuses, fn {id, status} ->
              id != driver_user_id and status == "withdrawn"
            end)
+  end
+
+  test "POST /api/rides/offers/:offer_id/accept rejects stale withdrawn offers", %{conn: conn} do
+    %{auth_conn: rider_conn} = AuthFixtures.authenticate_rider!(conn)
+
+    %{auth_conn: first_driver_conn, user_id: first_driver_user_id} =
+      AuthFixtures.authenticate_driver!(conn)
+
+    %{auth_conn: second_driver_conn, user_id: second_driver_user_id} =
+      AuthFixtures.authenticate_driver!(conn)
+
+    category_id = VerificationFixtures.insert_vehicle_category!()
+
+    _ = create_eligible_driver_profile!(first_driver_user_id, category_id)
+    _ = create_eligible_driver_profile!(second_driver_user_id, category_id)
+
+    request_conn =
+      post(rider_conn, "/api/rides/requests", %{
+        "vehicle_category_id" => category_id,
+        "pickup_lat" => "-1.2921",
+        "pickup_lng" => "36.8219",
+        "dropoff_lat" => "-1.3000",
+        "dropoff_lng" => "36.8000",
+        "offer_limit" => 2,
+        "offer_ttl_seconds" => 30
+      })
+
+    assert %{"data" => %{"offers" => offers}} = json_response(request_conn, 201)
+
+    first_offer_id =
+      offers
+      |> Enum.find(&(&1["driver_id"] == first_driver_user_id))
+      |> Map.fetch!("id")
+
+    stale_offer_id =
+      offers
+      |> Enum.find(&(&1["driver_id"] == second_driver_user_id))
+      |> Map.fetch!("id")
+
+    assert %{"data" => %{"ride" => %{"status" => "accepted"}}} =
+             post(first_driver_conn, "/api/rides/offers/#{first_offer_id}/accept", %{})
+             |> json_response(200)
+
+    assert %{"error" => %{"code" => "RIDE_OFFER_NOT_OPEN"}} =
+             post(second_driver_conn, "/api/rides/offers/#{stale_offer_id}/accept", %{})
+             |> json_response(422)
+  end
+
+  test "POST /api/rides/offers/:offer_id/accept blocks accepting a second active ride", %{
+    conn: conn
+  } do
+    %{auth_conn: first_rider_conn} = AuthFixtures.authenticate_rider!(conn)
+    %{user_id: second_rider_user_id} = AuthFixtures.authenticate_rider!(conn)
+    %{auth_conn: driver_conn, user_id: driver_user_id} = AuthFixtures.authenticate_driver!(conn)
+    category_id = VerificationFixtures.insert_vehicle_category!()
+
+    _ = create_eligible_driver_profile!(driver_user_id, category_id)
+
+    first_request_conn =
+      post(first_rider_conn, "/api/rides/requests", %{
+        "vehicle_category_id" => category_id,
+        "pickup_lat" => "-1.2921",
+        "pickup_lng" => "36.8219",
+        "dropoff_lat" => "-1.3000",
+        "dropoff_lng" => "36.8000",
+        "offer_limit" => 1,
+        "offer_ttl_seconds" => 30
+      })
+
+    assert %{"data" => %{"offers" => [%{"id" => first_offer_id}]}} =
+             json_response(first_request_conn, 201)
+
+    assert %{"data" => %{"ride" => %{"status" => "accepted"}}} =
+             post(driver_conn, "/api/rides/offers/#{first_offer_id}/accept", %{})
+             |> json_response(200)
+
+    now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
+
+    second_ride =
+      %Ride{}
+      |> Ride.create_changeset(%{
+        "rider_id" => second_rider_user_id,
+        "vehicle_category_id" => category_id,
+        "status" => "offering",
+        "pickup_lat" => "-1.2921",
+        "pickup_lng" => "36.8219",
+        "dropoff_lat" => "-1.3000",
+        "dropoff_lng" => "36.8000",
+        "requested_at" => now
+      })
+      |> Repo.insert!()
+
+    second_offer =
+      %RideOffer{}
+      |> RideOffer.create_changeset(%{
+        "ride_id" => second_ride.id,
+        "driver_id" => driver_user_id,
+        "status" => "offered",
+        "offered_at" => now,
+        "expires_at" => DateTime.add(now, 45, :second)
+      })
+      |> Repo.insert!()
+
+    assert %{"error" => %{"code" => "DRIVER_HAS_ACTIVE_RIDE"}} =
+             post(driver_conn, "/api/rides/offers/#{second_offer.id}/accept", %{})
+             |> json_response(403)
+
+    reloaded_offer = Repo.get!(RideOffer, second_offer.id)
+    assert reloaded_offer.status == "offered"
+
+    reloaded_first_ride = Repo.get!(Ride, second_ride.id)
+    assert reloaded_first_ride.driver_id == nil
+    assert reloaded_first_ride.status == "offering"
   end
 
   test "GET rider and driver ride history endpoints return accepted ride records", %{conn: conn} do

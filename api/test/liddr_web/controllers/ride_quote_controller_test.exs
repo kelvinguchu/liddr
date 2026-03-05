@@ -124,6 +124,92 @@ defmodule LiddrWeb.RideQuoteControllerTest do
     refute get_in(response, ["data", "quote", "pricing", "booking_fee_kes"])
   end
 
+  test "POST /api/rides/quote with shared product_type applies dynamic discount and rounds fare",
+       %{conn: conn} do
+    %{auth_conn: auth_conn} = AuthFixtures.authenticate_rider!(conn)
+    category_id = VerificationFixtures.insert_vehicle_category!(%{slug: "basic"})
+
+    solo_conn =
+      post(auth_conn, "/api/rides/quote", %{
+        "vehicle_category_id" => category_id,
+        "product_type" => "solo",
+        "pickup_lat" => "-1.2921",
+        "pickup_lng" => "36.8219",
+        "dropoff_lat" => "-1.3000",
+        "dropoff_lng" => "36.8000"
+      })
+
+    shared_conn =
+      post(auth_conn, "/api/rides/quote", %{
+        "vehicle_category_id" => category_id,
+        "product_type" => "shared",
+        "pickup_lat" => "-1.2921",
+        "pickup_lng" => "36.8219",
+        "dropoff_lat" => "-1.3000",
+        "dropoff_lng" => "36.8000",
+        "shared_extra_eta_min" => 2.0,
+        "shared_extra_detour_km" => 0.8
+      })
+
+    assert %{"data" => %{"quote" => %{"pricing" => %{"final_fare_kes" => solo_final}}}} =
+             json_response(solo_conn, 201)
+
+    assert %{
+             "data" => %{
+               "quote" => %{
+                 "product_type" => "shared",
+                 "pricing" => %{
+                   "final_fare_kes" => shared_final,
+                   "shared_pricing" => %{
+                     "enabled" => true,
+                     "solo_fare_kes" => _,
+                     "shared_fare_kes" => _,
+                     "discount_percent" => discount_percent
+                   }
+                 }
+               }
+             }
+           } = json_response(shared_conn, 201)
+
+    assert D.compare(D.new(shared_final), D.new(solo_final)) in [:lt, :eq]
+    assert D.compare(D.new(discount_percent), D.new("5.00")) in [:gt, :eq]
+
+    {shared_int, ""} = Integer.parse(String.replace(shared_final, ".00", ""))
+    assert rem(shared_int, 10) == 0
+  end
+
+  test "POST /api/rides/quote blocks shared product_type for two-wheel categories", %{conn: conn} do
+    %{auth_conn: auth_conn} = AuthFixtures.authenticate_rider!(conn)
+    motorbike_id = VerificationFixtures.insert_vehicle_category!(%{slug: "motorbike"})
+    e_motorbike_id = VerificationFixtures.insert_vehicle_category!(%{slug: "electric_motorbike"})
+
+    motorbike_conn =
+      post(auth_conn, "/api/rides/quote", %{
+        "vehicle_category_id" => motorbike_id,
+        "product_type" => "shared",
+        "pickup_lat" => "-1.2921",
+        "pickup_lng" => "36.8219",
+        "dropoff_lat" => "-1.3000",
+        "dropoff_lng" => "36.8000"
+      })
+
+    assert %{"error" => %{"code" => "SHARED_NOT_SUPPORTED_FOR_CATEGORY"}} =
+             json_response(motorbike_conn, 422)
+
+    e_motorbike_conn =
+      post(auth_conn, "/api/rides/quote", %{
+        "vehicle_category_id" => e_motorbike_id,
+        "product_type" => "shared",
+        "pickup_lat" => "-1.2921",
+        "pickup_lng" => "36.8219",
+        "dropoff_lat" => "-1.3000",
+        "dropoff_lng" => "36.8000"
+      })
+
+    assert %{"error" => %{"code" => "SHARED_NOT_SUPPORTED_FOR_CATEGORY"}} =
+             json_response(e_motorbike_conn, 422)
+  end
+
   test "POST /api/rides/quote surfaces upstream transport errors", %{conn: conn} do
     previous_client = Application.get_env(:liddr, :google_routes_client)
     Application.put_env(:liddr, :google_routes_client, FakeRoutesClientFailure)

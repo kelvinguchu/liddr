@@ -1,11 +1,16 @@
 package com.liddr.app.ui.launch
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -30,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,13 +53,6 @@ fun AuthGatewayScreen(
         onModeChange: (AuthModeUi) -> Unit,
         onMethodSelected: (AuthMethodUi) -> Unit
 ) {
-    val methods = methodsForMode(role, mode)
-    val slotCount = 2 + methods.size // header + pill + methods
-    val vis = rememberStaggeredEntrance(count = slotCount, initialDelayMs = 50, staggerMs = 55)
-    val enter =
-            fadeIn(tween(320, easing = FastOutSlowInEasing)) +
-                    slideInVertically(tween(320, easing = FastOutSlowInEasing)) { it / 5 }
-
     OnboardingBackground {
         Column(
                 Modifier.fillMaxSize()
@@ -63,28 +62,35 @@ fun AuthGatewayScreen(
         ) {
             Column {
                 /* ── top bar ─────────────────────────────── */
-                AnimatedVisibility(vis[0], enter = enter) {
-                    Row(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        TextButton(onClick = onBack) { Text("Back") }
-                        Text(
-                                role.title,
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onBack) { Text("Back") }
+                    Text(
+                            role.title,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
                 Spacer(Modifier.height(10.dp))
 
-                AnimatedVisibility(vis[0], enter = enter) {
-                    Column {
-                        LiddrLogo()
-                        Spacer(Modifier.height(18.dp))
+                Column {
+                    LiddrLogo()
+                    Spacer(Modifier.height(18.dp))
+                    AnimatedContent(
+                            targetState = mode,
+                            transitionSpec = {
+                                fadeIn(tween(180, easing = FastOutSlowInEasing))
+                                        .togetherWith(
+                                                fadeOut(tween(140, easing = FastOutSlowInEasing))
+                                        )
+                            },
+                            label = "mode-title"
+                    ) { targetMode ->
                         Text(
-                                if (mode == AuthModeUi.SIGN_UP) "Create account"
+                                if (targetMode == AuthModeUi.SIGN_UP) "Create account"
                                 else "Welcome back",
                                 style = MaterialTheme.typography.headlineLarge,
                                 fontWeight = FontWeight.Bold,
@@ -95,28 +101,84 @@ fun AuthGatewayScreen(
                 Spacer(Modifier.height(22.dp))
 
                 /* ── pill toggle ──────────────────────────── */
-                AnimatedVisibility(vis[1], enter = enter) {
-                    PillSegmentedControl(
-                            selectedIndex = if (mode == AuthModeUi.SIGN_UP) 0 else 1,
-                            labels = listOf(AuthModeUi.SIGN_UP.title, AuthModeUi.SIGN_IN.title),
-                            onSelect = {
-                                onModeChange(
-                                        if (it == 0) AuthModeUi.SIGN_UP else AuthModeUi.SIGN_IN
-                                )
-                            }
-                    )
-                }
+                PillSegmentedControl(
+                        selectedIndex = if (mode == AuthModeUi.SIGN_UP) 0 else 1,
+                        labels = listOf(AuthModeUi.SIGN_UP.title, AuthModeUi.SIGN_IN.title),
+                        onSelect = {
+                            onModeChange(if (it == 0) AuthModeUi.SIGN_UP else AuthModeUi.SIGN_IN)
+                        }
+                )
                 Spacer(Modifier.height(24.dp))
 
                 /* ── individual method buttons ───────────── */
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    methods.forEachIndexed { i, m ->
-                        AnimatedVisibility(vis[2 + i], enter = enter) {
-                            MethodButton(
-                                    label = m.label,
-                                    icon = m.icon,
-                                    onClick = { onMethodSelected(m) }
-                            )
+                val roleMethods =
+                        allOnboardingMethods.filter { role in it.allowedRoles }.sortedBy { method ->
+                            when {
+                                method.signUp && method.signIn -> 0
+                                !method.signUp && method.signIn -> 1
+                                method.signUp && !method.signIn -> 2
+                                else -> 3
+                            }
+                        }
+                Column(
+                        modifier =
+                                Modifier.fillMaxWidth()
+                                        .animateContentSize(
+                                                animationSpec =
+                                                        tween(
+                                                                durationMillis = 200,
+                                                                easing = FastOutSlowInEasing
+                                                        )
+                                        ),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    roleMethods.forEach { m ->
+                        key(m.method) {
+                            val visible = if (mode == AuthModeUi.SIGN_UP) m.signUp else m.signIn
+
+                            AnimatedVisibility(
+                                    visible = visible,
+                                    enter =
+                                            expandVertically(
+                                                    expandFrom = Alignment.Top,
+                                                    animationSpec =
+                                                            tween(
+                                                                    durationMillis = 180,
+                                                                    easing = FastOutSlowInEasing
+                                                            )
+                                            ) +
+                                                    fadeIn(
+                                                            animationSpec =
+                                                                    tween(
+                                                                            durationMillis = 150,
+                                                                            easing =
+                                                                                    FastOutSlowInEasing
+                                                                    )
+                                                    ),
+                                    exit =
+                                            shrinkVertically(
+                                                    shrinkTowards = Alignment.Top,
+                                                    animationSpec =
+                                                            tween(
+                                                                    durationMillis = 220,
+                                                                    easing = FastOutSlowInEasing
+                                                            )
+                                            ) +
+                                                    fadeOut(
+                                                            animationSpec =
+                                                                    tween(
+                                                                            durationMillis = 180,
+                                                                            easing =
+                                                                                    FastOutSlowInEasing
+                                                                    )
+                                                    )
+                            ) {
+                                MethodButton(
+                                        label = m.label,
+                                        icon = m.icon,
+                                        onClick = { onMethodSelected(m) }
+                                )
+                            }
                         }
                     }
                 }
@@ -135,7 +197,7 @@ private fun MethodButton(
 ) {
     val src = remember { MutableInteractionSource() }
     val pressed by src.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) 0.97f else 1f, tween(80), label = "btn")
+    val scale by animateFloatAsState(if (pressed) 0.985f else 1f, tween(70), label = "btn")
     val colors = MaterialTheme.colorScheme
 
     Surface(
@@ -149,7 +211,7 @@ private fun MethodButton(
             color = colors.surface,
             border = BorderStroke(1.dp, colors.outlineVariant),
             tonalElevation = if (pressed) 0.dp else 1.dp,
-            shadowElevation = if (pressed) 0.dp else 3.dp,
+            shadowElevation = 0.dp,
             interactionSource = src
     ) {
         Row(

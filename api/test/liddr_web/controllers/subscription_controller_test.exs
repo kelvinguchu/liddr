@@ -290,6 +290,30 @@ defmodule LiddrWeb.SubscriptionControllerTest do
     assert failed_payment.phone_e164 == @test_phone
   end
 
+  test "POST /api/subscriptions/pay returns 503 when callback token config is missing", %{
+    conn: conn
+  } do
+    System.delete_env("MPESA_CALLBACK_TOKEN")
+    %{auth_conn: auth_conn, user_id: user_id} = AuthFixtures.authenticate_driver!(conn)
+    category_id = VerificationFixtures.insert_vehicle_category!(%{weekly_sub_kes: 1000})
+    user = Repo.get!(User, user_id)
+
+    _driver =
+      VerificationFixtures.create_driver!(
+        user: user,
+        vehicle_category_id: category_id,
+        account_status: "active",
+        verification_status: "approved"
+      )
+
+    conn =
+      post(auth_conn, "/api/subscriptions/pay", %{
+        "phone" => @test_phone
+      })
+
+    assert %{"error" => %{"code" => "MISSING_CALLBACK_TOKEN_CONFIG"}} = json_response(conn, 503)
+  end
+
   defp restore_env(key, nil), do: System.delete_env(key)
   defp restore_env(key, value), do: System.put_env(key, value)
 end

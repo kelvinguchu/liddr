@@ -3,6 +3,7 @@ defmodule LiddrWeb.VerificationOpsController do
 
   alias Ecto.Changeset
   alias Liddr.Verification
+  alias LiddrWeb.Idempotency
   alias LiddrWeb.VerificationSerializer
 
   @error_mappings %{
@@ -50,44 +51,62 @@ defmodule LiddrWeb.VerificationOpsController do
   def review_application(conn, %{"id" => application_id} = params) do
     reviewer_user_id = conn.assigns.current_user.id
 
-    case Verification.review_application(application_id, params, reviewer_user_id) do
-      {:ok, payload} ->
-        conn
-        |> put_status(:created)
-        |> json(%{data: VerificationSerializer.review_application(payload)})
+    Idempotency.execute(
+      conn,
+      "ops.verification.application.review:#{application_id}",
+      params,
+      fn ->
+        case Verification.review_application(application_id, params, reviewer_user_id) do
+          {:ok, payload} ->
+            {:ok, 201, %{data: VerificationSerializer.review_application(payload)}}
 
-      {:error, reason} ->
-        render_error(conn, reason)
-    end
+          {:error, reason} ->
+            {:error, reason}
+        end
+      end,
+      &render_error/2
+    )
   end
 
   def review_document(conn, %{"id" => document_id} = params) do
     reviewer_user_id = conn.assigns.current_user.id
 
-    case Verification.review_document(document_id, params, reviewer_user_id) do
-      {:ok, payload} ->
-        conn
-        |> put_status(:created)
-        |> json(%{data: VerificationSerializer.review_document(payload)})
+    Idempotency.execute(
+      conn,
+      "ops.verification.document.review:#{document_id}",
+      params,
+      fn ->
+        case Verification.review_document(document_id, params, reviewer_user_id) do
+          {:ok, payload} ->
+            {:ok, 201, %{data: VerificationSerializer.review_document(payload)}}
 
-      {:error, reason} ->
-        render_error(conn, reason)
-    end
+          {:error, reason} ->
+            {:error, reason}
+        end
+      end,
+      &render_error/2
+    )
   end
 
   def review_documents_bulk(conn, params) do
     reviewer_user_id = conn.assigns.current_user.id
     document_ids = Map.get(params, "document_ids")
 
-    case Verification.review_documents_bulk(document_ids, params, reviewer_user_id) do
-      {:ok, results} ->
-        conn
-        |> put_status(:created)
-        |> json(%{data: VerificationSerializer.review_bulk(results)})
+    Idempotency.execute(
+      conn,
+      "ops.verification.document.review_bulk",
+      params,
+      fn ->
+        case Verification.review_documents_bulk(document_ids, params, reviewer_user_id) do
+          {:ok, results} ->
+            {:ok, 201, %{data: VerificationSerializer.review_bulk(results)}}
 
-      {:error, reason} ->
-        render_error(conn, reason)
-    end
+          {:error, reason} ->
+            {:error, reason}
+        end
+      end,
+      &render_error/2
+    )
   end
 
   defp render_error(conn, %Changeset{} = changeset) do

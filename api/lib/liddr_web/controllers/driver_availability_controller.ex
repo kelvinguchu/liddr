@@ -3,6 +3,7 @@ defmodule LiddrWeb.DriverAvailabilityController do
 
   alias Ecto.Changeset
   alias Liddr.DriverAvailability
+  alias Liddr.Rides.DriverLiveness
 
   def online(conn, _params) do
     driver_user_id = conn.assigns.current_user.id
@@ -29,6 +30,8 @@ defmodule LiddrWeb.DriverAvailabilityController do
   end
 
   defp availability_payload(driver) do
+    liveness = DriverLiveness.snapshot(driver)
+
     %{
       user_id: driver.user_id,
       subscription_status: driver.subscription_status,
@@ -38,7 +41,9 @@ defmodule LiddrWeb.DriverAvailabilityController do
       dispatch_status: driver.dispatch_status,
       current_ride_id: driver.current_ride_id,
       last_online_at: driver.last_online_at,
-      last_seen_at: driver.last_seen_at
+      last_seen_at: driver.last_seen_at,
+      liveness_state: liveness.state,
+      liveness_signal_age_seconds: liveness.signal_age_seconds
     }
   end
 

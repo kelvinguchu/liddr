@@ -71,6 +71,7 @@ defmodule Liddr.VerificationFixtures do
       "vehicle_category_id" => category_id,
       "subscription_status" => Keyword.get(opts, :subscription_status, "inactive"),
       "is_available" => Keyword.get(opts, :is_available, false),
+      "gender_verified" => Keyword.get(opts, :gender_verified, false),
       "account_status" => Keyword.get(opts, :account_status, "pending"),
       "verification_status" => Keyword.get(opts, :verification_status, "pending"),
       "last_seen_at" => now

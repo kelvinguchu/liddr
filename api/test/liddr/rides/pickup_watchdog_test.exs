@@ -7,6 +7,7 @@ defmodule Liddr.Rides.PickupWatchdogTest do
   alias Liddr.Repo
   alias Liddr.Rides.PickupWatchdog
   alias Liddr.Rides.Ride
+  alias Liddr.Rides.RideNotification
   alias Liddr.Rides.RideOffer
   alias Liddr.VerificationFixtures
 
@@ -102,6 +103,16 @@ defmodule Liddr.Rides.PickupWatchdogTest do
 
     assert {first_driver.user_id, "withdrawn"} in statuses
     assert {second_driver.user_id, "offered"} in statuses
+
+    reassigned_notifications =
+      Repo.all(
+        from n in RideNotification,
+          where: n.ride_id == ^ride.id and n.event_type == "ride_reassigned",
+          select: {n.recipient_user_id, n.socket_status}
+      )
+
+    assert {rider.id, "sent"} in reassigned_notifications
+    assert {first_driver.user_id, "sent"} in reassigned_notifications
   end
 
   test "auto-cancels stale pickup after reassign threshold is exceeded" do
@@ -174,5 +185,15 @@ defmodule Liddr.Rides.PickupWatchdogTest do
     assert is_nil(refreshed_driver.current_ride_id)
     assert refreshed_driver.dispatch_status == "idle"
     assert refreshed_driver.is_available == true
+
+    trip_cancelled_notifications =
+      Repo.all(
+        from n in RideNotification,
+          where: n.ride_id == ^ride.id and n.event_type == "trip_cancelled",
+          select: {n.recipient_user_id, n.socket_status}
+      )
+
+    assert {rider.id, "sent"} in trip_cancelled_notifications
+    assert {driver.user_id, "sent"} in trip_cancelled_notifications
   end
 end

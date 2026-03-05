@@ -6,6 +6,7 @@ defmodule Liddr.DriverAvailability do
   alias Liddr.Accounts.Driver
   alias Liddr.Location
   alias Liddr.Repo
+  alias Liddr.Rides.ActiveRides
   alias Liddr.Verification.DriverActivityEvent
 
   def go_online(driver_user_id) do
@@ -63,6 +64,9 @@ defmodule Liddr.DriverAvailability do
         Repo.rollback(:driver_subscription_not_active)
 
       not is_nil(driver.current_ride_id) ->
+        Repo.rollback(:driver_has_active_ride)
+
+      ActiveRides.driver_has_active_ride?(driver.user_id) ->
         Repo.rollback(:driver_has_active_ride)
 
       true ->

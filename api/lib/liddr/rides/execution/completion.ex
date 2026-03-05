@@ -9,6 +9,7 @@ defmodule Liddr.Rides.Execution.Completion do
   alias Liddr.Rides.Execution.Shared
   alias Liddr.Rides.Realtime
   alias Liddr.Rides.RideQuote
+  alias Liddr.Rides.SendDeliveries
   alias Liddr.Subscriptions.PaymentUtils
 
   @payment_modes ~w(cash_direct mpesa_direct in_app_mpesa)
@@ -31,6 +32,7 @@ defmodule Liddr.Rides.Execution.Completion do
             Repo.rollback(:ride_not_completable)
 
           true ->
+            SendDeliveries.ensure_completion_allowed!(ride, now)
             payment_mode = resolve_payment_mode!(attrs)
             ensure_request_payment_mode_policy!(ride, payment_mode)
             {final_fare, pricing_payload} = resolve_completion_pricing!(ride, attrs, payment_mode)
@@ -58,6 +60,7 @@ defmodule Liddr.Rides.Execution.Completion do
               )
               |> Shared.unwrap_or_rollback()
 
+            _ = SendDeliveries.mark_completed!(completed_ride)
             rating_actions = Ratings.enqueue_for_completed_ride!(completed_ride, now)
 
             _ =

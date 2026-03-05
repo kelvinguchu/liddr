@@ -42,8 +42,16 @@ defmodule LiddrWeb.RideDestinationChangeControllerTest do
   setup do
     previous_client = Application.get_env(:liddr, :google_routes_client)
     previous_multiplier = Application.get_env(:liddr, :ride_market_multiplier)
+    previous_policy = Application.get_env(:liddr, Liddr.Rides.DestinationChanges.Policy)
     Application.put_env(:liddr, :google_routes_client, FakeRoutesClient)
     Application.put_env(:liddr, :ride_market_multiplier, FakeMarketMultiplier)
+
+    Application.put_env(:liddr, Liddr.Rides.DestinationChanges.Policy,
+      cooldown_seconds: 0,
+      max_elapsed_seconds: 7_200,
+      request_ttl_seconds: 1_800,
+      origin_location_freshness_seconds: 600
+    )
 
     on_exit(fn ->
       if previous_client do
@@ -56,6 +64,12 @@ defmodule LiddrWeb.RideDestinationChangeControllerTest do
         Application.put_env(:liddr, :ride_market_multiplier, previous_multiplier)
       else
         Application.delete_env(:liddr, :ride_market_multiplier)
+      end
+
+      if previous_policy do
+        Application.put_env(:liddr, Liddr.Rides.DestinationChanges.Policy, previous_policy)
+      else
+        Application.delete_env(:liddr, Liddr.Rides.DestinationChanges.Policy)
       end
     end)
 

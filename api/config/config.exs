@@ -16,7 +16,18 @@ config :liddr, :google_routes_client, Liddr.Maps.RoutesClient
 config :liddr, :ride_market_multiplier, Liddr.Rides.MarketMultiplier
 config :liddr, :auth_debug_otp, false
 config :liddr, :auth_debug_otp_targets, []
+config :liddr, :otp_sms_client, Liddr.Auth.OtpDelivery.HostPinnacle
 config :liddr, :ride_supply_index, Liddr.Location.SupplyIndex
+config :liddr, :ride_push_client, Liddr.Rides.PushClient.FCM
+
+config :liddr, Liddr.Auth.ChallengeRateLimiter,
+  cooldown_seconds: 30,
+  identity_window_seconds: 900,
+  identity_max_requests: 5,
+  ip_window_seconds: 900,
+  ip_max_requests: 60,
+  device_window_seconds: 900,
+  device_max_requests: 40
 
 config :liddr, Liddr.Location.Cells, cell_size_deg: 0.01
 
@@ -54,15 +65,65 @@ config :liddr, Liddr.Rides.Integrity.Policy,
   rider_prepay_payment_mode: "in_app_mpesa",
   pickup_auto_reassign_enabled: true,
   pickup_auto_reassign_after_seconds: 420,
+  pickup_fast_reassign_enabled: true,
+  pickup_fast_reassign_after_seconds: 180,
   pickup_auto_cancel_enabled: true,
   pickup_auto_cancel_after_seconds: 900,
   pickup_auto_cancel_min_reassign_count: 1,
   pickup_watchdog_limit: 100
 
+config :liddr, Liddr.Rides.SharedRides.DetourGuard,
+  max_extra_detour_m: 2_000.0,
+  max_extra_detour_ratio: 0.6
+
+config :liddr, Liddr.Rides.SharedRides.StopEta,
+  google_enabled: false,
+  fallback_speed_kph: 28.0,
+  min_leg_seconds: 60,
+  max_leg_seconds: 7_200
+
+config :liddr, Liddr.Rides.DispatchEta,
+  enabled: true,
+  probe_limit: 8,
+  max_concurrency: 4,
+  timeout_ms: 1_200,
+  fallback_speed_kph: 28.0,
+  min_eta_seconds: 30,
+  max_eta_seconds: 7_200
+
+config :liddr, Liddr.Rides.DriverLiveness,
+  online_max_age_seconds: 90,
+  offline_after_seconds: 240
+
+config :liddr, Liddr.Rides.SharedRides.LocationEtaRefresh, min_interval_seconds: 15
+config :liddr, Liddr.Rides.PushClient.FCM, timeout_ms: 10_000
+
+config :liddr, Liddr.Rides.OfferLockMonitor,
+  enabled: true,
+  window_ms: 60_000,
+  min_attempts: 20,
+  unavailable_ratio_alert_threshold: 0.05
+
+config :liddr, Liddr.Rides.OfferLockExternalAlerting,
+  enabled: false,
+  provider: "raw",
+  webhook_url: nil,
+  min_level: "critical",
+  timeout_ms: 3_000,
+  auth_header: nil,
+  pagerduty_routing_key: nil,
+  slack_channel: nil,
+  slack_username: nil
+
 config :liddr, Liddr.Rides.NotificationRetry,
   limit: 100,
   max_attempts: 3,
   retry_interval_seconds: 30
+
+config :liddr, Liddr.Rides.MessageModerationPolicy,
+  report_window_days: 7,
+  auto_restrict_threshold: 3,
+  signal_cooldown_days: 2
 
 config :liddr, Liddr.Ratings.Policy,
   rating_window_hours: 24,

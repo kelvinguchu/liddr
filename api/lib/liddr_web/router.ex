@@ -67,8 +67,24 @@ defmodule LiddrWeb.Router do
     pipe_through [:api, :api_auth, :require_rider_or_driver]
 
     post "/reports", ReportController, :create
-    get "/ride-notifications", RideNotificationController, :index
-    post "/ride-notifications/:id/ack", RideNotificationController, :ack
+    get "/notifications/summary", RideNotificationController, :summary
+    get "/notifications", RideNotificationController, :index
+    post "/notifications/:id/ack", RideNotificationController, :ack
+    post "/push-tokens", PushTokenController, :upsert
+    delete "/push-tokens", PushTokenController, :revoke
+
+    post "/send/rides/:ride_id/recipient-confirm",
+         SendDeliveryController,
+         :confirm_recipient_in_app
+
+    get "/rides/messages/quick-actions", RideMessageController, :quick_actions
+    get "/rides/:ride_id/shared", SharedRideController, :show
+    get "/rides/:ride_id/messages", RideMessageController, :index
+    post "/rides/:ride_id/messages", RideMessageController, :create
+    post "/rides/:ride_id/messages/:id/read", RideMessageController, :mark_read
+    post "/rides/:ride_id/messages/:id/hide", RideMessageController, :hide
+    post "/rides/:ride_id/messages/:id/report", RideMessageController, :report
+
     get "/ratings/me/pending", RatingController, :pending
     post "/rides/:ride_id/rate", RatingController, :rate
     post "/rides/:ride_id/rate/skip", RatingController, :skip
@@ -79,9 +95,13 @@ defmodule LiddrWeb.Router do
 
     post "/rides/quote", RideController, :quote
     post "/rides/requests", RideController, :request
+    post "/send/quote", SendController, :quote
+    post "/send/requests", SendController, :request
+    get "/send/history/sender", SendController, :sender_history
     get "/rides/:ride_id/pickup-health", RideController, :pickup_health
     post "/rides/:ride_id/reassign", RideController, :reassign
     post "/rides/:ride_id/cancel", RideController, :rider_cancel
+    post "/rides/:ride_id/shared/members/:member_id/cancel", SharedRideController, :cancel_member
     post "/rides/:ride_id/destination-change-requests", RideDestinationChangeController, :request
     get "/rides/history/rider", RideController, :rider_history
   end
@@ -109,6 +129,22 @@ defmodule LiddrWeb.Router do
     post "/rides/:ride_id/driver-cancel", RideController, :driver_cancel
     post "/rides/:ride_id/no-show", RideController, :rider_no_show
 
+    post "/rides/:ride_id/shared/members/:member_id/no-show",
+         SharedRideController,
+         :mark_member_no_show
+
+    post "/rides/:ride_id/shared/members/:member_id/arrive-pickup",
+         SharedRideController,
+         :arrive_member_pickup
+
+    post "/rides/:ride_id/shared/members/:member_id/picked-up",
+         SharedRideController,
+         :mark_member_picked_up
+
+    post "/rides/:ride_id/shared/members/:member_id/dropped-off",
+         SharedRideController,
+         :mark_member_dropped_off
+
     post "/rides/:ride_id/destination-change-requests/:id/accept",
          RideDestinationChangeController,
          :accept
@@ -117,6 +153,9 @@ defmodule LiddrWeb.Router do
          RideDestinationChangeController,
          :reject
 
+    post "/send/rides/:ride_id/pickup-proof", SendDeliveryController, :pickup_proof
+    post "/send/rides/:ride_id/dropoff-proof", SendDeliveryController, :dropoff_proof
+    get "/send/history/courier", SendController, :courier_history
     get "/rides/history/driver", RideController, :driver_history
   end
 
@@ -138,6 +177,7 @@ defmodule LiddrWeb.Router do
     get "/ops/rides/integrity/users/:user_id", RideOpsController, :integrity_lookup
     post "/ops/rides/integrity/reconcile-prepay-modes", RideOpsController, :reconcile_prepay_modes
     get "/ops/rides/pickup-watchdog/summary", RideOpsController, :pickup_watchdog_summary
+    get "/ops/rides/offer-lock/health", RideOpsController, :offer_lock_health
     get "/ops/rides/:ride_id/notifications", RideOpsController, :ride_notifications
 
     get "/moderation/verification/applications", VerificationOpsController, :list_applications
@@ -177,6 +217,7 @@ defmodule LiddrWeb.Router do
     pipe_through [:api, :api_auth, :require_rider_or_driver]
 
     get "/rides/integrity/me", RideIntegrityController, :me
+    get "/rides/:ride_id/current-status", RideController, :current_status
     get "/rides/:ride_id/events", RideController, :events
     get "/rides/:ride_id/incidents", RideController, :incidents
     get "/rides/:ride_id", RideController, :show

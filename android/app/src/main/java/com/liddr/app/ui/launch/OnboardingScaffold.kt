@@ -10,6 +10,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -49,74 +50,76 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun OnboardingBackground(modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    val t = rememberInfiniteTransition(label = "bg")
-    val pulse by
-            t.animateFloat(
-                    initialValue = 0.93f,
-                    targetValue = 1.07f,
-                    animationSpec =
-                            infiniteRepeatable(
-                                    tween(3400, easing = FastOutSlowInEasing),
-                                    RepeatMode.Reverse
-                            ),
-                    label = "pulse"
-            )
+        val colors = MaterialTheme.colorScheme
+        val t = rememberInfiniteTransition(label = "bg")
+        val pulse by
+                t.animateFloat(
+                        initialValue = 0.97f,
+                        targetValue = 1.03f,
+                        animationSpec =
+                                infiniteRepeatable(
+                                        tween(4600, easing = FastOutSlowInEasing),
+                                        RepeatMode.Reverse
+                                ),
+                        label = "pulse"
+                )
 
-    Box(
-            modifier.fillMaxSize()
-                    .background(Brush.verticalGradient(listOf(colors.background, colors.surface)))
-    ) {
         Box(
-                Modifier.align(Alignment.TopEnd)
-                        .offset(x = 72.dp, y = (-56).dp)
-                        .size(220.dp)
-                        .graphicsLayer {
-                            scaleX = pulse
-                            scaleY = pulse
-                        }
-                        .clip(CircleShape)
-                        .background(colors.primary.copy(alpha = 0.08f))
-        )
-        Box(
-                Modifier.align(Alignment.BottomStart)
-                        .offset(x = (-80).dp, y = 80.dp)
-                        .size(260.dp)
-                        .graphicsLayer {
-                            val s = pulse * 1.04f
-                            scaleX = s
-                            scaleY = s
-                        }
-                        .clip(CircleShape)
-                        .background(colors.tertiary.copy(alpha = 0.06f))
-        )
-        content()
-    }
+                modifier.fillMaxSize()
+                        .background(
+                                Brush.verticalGradient(listOf(colors.background, colors.surface))
+                        )
+        ) {
+                Box(
+                        Modifier.align(Alignment.TopEnd)
+                                .offset(x = 72.dp, y = (-56).dp)
+                                .size(220.dp)
+                                .graphicsLayer {
+                                        scaleX = pulse
+                                        scaleY = pulse
+                                }
+                                .clip(CircleShape)
+                                .background(colors.primary.copy(alpha = 0.08f))
+                )
+                Box(
+                        Modifier.align(Alignment.BottomStart)
+                                .offset(x = (-80).dp, y = 80.dp)
+                                .size(260.dp)
+                                .graphicsLayer {
+                                        val s = pulse * 1.04f
+                                        scaleX = s
+                                        scaleY = s
+                                }
+                                .clip(CircleShape)
+                                .background(colors.tertiary.copy(alpha = 0.06f))
+                )
+                content()
+        }
 }
 
 /* ── Logo ──────────────────────────────────────────────────── */
 
 @Composable
 fun LiddrLogo(modifier: Modifier = Modifier) {
-    Image(
-            painterResource(R.drawable.liddr_orange_logo),
-            "Liddr",
-            contentScale = ContentScale.Fit,
-            modifier = modifier.fillMaxWidth(0.44f).height(52.dp)
-    )
+        Image(
+                painterResource(R.drawable.liddr_orange_logo),
+                "Liddr",
+                contentScale = ContentScale.Fit,
+                modifier = modifier.fillMaxWidth(0.44f).height(52.dp)
+        )
 }
 
 /* ── Legal footer ──────────────────────────────────────────── */
 
 @Composable
 fun LegalFooter(modifier: Modifier = Modifier) {
-    Text(
-            "By continuing you agree to Liddr\u2019s Terms & Privacy Policy.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = modifier.fillMaxWidth()
-    )
+        Text(
+                "By continuing you agree to Liddr\u2019s Terms & Privacy Policy.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = modifier.fillMaxWidth()
+        )
 }
 
 /* ── Pill segmented control ────────────────────────────────── */
@@ -128,71 +131,72 @@ fun PillSegmentedControl(
         modifier: Modifier = Modifier,
         onSelect: (Int) -> Unit
 ) {
-    val colors = MaterialTheme.colorScheme
-    val frac = 1f / labels.size
-    val anim by
-            animateFloatAsState(
-                    selectedIndex * frac,
-                    tween(280, easing = FastOutSlowInEasing),
-                    label = "pill"
-            )
+        val colors = MaterialTheme.colorScheme
+        val frac = 1f / labels.size
+        val anim by
+                animateFloatAsState(
+                        selectedIndex * frac,
+                        tween(220, easing = FastOutSlowInEasing),
+                        label = "pill"
+                )
 
-    Box(
-            modifier.fillMaxWidth()
-                    .height(46.dp)
-                    .clip(RoundedCornerShape(23.dp))
-                    .background(colors.surfaceVariant)
-    ) {
         Box(
-                Modifier.fillMaxWidth(frac)
-                        .fillMaxHeight()
-                        .graphicsLayer { translationX = anim * size.width * labels.size }
-                        .padding(3.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(colors.primary)
-        )
-        Row(Modifier.fillMaxSize()) {
-            labels.forEachIndexed { i, label ->
-                val tc by
-                        animateColorAsState(
-                                if (i == selectedIndex) colors.onPrimary
-                                else colors.onSurfaceVariant,
-                                tween(200),
-                                label = "seg$i"
-                        )
+                modifier.fillMaxWidth()
+                        .height(46.dp)
+                        .clip(RoundedCornerShape(23.dp))
+                        .border(1.dp, colors.outlineVariant, RoundedCornerShape(23.dp))
+                        .background(colors.surfaceVariant)
+        ) {
                 Box(
-                        Modifier.weight(1f).fillMaxHeight().clickable(
-                                        remember { MutableInteractionSource() },
-                                        indication = null
-                                ) { onSelect(i) },
-                        contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                            label,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = tc
-                    )
+                        Modifier.fillMaxWidth(frac)
+                                .fillMaxHeight()
+                                .graphicsLayer { translationX = anim * size.width * labels.size }
+                                .padding(3.dp)
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(colors.primary)
+                )
+                Row(Modifier.fillMaxSize()) {
+                        labels.forEachIndexed { i, label ->
+                                val tc by
+                                        animateColorAsState(
+                                                if (i == selectedIndex) colors.onPrimary
+                                                else colors.onSurface,
+                                                tween(160),
+                                                label = "seg$i"
+                                        )
+                                Box(
+                                        Modifier.weight(1f).fillMaxHeight().clickable(
+                                                        remember { MutableInteractionSource() },
+                                                        indication = null
+                                                ) { onSelect(i) },
+                                        contentAlignment = Alignment.Center
+                                ) {
+                                        Text(
+                                                label,
+                                                style = MaterialTheme.typography.labelLarge,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = tc
+                                        )
+                                }
+                        }
                 }
-            }
         }
-    }
 }
 
 /* ── "or" divider ──────────────────────────────────────────── */
 
 @Composable
 fun OrDivider(modifier: Modifier = Modifier) {
-    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        HorizontalDivider(Modifier.weight(1f), color = MaterialTheme.colorScheme.outline)
-        Text(
-                "or",
-                Modifier.padding(horizontal = 16.dp),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        HorizontalDivider(Modifier.weight(1f), color = MaterialTheme.colorScheme.outline)
-    }
+        Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                HorizontalDivider(Modifier.weight(1f), color = MaterialTheme.colorScheme.outline)
+                Text(
+                        "or",
+                        Modifier.padding(horizontal = 16.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                HorizontalDivider(Modifier.weight(1f), color = MaterialTheme.colorScheme.outline)
+        }
 }
 
 /* ── Staggered entrance helper ─────────────────────────────── */
@@ -200,24 +204,20 @@ fun OrDivider(modifier: Modifier = Modifier) {
 @Composable
 fun rememberStaggeredEntrance(
         count: Int,
-        initialDelayMs: Long = 80L,
-        staggerMs: Long = 70L
+        initialDelayMs: Long = 40L,
+        staggerMs: Long = 40L
 ): List<Boolean> {
-    val flags = remember { mutableStateListOf(*Array(count) { false }) }
+        // Key on count so the list is always exactly the right size during
+        // composition. When count changes (e.g. sign-up ↔ sign-in toggle)
+        // a fresh list is created, avoiding IndexOutOfBoundsException.
+        val flags = remember(count) { mutableStateListOf(*Array(count) { false }) }
 
-    // React to size changes: grow or shrink the list to match count.
-    LaunchedEffect(count) {
-        while (flags.size < count) flags.add(true)
-        while (flags.size > count) flags.removeAt(flags.lastIndex)
-    }
-
-    // Initial staggered reveal on first composition only.
-    LaunchedEffect(Unit) {
-        delay(initialDelayMs)
-        for (i in 0 until count) {
-            if (i < flags.size) flags[i] = true
-            if (i < count - 1) delay(staggerMs)
+        LaunchedEffect(count) {
+                delay(initialDelayMs)
+                for (i in 0 until count) {
+                        if (i < flags.size) flags[i] = true
+                        if (i < count - 1) delay(staggerMs)
+                }
         }
-    }
-    return flags
+        return flags
 }

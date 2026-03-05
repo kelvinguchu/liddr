@@ -5,6 +5,7 @@ defmodule Liddr.Rides.Execution.Reassignment do
 
   alias Liddr.Repo
   alias Liddr.Location
+  alias Liddr.Rides.DriverOfferLock
   alias Liddr.Rides.Dispatcher
   alias Liddr.Rides.Events
   alias Liddr.Rides.Execution.PickupHealth
@@ -58,6 +59,33 @@ defmodule Liddr.Rides.Execution.Reassignment do
             "metadata" => metadata
           })
 
+        status_signal = status_signal_from_health(health)
+
+        _ =
+          maybe_record_status_signal_event(
+            updated_ride.id,
+            rider_user_id,
+            previous_driver_id,
+            status_signal,
+            health,
+            now
+          )
+
+        reassigning_payload = %{
+          "previous_driver_id" => previous_driver_id,
+          "recommendation_reason_code" => health["recommendation_reason_code"],
+          "signals" => health["signals"],
+          "flags" => health["flags"],
+          "trigger_reason" => get_reassign_trigger_reason(attrs)
+        }
+
+        _ =
+          Events.record_event(updated_ride.id, "reassigning_driver", now,
+            actor_user_id: rider_user_id,
+            payload: reassigning_payload
+          )
+          |> Shared.unwrap_or_rollback()
+
         _ =
           if driver.current_ride_id == ride.id do
             Shared.release_driver_after_cancellation!(driver, now)
@@ -81,7 +109,9 @@ defmodule Liddr.Rides.Execution.Reassignment do
           ride: updated_ride,
           withdrawn_offer: withdrawn_offer,
           health: health,
-          previous_driver_id: previous_driver_id
+          previous_driver_id: previous_driver_id,
+          status_signal: status_signal,
+          reassigning_payload: reassigning_payload
         }
       end)
       |> Shared.unwrap_transaction_result()
@@ -89,8 +119,22 @@ defmodule Liddr.Rides.Execution.Reassignment do
     case result do
       {:ok, payload} ->
         _ = Location.sync_driver_supply(payload.previous_driver_id)
+        DriverOfferLock.release_many([payload.withdrawn_offer], source: "rider_reassign")
         maybe_broadcast_offer_withdrawn(payload.ride.id, payload.withdrawn_offer)
-        Realtime.broadcast_ride_reassigned(payload.ride, payload.health)
+        maybe_broadcast_status_signal(payload)
+
+        Realtime.broadcast_reassigning_driver(
+          payload.ride,
+          payload.reassigning_payload,
+          payload.previous_driver_id
+        )
+
+        Realtime.broadcast_ride_reassigned(
+          payload.ride,
+          payload.health,
+          payload.previous_driver_id
+        )
+
         _ = Dispatcher.ensure_started(payload.ride.id)
         :ok = Dispatcher.dispatch_now(payload.ride.id)
         {:ok, payload.ride}
@@ -185,4 +229,79 @@ defmodule Liddr.Rides.Execution.Reassignment do
 
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
+
+  defp status_signal_from_health(%{"flags" => flags}) when is_map(flags) do
+    cond do
+      flags["driver_location_stale"] == true -> :driver_offline_detected
+      flags["driver_late"] == true -> :driver_delayed
+      flags["driver_no_progress"] == true -> :driver_delayed
+      flags["driver_moving_away"] == true -> :driver_delayed
+      true -> nil
+    end
+  end
+
+  defp status_signal_from_health(_health), do: nil
+
+  defp maybe_record_status_signal_event(
+         _ride_id,
+         _actor_user_id,
+         _previous_driver_id,
+         nil,
+         _health,
+         _now
+       ),
+       do: :ok
+
+  defp maybe_record_status_signal_event(
+         ride_id,
+         actor_user_id,
+         previous_driver_id,
+         signal_event,
+         health,
+         now
+       ) do
+    Events.record_event(ride_id, signal_event, now,
+      actor_user_id: actor_user_id,
+      payload: %{
+        "previous_driver_id" => previous_driver_id,
+        "recommendation_reason_code" => health["recommendation_reason_code"],
+        "signals" => health["signals"],
+        "flags" => health["flags"]
+      }
+    )
+    |> Shared.unwrap_or_rollback()
+  end
+
+  defp maybe_broadcast_status_signal(%{status_signal: nil}), do: :ok
+
+  defp maybe_broadcast_status_signal(%{status_signal: :driver_offline_detected} = payload) do
+    Realtime.broadcast_driver_offline_detected(
+      payload.ride,
+      %{
+        previous_driver_id: payload.previous_driver_id,
+        recommendation_reason_code: payload.health["recommendation_reason_code"],
+        pickup_health: payload.health
+      },
+      payload.previous_driver_id
+    )
+  end
+
+  defp maybe_broadcast_status_signal(%{status_signal: :driver_delayed} = payload) do
+    Realtime.broadcast_driver_delayed(
+      payload.ride,
+      %{
+        previous_driver_id: payload.previous_driver_id,
+        recommendation_reason_code: payload.health["recommendation_reason_code"],
+        pickup_health: payload.health
+      },
+      payload.previous_driver_id
+    )
+  end
+
+  defp get_reassign_trigger_reason(attrs) do
+    case get_value(attrs, :reason) do
+      value when is_binary(value) and value != "" -> String.trim(value)
+      _ -> "manual_reassign"
+    end
+  end
 end

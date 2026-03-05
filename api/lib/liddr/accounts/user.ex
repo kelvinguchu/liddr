@@ -4,11 +4,13 @@ defmodule Liddr.Accounts.User do
 
   @account_statuses ~w(active restricted suspended banned deactivated)
   @ride_booking_modes ~w(normal prepay_only)
+  @genders ~w(female male other unknown)
 
   schema "users" do
     field :phone, :string
     field :google_id, :string
     field :email, :string
+    field :gender, :string
     field :phone_verified_at, :utc_datetime_usec
     field :email_verified_at, :utc_datetime_usec
     field :account_status, :string
@@ -28,10 +30,13 @@ defmodule Liddr.Accounts.User do
 
   def registration_changeset(user, attrs) do
     user
-    |> cast(attrs, [:phone, :google_id, :email, :phone_verified_at, :email_verified_at])
+    |> cast(attrs, [:phone, :google_id, :email, :gender, :phone_verified_at, :email_verified_at])
+    |> update_change(:gender, &normalize_gender/1)
+    |> validate_inclusion(:gender, @genders)
     |> unique_constraint(:phone)
     |> unique_constraint(:google_id)
     |> unique_constraint(:email)
+    |> check_constraint(:gender, name: :users_gender_valid)
   end
 
   def account_status_changeset(user, attrs) do
@@ -64,4 +69,18 @@ defmodule Liddr.Accounts.User do
     |> check_constraint(:rating_count, name: :users_rating_count_non_negative)
     |> check_constraint(:rating_weight_total, name: :users_rating_weight_total_non_negative)
   end
+
+  defp normalize_gender(nil), do: nil
+
+  defp normalize_gender(value) when is_binary(value) do
+    value
+    |> String.trim()
+    |> String.downcase()
+    |> case do
+      "" -> nil
+      normalized -> normalized
+    end
+  end
+
+  defp normalize_gender(value), do: to_string(value) |> normalize_gender()
 end

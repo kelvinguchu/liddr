@@ -516,3 +516,53 @@ Repo.insert_all(
      ]},
   conflict_target: [:slug]
 )
+
+prohibited_items = [
+  %{
+    keyword: "cash",
+    severity: "block",
+    message: "Cash delivery is not allowed for Send.",
+    is_active: true,
+    inserted_at: now,
+    updated_at: now
+  },
+  %{
+    keyword: "firearm",
+    severity: "block",
+    message: "Firearms are prohibited on the platform.",
+    is_active: true,
+    inserted_at: now,
+    updated_at: now
+  },
+  %{
+    keyword: "alcohol",
+    severity: "block",
+    message: "Alcohol delivery is not supported for Send.",
+    is_active: true,
+    inserted_at: now,
+    updated_at: now
+  },
+  %{
+    keyword: "jewellery",
+    severity: "warn",
+    message: "High-value items travel at sender liability.",
+    is_active: true,
+    inserted_at: now,
+    updated_at: now
+  },
+  %{
+    keyword: "electronics",
+    severity: "warn",
+    message: "Fragile electronics require careful packaging by sender.",
+    is_active: true,
+    inserted_at: now,
+    updated_at: now
+  }
+]
+
+Repo.insert_all(
+  "prohibited_items",
+  prohibited_items,
+  on_conflict: {:replace, [:severity, :message, :is_active, :updated_at]},
+  conflict_target: [:keyword]
+)

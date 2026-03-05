@@ -196,6 +196,47 @@ defmodule Liddr.Rides.RealtimeTest do
     }
   end
 
+  test "broadcast_shared_eta_updated publishes lightweight payload to ride and driver topics", %{
+    ride: ride,
+    driver_id: driver_id
+  } do
+    ride_id = ride.id
+    ride_topic = "ride:#{ride_id}"
+    driver_topic = "driver:#{driver_id}"
+
+    next_stop = %{
+      "id" => 9001,
+      "member_id" => 77,
+      "stop_type" => "pickup",
+      "status" => "pending",
+      "sequence" => 1,
+      "lat" => Decimal.new("-1.2910000"),
+      "lng" => Decimal.new("36.8220000"),
+      "eta_at" => DateTime.utc_now() |> DateTime.truncate(:microsecond)
+    }
+
+    Realtime.broadcast_shared_eta_updated(
+      %{ride | driver_id: driver_id, status: "accepted"},
+      next_stop
+    )
+
+    assert_receive %Phoenix.Socket.Broadcast{
+      topic: ^ride_topic,
+      event: "shared_eta_updated",
+      payload: %{ride_id: ^ride_id, next_stop: %{"id" => 9001}, emitted_at: ride_emitted_at}
+    }
+
+    assert %DateTime{} = ride_emitted_at
+
+    assert_receive %Phoenix.Socket.Broadcast{
+      topic: ^driver_topic,
+      event: "shared_eta_updated",
+      payload: %{ride_id: ^ride_id, next_stop: %{"id" => 9001}, emitted_at: driver_emitted_at}
+    }
+
+    assert %DateTime{} = driver_emitted_at
+  end
+
   defp create_eligible_driver_profile!(user_id, category_id) do
     user = Repo.get!(User, user_id)
 

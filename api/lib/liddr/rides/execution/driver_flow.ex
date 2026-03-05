@@ -2,6 +2,7 @@ defmodule Liddr.Rides.Execution.DriverFlow do
   alias Liddr.Rides.Events
   alias Liddr.Rides.Execution.Geofence
   alias Liddr.Repo
+  alias Liddr.Rides.SendDeliveries
   alias Liddr.Rides.Execution.Shared
   alias Liddr.Rides.Realtime
 
@@ -112,6 +113,8 @@ defmodule Liddr.Rides.Execution.DriverFlow do
         %{ride: ride, event: nil}
 
       ride.status == "arrived" ->
+        SendDeliveries.ensure_start_allowed!(ride)
+
         updated_ride =
           Shared.update_ride!(ride, %{
             "status" => "in_progress",

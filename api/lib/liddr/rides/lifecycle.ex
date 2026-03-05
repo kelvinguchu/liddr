@@ -1,12 +1,16 @@
 defmodule Liddr.Rides.Lifecycle do
   import Ecto.Query
 
+  alias Ecto.Changeset
   alias Liddr.Accounts.Driver
   alias Liddr.Accounts.User
   alias Liddr.Auth.Policy
   alias Liddr.Location
   alias Liddr.Repo
+  alias Liddr.Rides.ActiveRides
+  alias Liddr.Rides.DriverOfferLock
   alias Liddr.Rides.Dispatcher
+  alias Liddr.Rides.DriverLiveness
   alias Liddr.Rides.Events
   alias Liddr.Rides.Integrity.AcceptanceTelemetry
   alias Liddr.Rides.Realtime
@@ -36,6 +40,7 @@ defmodule Liddr.Rides.Lifecycle do
 
     record_offer_events!("offer_expired", expired_offers, now)
     record_offer_events!("offer_missed", expired_offers, now)
+    DriverOfferLock.release_many(expired_offers, source: "driver_offer_list_expire")
 
     offers =
       Repo.all(
@@ -63,7 +68,7 @@ defmodule Liddr.Rides.Lifecycle do
         offer = fetch_offer_for_update!(offer_id)
         ensure_offer_belongs_to_driver!(offer, driver_user_id)
         ensure_offer_open!(offer, now)
-        driver = ensure_driver_eligible_for_accept!(driver_user_id)
+        driver = ensure_driver_eligible_for_accept!(driver_user_id, now)
         ride = fetch_ride_for_update!(offer.ride_id)
         ensure_ride_assignable!(ride)
 
@@ -139,14 +144,28 @@ defmodule Liddr.Rides.Lifecycle do
           )
           |> unwrap_or_rollback()
 
+        new_driver_found_payload =
+          build_new_driver_found_payload(ride.metadata, driver_user_id, accepted_offer.id)
+
+        _ =
+          maybe_record_new_driver_found_event(
+            ride.id,
+            driver_user_id,
+            new_driver_found_payload,
+            now
+          )
+          |> unwrap_or_rollback()
+
         %{
           ride: updated_ride,
           offer: accepted_offer,
           competing_ride_offers: competing_ride_offers,
-          competing_driver_offers: competing_driver_offers
+          competing_driver_offers: competing_driver_offers,
+          new_driver_found_payload: new_driver_found_payload
         }
       end)
       |> unwrap_transaction_result()
+      |> normalize_accept_error()
 
     case result do
       {:ok,
@@ -154,10 +173,20 @@ defmodule Liddr.Rides.Lifecycle do
          ride: ride,
          offer: accepted_offer,
          competing_ride_offers: competing_ride_offers,
-         competing_driver_offers: competing_driver_offers
+         competing_driver_offers: competing_driver_offers,
+         new_driver_found_payload: new_driver_found_payload
        } = payload} ->
         _ = Location.remove_driver_from_supply(driver_user_id)
+
+        DriverOfferLock.release_many(
+          [
+            accepted_offer | competing_ride_offers ++ competing_driver_offers
+          ],
+          source: "offer_accept"
+        )
+
         Realtime.broadcast_ride_assigned(ride, accepted_offer)
+        maybe_broadcast_new_driver_found(ride, new_driver_found_payload)
 
         Enum.each(
           competing_ride_offers,
@@ -206,6 +235,7 @@ defmodule Liddr.Rides.Lifecycle do
 
     case result do
       {:ok, %{ride: ride, offer: rejected_offer} = payload} ->
+        DriverOfferLock.release_many([rejected_offer], source: "offer_reject")
         Realtime.broadcast_offer_withdrawn(ride.id, rejected_offer, "driver_rejected")
         _ = Dispatcher.ensure_started(ride.id)
         :ok = Dispatcher.dispatch_now(ride.id)
@@ -264,7 +294,7 @@ defmodule Liddr.Rides.Lifecycle do
     end
   end
 
-  defp ensure_driver_eligible_for_accept!(driver_user_id) do
+  defp ensure_driver_eligible_for_accept!(driver_user_id, now) do
     user = Repo.get(User, driver_user_id) || Repo.rollback(:user_not_found)
 
     case Policy.ensure_user_can_authenticate(user) do
@@ -280,12 +310,29 @@ defmodule Liddr.Rides.Lifecycle do
       ) || Repo.rollback(:driver_profile_not_found)
 
     cond do
-      driver.account_status != "active" -> Repo.rollback(:driver_account_not_active)
-      driver.verification_status != "approved" -> Repo.rollback(:driver_not_verified)
-      driver.subscription_status != "active" -> Repo.rollback(:driver_subscription_not_active)
-      driver.is_available != true -> Repo.rollback(:driver_not_available)
-      not is_nil(driver.current_ride_id) -> Repo.rollback(:driver_has_active_ride)
-      true -> driver
+      driver.account_status != "active" ->
+        Repo.rollback(:driver_account_not_active)
+
+      driver.verification_status != "approved" ->
+        Repo.rollback(:driver_not_verified)
+
+      driver.subscription_status != "active" ->
+        Repo.rollback(:driver_subscription_not_active)
+
+      not is_nil(driver.current_ride_id) ->
+        Repo.rollback(:driver_has_active_ride)
+
+      ActiveRides.driver_has_active_ride?(driver_user_id) ->
+        Repo.rollback(:driver_has_active_ride)
+
+      driver.is_available != true ->
+        Repo.rollback(:driver_not_available)
+
+      not DriverLiveness.accept_allowed?(DriverLiveness.snapshot(driver, now)) ->
+        Repo.rollback(:driver_presence_unhealthy)
+
+      true ->
+        driver
     end
   end
 
@@ -333,4 +380,60 @@ defmodule Liddr.Rides.Lifecycle do
   defp unwrap_transaction_result({:error, reason}), do: {:error, reason}
   defp unwrap_or_rollback({:ok, value}), do: value
   defp unwrap_or_rollback({:error, changeset}), do: Repo.rollback(changeset)
+
+  defp normalize_accept_error({:error, %Changeset{} = changeset}) do
+    if active_driver_conflict_changeset?(changeset),
+      do: {:error, :driver_has_active_ride},
+      else: {:error, changeset}
+  end
+
+  defp normalize_accept_error(result), do: result
+
+  defp active_driver_conflict_changeset?(changeset) do
+    changeset.errors
+    |> Keyword.get_values(:driver_id)
+    |> Enum.any?(fn {_message, opts} ->
+      Keyword.get(opts, :constraint) == :unique and
+        Keyword.get(opts, :constraint_name) == "rides_unique_active_driver_idx"
+    end)
+  end
+
+  defp build_new_driver_found_payload(%{} = metadata, new_driver_id, offer_id) do
+    reassign_count = Map.get(metadata, "reassign_count", 0)
+
+    if is_integer(reassign_count) and reassign_count > 0 do
+      %{
+        "reassign_count" => reassign_count,
+        "previous_driver_id" => Map.get(metadata, "last_reassign_driver_id"),
+        "new_driver_id" => new_driver_id,
+        "offer_id" => offer_id,
+        "recommendation_reason_code" => Map.get(metadata, "last_reassign_reason_code")
+      }
+    else
+      nil
+    end
+  end
+
+  defp build_new_driver_found_payload(_metadata, _new_driver_id, _offer_id), do: nil
+
+  defp maybe_record_new_driver_found_event(_ride_id, _driver_user_id, nil, _now), do: {:ok, nil}
+
+  defp maybe_record_new_driver_found_event(ride_id, driver_user_id, payload, now) do
+    Events.record_event(ride_id, "new_driver_found", now,
+      actor_user_id: driver_user_id,
+      payload: payload
+    )
+  end
+
+  defp maybe_broadcast_new_driver_found(_ride, nil), do: :ok
+
+  defp maybe_broadcast_new_driver_found(ride, payload) do
+    Realtime.broadcast_new_driver_found(ride, %{
+      previous_driver_id: payload["previous_driver_id"],
+      new_driver_id: payload["new_driver_id"],
+      reassign_count: payload["reassign_count"],
+      recommendation_reason_code: payload["recommendation_reason_code"],
+      offer_id: payload["offer_id"]
+    })
+  end
 end

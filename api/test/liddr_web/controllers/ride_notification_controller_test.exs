@@ -22,7 +22,7 @@ defmodule LiddrWeb.RideNotificationControllerTest do
     Realtime.broadcast_driver_arriving(ride)
 
     assert %{"data" => %{"notifications" => rider_notifications}} =
-             get(rider_conn, "/api/ride-notifications?limit=20")
+             get(rider_conn, "/api/notifications?limit=20")
              |> json_response(200)
 
     assert Enum.any?(rider_notifications, fn row ->
@@ -31,7 +31,7 @@ defmodule LiddrWeb.RideNotificationControllerTest do
            end)
 
     assert %{"data" => %{"notifications" => driver_notifications}} =
-             get(driver_conn, "/api/ride-notifications?limit=20")
+             get(driver_conn, "/api/notifications?limit=20")
              |> json_response(200)
 
     assert Enum.any?(driver_notifications, fn row ->
@@ -67,24 +67,76 @@ defmodule LiddrWeb.RideNotificationControllerTest do
       )
 
     assert %{"data" => %{"notification" => %{"id" => id, "socket_status" => "acked"}}} =
-             post(rider_conn, "/api/ride-notifications/#{notification.id}/ack", %{})
+             post(rider_conn, "/api/notifications/#{notification.id}/ack", %{})
              |> json_response(200)
 
     assert id == notification.id
 
     assert %{"data" => %{"notifications" => rows}} =
-             get(rider_conn, "/api/ride-notifications?limit=20")
+             get(rider_conn, "/api/notifications?limit=20")
              |> json_response(200)
 
     refute Enum.any?(rows, &(&1["id"] == notification.id))
 
     assert %{"data" => %{"notifications" => rows_with_acked}} =
-             get(rider_conn, "/api/ride-notifications?limit=20&include_acked=true")
+             get(rider_conn, "/api/notifications?limit=20&include_acked=true")
              |> json_response(200)
 
     assert Enum.any?(rows_with_acked, fn row ->
              row["id"] == notification.id and row["socket_status"] == "acked"
            end)
+  end
+
+  test "summary returns unread, critical and latest notification timestamp", %{conn: conn} do
+    %{auth_conn: rider_conn, user_id: rider_user_id} = AuthFixtures.authenticate_rider!(conn)
+    %{user_id: driver_user_id} = AuthFixtures.authenticate_driver!(conn)
+    category_id = VerificationFixtures.insert_vehicle_category!()
+    _ = create_driver_profile!(driver_user_id, category_id)
+    ride = create_accepted_ride!(rider_user_id, driver_user_id, category_id)
+    first_at = DateTime.utc_now() |> DateTime.truncate(:microsecond)
+    second_at = DateTime.add(first_at, 1, :second)
+
+    _ =
+      Notifications.queue_event_for_user!(
+        ride.id,
+        rider_user_id,
+        "driver_arrived",
+        %{"ride_id" => ride.id},
+        first_at
+      )
+
+    _ =
+      Notifications.queue_event_for_user!(
+        ride.id,
+        rider_user_id,
+        "ride_cancelled",
+        %{"ride_id" => ride.id},
+        second_at
+      )
+
+    notification =
+      Repo.one!(
+        from n in RideNotification,
+          where:
+            n.ride_id == ^ride.id and n.recipient_user_id == ^rider_user_id and
+              n.event_type == "driver_arrived",
+          order_by: [desc: n.id],
+          limit: 1
+      )
+
+    _ = post(rider_conn, "/api/notifications/#{notification.id}/ack", %{}) |> json_response(200)
+
+    assert %{
+             "data" => %{
+               "unread_count" => 1,
+               "critical_count" => 1,
+               "latest_notification_at" => latest_notification_at
+             }
+           } =
+             get(rider_conn, "/api/notifications/summary")
+             |> json_response(200)
+
+    assert latest_notification_at == DateTime.to_iso8601(second_at)
   end
 
   defp create_accepted_ride!(rider_id, driver_id, category_id) do

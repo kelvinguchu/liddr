@@ -17,12 +17,22 @@ defmodule Liddr.Rides.Notifications do
     trip_cancelled
     ride_completed
     ride_reassigned
+    driver_delayed
+    driver_offline_detected
+    reassigning_driver
+    new_driver_found
     destination_change_requested
     destination_change_accepted
     destination_change_rejected
+    send_pickup_proof_captured
+    send_dropoff_proof_captured
+    send_recipient_confirmed
+    shared_eta_updated
     rating_pending
     rating_submitted
     rating_skipped
+    ride_message_sent
+    ride_message_read
     ride_cancelled
   )
 
@@ -65,6 +75,23 @@ defmodule Liddr.Rides.Notifications do
     else
       []
     end
+  end
+
+  def queue_event_for_user!(ride_id, recipient_user_id, event_type, payload, occurred_at) do
+    row = %{
+      ride_id: ride_id,
+      recipient_user_id: recipient_user_id,
+      event_type: to_string(event_type),
+      socket_status: "pending",
+      push_status: "pending",
+      poll_status: "pending",
+      payload: normalize_payload(payload),
+      inserted_at: occurred_at,
+      updated_at: occurred_at
+    }
+
+    {_, inserted} = Repo.insert_all(RideNotification, [row], returning: [:recipient_user_id])
+    Enum.map(inserted, &Map.get(&1, :recipient_user_id))
   end
 
   def list_for_user(user_id, attrs \\ %{}) do

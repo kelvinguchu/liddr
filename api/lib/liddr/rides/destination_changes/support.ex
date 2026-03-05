@@ -4,6 +4,7 @@ defmodule Liddr.Rides.DestinationChanges.Support do
   alias Decimal, as: D
   alias Liddr.Location.DriverLocation
   alias Liddr.Repo
+  alias Liddr.Rides.DestinationChanges.Policy
   alias Liddr.Rides.Execution.Shared
   alias Liddr.Rides.Ride
   alias Liddr.Rides.RideDestinationChange
@@ -19,6 +20,50 @@ defmodule Liddr.Rides.DestinationChanges.Support do
       status != "in_progress" -> Repo.rollback(:ride_destination_change_not_allowed)
       product_type == "shared" -> Repo.rollback(:ride_destination_change_not_allowed_for_shared)
       true -> :ok
+    end
+  end
+
+  def ensure_destination_change_window!(%Ride{started_at: nil}, _now) do
+    Repo.rollback(:ride_destination_change_not_allowed)
+  end
+
+  def ensure_destination_change_window!(%Ride{started_at: started_at}, now) do
+    elapsed_seconds = max(DateTime.diff(now, started_at, :second), 0)
+
+    if elapsed_seconds > Policy.max_elapsed_seconds() do
+      Repo.rollback(:destination_change_window_elapsed)
+    else
+      :ok
+    end
+  end
+
+  def ensure_destination_change_cooldown!(ride_id, now) do
+    cooldown_seconds = Policy.cooldown_seconds()
+
+    if cooldown_seconds <= 0 do
+      :ok
+    else
+      latest_requested_at =
+        Repo.one(
+          from dc in RideDestinationChange,
+            where: dc.ride_id == ^ride_id,
+            order_by: [desc: dc.requested_at],
+            limit: 1,
+            select: dc.requested_at
+        )
+
+      within_cooldown? =
+        case latest_requested_at do
+          %DateTime{} = requested_at ->
+            DateTime.diff(now, requested_at, :second) < cooldown_seconds
+
+          _ ->
+            false
+        end
+
+      if within_cooldown?,
+        do: Repo.rollback(:destination_change_cooldown_active),
+        else: :ok
     end
   end
 
@@ -56,6 +101,16 @@ defmodule Liddr.Rides.DestinationChanges.Support do
             dc.status == "requested",
         lock: "FOR UPDATE"
     ) || Repo.rollback(:destination_change_not_found)
+  end
+
+  def ensure_change_request_fresh!(change, now) do
+    age_seconds = max(DateTime.diff(now, change.requested_at, :second), 0)
+
+    if age_seconds > Policy.request_ttl_seconds() do
+      Repo.rollback(:destination_change_request_stale)
+    else
+      :ok
+    end
   end
 
   def resolve_reason_code!(attrs, allowed_codes) do
@@ -115,11 +170,14 @@ defmodule Liddr.Rides.DestinationChanges.Support do
     Repo.get(VehicleCategory, category_id) || Repo.rollback(:vehicle_category_not_found)
   end
 
-  def current_origin_point(%Ride{
-        driver_id: driver_user_id,
-        pickup_lat: pickup_lat,
-        pickup_lng: pickup_lng
-      }) do
+  def current_origin_point!(
+        %Ride{
+          driver_id: driver_user_id,
+          pickup_lat: pickup_lat,
+          pickup_lng: pickup_lng
+        },
+        now
+      ) do
     location =
       Repo.one(
         from dl in DriverLocation,
@@ -129,6 +187,7 @@ defmodule Liddr.Rides.DestinationChanges.Support do
       )
 
     if location do
+      ensure_origin_location_fresh!(location, now)
       %{lat: to_float(location.lat), lng: to_float(location.lng)}
     else
       %{lat: to_float(pickup_lat), lng: to_float(pickup_lng)}
@@ -156,63 +215,6 @@ defmodule Liddr.Rides.DestinationChanges.Support do
       {:ok, payload} -> payload
       {:error, reason} -> Repo.rollback(reason)
     end
-  end
-
-  def destination_change_metadata(metadata, change) do
-    metadata = Shared.normalize_metadata(metadata)
-    existing = Map.get(metadata, "destination_changes", [])
-
-    entry = %{
-      "destination_change_id" => change.id,
-      "accepted_at" => change.responded_at,
-      "old_dropoff_lat" => RoutePricing.decimal_to_string(change.old_dropoff_lat),
-      "old_dropoff_lng" => RoutePricing.decimal_to_string(change.old_dropoff_lng),
-      "new_dropoff_lat" => RoutePricing.decimal_to_string(change.new_dropoff_lat),
-      "new_dropoff_lng" => RoutePricing.decimal_to_string(change.new_dropoff_lng),
-      "old_fare_kes" => RoutePricing.decimal_to_string(change.old_fare_kes),
-      "new_fare_kes" => RoutePricing.decimal_to_string(change.new_fare_kes),
-      "fare_delta_kes" => RoutePricing.decimal_to_string(change.fare_delta_kes)
-    }
-
-    metadata
-    |> Map.put("quoted_final_fare_kes", RoutePricing.decimal_to_string(change.new_fare_kes))
-    |> Map.put("destination_changes", existing ++ [entry])
-  end
-
-  def destination_change_event_payload(change) do
-    %{
-      "destination_change_id" => change.id,
-      "status" => change.status,
-      "reason_code" => change.reason_code,
-      "old_fare_kes" => RoutePricing.decimal_to_string(change.old_fare_kes),
-      "new_fare_kes" => RoutePricing.decimal_to_string(change.new_fare_kes),
-      "fare_delta_kes" => RoutePricing.decimal_to_string(change.fare_delta_kes),
-      "new_dropoff_lat" => RoutePricing.decimal_to_string(change.new_dropoff_lat),
-      "new_dropoff_lng" => RoutePricing.decimal_to_string(change.new_dropoff_lng)
-    }
-  end
-
-  def pricing_payload(estimate) do
-    %{
-      "route" => %{
-        "distance_m" => estimate.route.distance_m,
-        "duration_s" => estimate.route.duration_s,
-        "static_duration_s" => estimate.route.static_duration_s,
-        "polyline" => estimate.route.polyline
-      },
-      "routing" => %{
-        "travel_mode" => estimate.routing.travel_mode,
-        "routing_preference" => estimate.routing.routing_preference,
-        "departure_time" => estimate.routing.departure_time
-      },
-      "pricing" => %{
-        "base_fare_kes" => RoutePricing.decimal_to_string(estimate.pricing.base_fare_kes),
-        "discount_percent" => RoutePricing.decimal_to_string(estimate.pricing.discount_percent),
-        "discount_amount_kes" =>
-          RoutePricing.decimal_to_string(estimate.pricing.discount_amount_kes),
-        "final_fare_kes" => RoutePricing.decimal_to_string(estimate.pricing.final_fare_kes)
-      }
-    }
   end
 
   def to_decimal(value), do: D.from_float(value) |> D.round(7)
@@ -247,4 +249,18 @@ defmodule Liddr.Rides.DestinationChanges.Support do
   end
 
   defp parse_decimal(_value), do: nil
+
+  defp ensure_origin_location_fresh!(%DriverLocation{captured_at: nil}, _now) do
+    Repo.rollback(:destination_change_origin_stale)
+  end
+
+  defp ensure_origin_location_fresh!(%DriverLocation{captured_at: captured_at}, now) do
+    age_seconds = max(DateTime.diff(now, captured_at, :second), 0)
+
+    if age_seconds > Policy.origin_location_freshness_seconds() do
+      Repo.rollback(:destination_change_origin_stale)
+    else
+      :ok
+    end
+  end
 end

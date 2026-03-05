@@ -17,6 +17,9 @@ defmodule LiddrWeb.AuthController do
     challenge_rate_limited:
       {:too_many_requests, "CHALLENGE_RATE_LIMITED",
        "Please wait before requesting another challenge"},
+    otp_delivery_unavailable:
+      {:service_unavailable, "OTP_DELIVERY_UNAVAILABLE",
+       "OTP delivery is temporarily unavailable"},
     missing_challenge_id:
       {:unprocessable_entity, "MISSING_CHALLENGE_ID", "challenge_id is required for verification"},
     missing_code: {:unprocessable_entity, "MISSING_CODE", "code is required for verification"},
@@ -51,6 +54,9 @@ defmodule LiddrWeb.AuthController do
       {:unprocessable_entity, "INVALID_PHONE",
        "Invalid phone format. Use a Kenyan number such as 07XXXXXXXX"},
     invalid_email: {:unprocessable_entity, "INVALID_EMAIL", "Invalid email format"},
+    invalid_gender:
+      {:unprocessable_entity, "INVALID_GENDER",
+       "gender must be one of female, male, other, or unknown"},
     missing_secret:
       {:unprocessable_entity, "MISSING_SECRET",
        "Secret is required for this authentication method"},

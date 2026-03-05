@@ -3,6 +3,7 @@ defmodule LiddrWeb.RideDestinationChangeController do
 
   alias Ecto.Changeset
   alias Liddr.Rides
+  alias LiddrWeb.Idempotency
   alias LiddrWeb.RideSerializer
 
   @known_errors %{
@@ -23,11 +24,23 @@ defmodule LiddrWeb.RideDestinationChangeController do
     destination_change_already_pending:
       {:conflict, "DESTINATION_CHANGE_ALREADY_PENDING",
        "A destination change request is already pending"},
+    destination_change_cooldown_active:
+      {:too_many_requests, "DESTINATION_CHANGE_COOLDOWN_ACTIVE",
+       "Please wait before requesting another destination change"},
     destination_change_not_found:
       {:not_found, "DESTINATION_CHANGE_NOT_FOUND", "Destination change request was not found"},
+    destination_change_request_stale:
+      {:conflict, "DESTINATION_CHANGE_REQUEST_STALE",
+       "Destination change request expired. Ask rider to request again"},
     destination_change_same_as_current:
       {:unprocessable_entity, "DESTINATION_CHANGE_SAME_AS_CURRENT",
        "New destination must differ from current dropoff"},
+    destination_change_window_elapsed:
+      {:unprocessable_entity, "DESTINATION_CHANGE_WINDOW_ELAPSED",
+       "Destination change window has elapsed for this ride"},
+    destination_change_origin_stale:
+      {:conflict, "DESTINATION_CHANGE_ORIGIN_STALE",
+       "Driver location is stale. Retry after refreshing location"},
     invalid_destination_coordinates:
       {:unprocessable_entity, "INVALID_DESTINATION_COORDINATES",
        "new_dropoff_lat/new_dropoff_lng must be valid coordinates"},
@@ -50,33 +63,52 @@ defmodule LiddrWeb.RideDestinationChangeController do
   def request(conn, %{"ride_id" => ride_id}) do
     rider_user_id = conn.assigns.current_user.id
 
-    case Rides.request_destination_change(rider_user_id, ride_id, conn.body_params) do
-      {:ok, payload} ->
-        conn
-        |> put_status(:created)
-        |> json(%{data: response_payload(payload)})
-
-      {:error, reason} ->
-        render_error(conn, reason)
-    end
+    Idempotency.execute(
+      conn,
+      "ride.destination_change.request:#{ride_id}",
+      conn.body_params,
+      fn ->
+        case Rides.request_destination_change(rider_user_id, ride_id, conn.body_params) do
+          {:ok, payload} -> {:ok, 201, %{data: response_payload(payload)}}
+          {:error, reason} -> {:error, reason}
+        end
+      end,
+      &render_error/2
+    )
   end
 
   def accept(conn, %{"ride_id" => ride_id, "id" => id}) do
     driver_user_id = conn.assigns.current_user.id
 
-    case Rides.accept_destination_change(driver_user_id, ride_id, id) do
-      {:ok, payload} -> json(conn, %{data: response_payload(payload)})
-      {:error, reason} -> render_error(conn, reason)
-    end
+    Idempotency.execute(
+      conn,
+      "ride.destination_change.accept:#{ride_id}:#{id}",
+      conn.body_params,
+      fn ->
+        case Rides.accept_destination_change(driver_user_id, ride_id, id) do
+          {:ok, payload} -> {:ok, 200, %{data: response_payload(payload)}}
+          {:error, reason} -> {:error, reason}
+        end
+      end,
+      &render_error/2
+    )
   end
 
   def reject(conn, %{"ride_id" => ride_id, "id" => id}) do
     driver_user_id = conn.assigns.current_user.id
 
-    case Rides.reject_destination_change(driver_user_id, ride_id, id, conn.body_params) do
-      {:ok, payload} -> json(conn, %{data: response_payload(payload)})
-      {:error, reason} -> render_error(conn, reason)
-    end
+    Idempotency.execute(
+      conn,
+      "ride.destination_change.reject:#{ride_id}:#{id}",
+      conn.body_params,
+      fn ->
+        case Rides.reject_destination_change(driver_user_id, ride_id, id, conn.body_params) do
+          {:ok, payload} -> {:ok, 200, %{data: response_payload(payload)}}
+          {:error, reason} -> {:error, reason}
+        end
+      end,
+      &render_error/2
+    )
   end
 
   defp response_payload(payload) do

@@ -4,18 +4,19 @@ defmodule Liddr.Auth.Challenges do
   require Logger
 
   alias Liddr.Auth.AuthChallenge
+  alias Liddr.Auth.ChallengeRateLimiter
   alias Liddr.Auth.AuthIdentity
   alias Liddr.Auth.Crypto
   alias Liddr.Auth.Identities
   alias Liddr.Auth.Input
   alias Liddr.Auth.Methods
+  alias Liddr.Auth.OtpDelivery
   alias Liddr.Auth.Policy
   alias Liddr.Auth.Sessions
   alias Liddr.Repo
 
   @challenge_ttl_seconds 300
   @challenge_lock_seconds 300
-  @challenge_cooldown_seconds 30
 
   def request_challenge(attrs, meta \\ %{}) do
     with {:ok, provider} <- Input.fetch_method(attrs),
@@ -26,7 +27,14 @@ defmodule Liddr.Auth.Challenges do
            Input.normalize_identifier_for_method(provider, identifier) do
       now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
 
-      with :ok <- enforce_challenge_cooldown(provider, normalized_identifier, purpose, now) do
+      with :ok <-
+             ChallengeRateLimiter.enforce(
+               provider,
+               normalized_identifier,
+               purpose,
+               meta,
+               now
+             ) do
         code = Crypto.generate_otp_code()
         maybe_log_debug_otp(provider, normalized_identifier, purpose, code)
         user = Identities.find_existing_user_by_identifier(Repo, provider, normalized_identifier)
@@ -50,15 +58,29 @@ defmodule Liddr.Auth.Challenges do
                |> AuthChallenge.create_changeset(challenge_attrs)
                |> Repo.insert() do
             {:ok, challenge} ->
-              {:ok,
-               %{
-                 challenge_id: challenge.id,
-                 method: provider,
-                 purpose: challenge.purpose,
-                 channel: challenge.channel,
-                 expires_at: challenge.expires_at,
-                 debug_code: Crypto.maybe_debug_code(code, normalized_identifier)
-               }}
+              debug_code = Crypto.maybe_debug_code(code, normalized_identifier)
+
+              case OtpDelivery.deliver_challenge(
+                     provider,
+                     normalized_identifier,
+                     code,
+                     debug_code
+                   ) do
+                :ok ->
+                  {:ok,
+                   %{
+                     challenge_id: challenge.id,
+                     method: provider,
+                     purpose: challenge.purpose,
+                     channel: challenge.channel,
+                     expires_at: challenge.expires_at,
+                     debug_code: debug_code
+                   }}
+
+                {:error, reason} ->
+                  rollback_delivery_failed_challenge(challenge, provider, normalized_identifier)
+                  {:error, reason}
+              end
 
             {:error, changeset} ->
               {:error, changeset}
@@ -127,21 +149,6 @@ defmodule Liddr.Auth.Challenges do
     end
   end
 
-  defp enforce_challenge_cooldown(provider, identity_value, purpose, now) do
-    cutoff = DateTime.add(now, -@challenge_cooldown_seconds, :second)
-
-    recent =
-      Repo.one(
-        from ac in AuthChallenge,
-          where:
-            ac.provider == ^provider and ac.identity_value == ^identity_value and
-              ac.purpose == ^purpose and
-              ac.inserted_at >= ^cutoff
-      )
-
-    if recent, do: {:error, :challenge_rate_limited}, else: :ok
-  end
-
   defp validate_challenge_state(challenge, now) do
     cond do
       not is_nil(challenge.consumed_at) ->
@@ -190,6 +197,18 @@ defmodule Liddr.Auth.Challenges do
       Logger.warning(
         "[auth.otp] provider=#{provider} identifier=#{identifier} purpose=#{purpose} code=#{code}"
       )
+    end
+  end
+
+  defp rollback_delivery_failed_challenge(challenge, provider, identifier) do
+    case Repo.delete(challenge) do
+      {:ok, _deleted} ->
+        :ok
+
+      {:error, reason} ->
+        Logger.error(
+          "[auth.otp_delivery] rollback_failed challenge_id=#{challenge.id} provider=#{provider} identifier=#{identifier} reason=#{inspect(reason)}"
+        )
     end
   end
 end

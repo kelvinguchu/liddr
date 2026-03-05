@@ -2,6 +2,7 @@ defmodule LiddrWeb.RatingController do
   use LiddrWeb, :controller
 
   alias Liddr.Ratings
+  alias LiddrWeb.Idempotency
 
   @known_errors %{
     ride_not_found: {:not_found, "RIDE_NOT_FOUND", "Ride was not found"},
@@ -33,27 +34,35 @@ defmodule LiddrWeb.RatingController do
   def rate(conn, %{"ride_id" => ride_id}) do
     user_id = conn.assigns.current_user.id
 
-    case Ratings.rate_ride(user_id, ride_id, conn.body_params) do
-      {:ok, payload} ->
-        conn
-        |> put_status(:created)
-        |> json(%{data: rating_payload(payload)})
-
-      {:error, reason} ->
-        render_error(conn, reason)
-    end
+    Idempotency.execute(
+      conn,
+      "ride.rate:#{ride_id}",
+      conn.body_params,
+      fn ->
+        case Ratings.rate_ride(user_id, ride_id, conn.body_params) do
+          {:ok, payload} -> {:ok, 201, %{data: rating_payload(payload)}}
+          {:error, reason} -> {:error, reason}
+        end
+      end,
+      &render_error/2
+    )
   end
 
   def skip(conn, %{"ride_id" => ride_id}) do
     user_id = conn.assigns.current_user.id
 
-    case Ratings.skip_ride_rating(user_id, ride_id) do
-      {:ok, payload} ->
-        json(conn, %{data: payload})
-
-      {:error, reason} ->
-        render_error(conn, reason)
-    end
+    Idempotency.execute(
+      conn,
+      "ride.rate.skip:#{ride_id}",
+      conn.body_params,
+      fn ->
+        case Ratings.skip_ride_rating(user_id, ride_id) do
+          {:ok, payload} -> {:ok, 200, %{data: payload}}
+          {:error, reason} -> {:error, reason}
+        end
+      end,
+      &render_error/2
+    )
   end
 
   defp rating_payload(payload) do

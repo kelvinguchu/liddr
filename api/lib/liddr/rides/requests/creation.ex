@@ -201,6 +201,11 @@ defmodule Liddr.Rides.Requests.Creation do
         source: "request_initial_offers"
       )
 
+    if DriverOfferLock.unavailable_blocked?(lock_result) do
+      DriverOfferLock.emit_blocked_telemetry("request_initial_offers", 1)
+      Repo.rollback(:offer_lock_backend_unavailable)
+    end
+
     selected_driver_ids = lock_result.selected_driver_ids
     locked_driver_ids = lock_result.locked_driver_ids
 

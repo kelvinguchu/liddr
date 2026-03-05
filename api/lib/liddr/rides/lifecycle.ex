@@ -10,6 +10,7 @@ defmodule Liddr.Rides.Lifecycle do
   alias Liddr.Rides.ActiveRides
   alias Liddr.Rides.DriverOfferLock
   alias Liddr.Rides.Dispatcher
+  alias Liddr.Rides.DriverLiveness
   alias Liddr.Rides.Events
   alias Liddr.Rides.Integrity.AcceptanceTelemetry
   alias Liddr.Rides.Realtime
@@ -67,7 +68,7 @@ defmodule Liddr.Rides.Lifecycle do
         offer = fetch_offer_for_update!(offer_id)
         ensure_offer_belongs_to_driver!(offer, driver_user_id)
         ensure_offer_open!(offer, now)
-        driver = ensure_driver_eligible_for_accept!(driver_user_id)
+        driver = ensure_driver_eligible_for_accept!(driver_user_id, now)
         ride = fetch_ride_for_update!(offer.ride_id)
         ensure_ride_assignable!(ride)
 
@@ -143,11 +144,24 @@ defmodule Liddr.Rides.Lifecycle do
           )
           |> unwrap_or_rollback()
 
+        new_driver_found_payload =
+          build_new_driver_found_payload(ride.metadata, driver_user_id, accepted_offer.id)
+
+        _ =
+          maybe_record_new_driver_found_event(
+            ride.id,
+            driver_user_id,
+            new_driver_found_payload,
+            now
+          )
+          |> unwrap_or_rollback()
+
         %{
           ride: updated_ride,
           offer: accepted_offer,
           competing_ride_offers: competing_ride_offers,
-          competing_driver_offers: competing_driver_offers
+          competing_driver_offers: competing_driver_offers,
+          new_driver_found_payload: new_driver_found_payload
         }
       end)
       |> unwrap_transaction_result()
@@ -159,7 +173,8 @@ defmodule Liddr.Rides.Lifecycle do
          ride: ride,
          offer: accepted_offer,
          competing_ride_offers: competing_ride_offers,
-         competing_driver_offers: competing_driver_offers
+         competing_driver_offers: competing_driver_offers,
+         new_driver_found_payload: new_driver_found_payload
        } = payload} ->
         _ = Location.remove_driver_from_supply(driver_user_id)
 
@@ -171,6 +186,7 @@ defmodule Liddr.Rides.Lifecycle do
         )
 
         Realtime.broadcast_ride_assigned(ride, accepted_offer)
+        maybe_broadcast_new_driver_found(ride, new_driver_found_payload)
 
         Enum.each(
           competing_ride_offers,
@@ -278,7 +294,7 @@ defmodule Liddr.Rides.Lifecycle do
     end
   end
 
-  defp ensure_driver_eligible_for_accept!(driver_user_id) do
+  defp ensure_driver_eligible_for_accept!(driver_user_id, now) do
     user = Repo.get(User, driver_user_id) || Repo.rollback(:user_not_found)
 
     case Policy.ensure_user_can_authenticate(user) do
@@ -311,6 +327,9 @@ defmodule Liddr.Rides.Lifecycle do
 
       driver.is_available != true ->
         Repo.rollback(:driver_not_available)
+
+      not DriverLiveness.accept_allowed?(DriverLiveness.snapshot(driver, now)) ->
+        Repo.rollback(:driver_presence_unhealthy)
 
       true ->
         driver
@@ -377,5 +396,44 @@ defmodule Liddr.Rides.Lifecycle do
       Keyword.get(opts, :constraint) == :unique and
         Keyword.get(opts, :constraint_name) == "rides_unique_active_driver_idx"
     end)
+  end
+
+  defp build_new_driver_found_payload(%{} = metadata, new_driver_id, offer_id) do
+    reassign_count = Map.get(metadata, "reassign_count", 0)
+
+    if is_integer(reassign_count) and reassign_count > 0 do
+      %{
+        "reassign_count" => reassign_count,
+        "previous_driver_id" => Map.get(metadata, "last_reassign_driver_id"),
+        "new_driver_id" => new_driver_id,
+        "offer_id" => offer_id,
+        "recommendation_reason_code" => Map.get(metadata, "last_reassign_reason_code")
+      }
+    else
+      nil
+    end
+  end
+
+  defp build_new_driver_found_payload(_metadata, _new_driver_id, _offer_id), do: nil
+
+  defp maybe_record_new_driver_found_event(_ride_id, _driver_user_id, nil, _now), do: {:ok, nil}
+
+  defp maybe_record_new_driver_found_event(ride_id, driver_user_id, payload, now) do
+    Events.record_event(ride_id, "new_driver_found", now,
+      actor_user_id: driver_user_id,
+      payload: payload
+    )
+  end
+
+  defp maybe_broadcast_new_driver_found(_ride, nil), do: :ok
+
+  defp maybe_broadcast_new_driver_found(ride, payload) do
+    Realtime.broadcast_new_driver_found(ride, %{
+      previous_driver_id: payload["previous_driver_id"],
+      new_driver_id: payload["new_driver_id"],
+      reassign_count: payload["reassign_count"],
+      recommendation_reason_code: payload["recommendation_reason_code"],
+      offer_id: payload["offer_id"]
+    })
   end
 end

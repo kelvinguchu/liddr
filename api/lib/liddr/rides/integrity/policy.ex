@@ -22,6 +22,8 @@ defmodule Liddr.Rides.Integrity.Policy do
     rider_prepay_payment_mode: "in_app_mpesa",
     pickup_auto_reassign_enabled: true,
     pickup_auto_reassign_after_seconds: 420,
+    pickup_fast_reassign_enabled: true,
+    pickup_fast_reassign_after_seconds: 180,
     pickup_auto_cancel_enabled: true,
     pickup_auto_cancel_after_seconds: 900,
     pickup_auto_cancel_min_reassign_count: 1,
@@ -48,6 +50,8 @@ defmodule Liddr.Rides.Integrity.Policy do
   def rider_prepay_payment_mode, do: fetch(:rider_prepay_payment_mode)
   def pickup_auto_reassign_enabled, do: fetch(:pickup_auto_reassign_enabled)
   def pickup_auto_reassign_after_seconds, do: fetch(:pickup_auto_reassign_after_seconds)
+  def pickup_fast_reassign_enabled, do: fetch(:pickup_fast_reassign_enabled)
+  def pickup_fast_reassign_after_seconds, do: fetch(:pickup_fast_reassign_after_seconds)
   def pickup_auto_cancel_enabled, do: fetch(:pickup_auto_cancel_enabled)
   def pickup_auto_cancel_after_seconds, do: fetch(:pickup_auto_cancel_after_seconds)
   def pickup_auto_cancel_min_reassign_count, do: fetch(:pickup_auto_cancel_min_reassign_count)

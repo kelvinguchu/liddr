@@ -3,6 +3,7 @@ defmodule LiddrWeb.SubscriptionController do
 
   alias Ecto.Changeset
   alias Liddr.Subscriptions
+  alias LiddrWeb.Idempotency
   alias LiddrWeb.SubscriptionSerializer
 
   def current(conn, _params) do
@@ -20,15 +21,21 @@ defmodule LiddrWeb.SubscriptionController do
   def pay(conn, params) do
     driver_user_id = conn.assigns.current_user.id
 
-    case Subscriptions.initiate_payment(driver_user_id, params) do
-      {:ok, payload} ->
-        conn
-        |> put_status(:created)
-        |> json(%{data: SubscriptionSerializer.payment_created_payload(payload)})
+    Idempotency.execute(
+      conn,
+      "subscription.pay",
+      params,
+      fn ->
+        case Subscriptions.initiate_payment(driver_user_id, params) do
+          {:ok, payload} ->
+            {:ok, 201, %{data: SubscriptionSerializer.payment_created_payload(payload)}}
 
-      {:error, reason} ->
-        render_error(conn, reason)
-    end
+          {:error, reason} ->
+            {:error, reason}
+        end
+      end,
+      &render_error/2
+    )
   end
 
   def history(conn, params) do

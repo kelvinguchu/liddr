@@ -3,6 +3,7 @@ defmodule LiddrWeb.ReportController do
 
   alias Ecto.Changeset
   alias Liddr.Moderation
+  alias LiddrWeb.Idempotency
 
   def categories(conn, params) do
     categories =
@@ -18,15 +19,18 @@ defmodule LiddrWeb.ReportController do
     reporter_id = conn.assigns.current_user.id
     report_params = Map.put(params, "reporter_user_id", reporter_id)
 
-    case Moderation.submit_report(report_params) do
-      {:ok, report} ->
-        conn
-        |> put_status(:created)
-        |> json(%{data: report_payload(report)})
-
-      {:error, reason} ->
-        render_error(conn, reason)
-    end
+    Idempotency.execute(
+      conn,
+      "report.create",
+      report_params,
+      fn ->
+        case Moderation.submit_report(report_params) do
+          {:ok, report} -> {:ok, 201, %{data: report_payload(report)}}
+          {:error, reason} -> {:error, reason}
+        end
+      end,
+      &render_error/2
+    )
   end
 
   defp render_error(conn, :missing_report_category),

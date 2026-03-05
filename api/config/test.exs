@@ -36,9 +36,12 @@ config :liddr, Oban, testing: :manual
 # Test-only helper to assert OTP challenge flow without SMS/email integration.
 config :liddr, :auth_debug_otp, true
 config :liddr, :rides_dispatch_async, false
+config :liddr, :ride_offer_lock_allow_unavailable_fallback, true
 config :liddr, :malware_scan_enabled, false
 config :liddr, :ocr_enabled, false
 config :liddr, :ocr_pdf_enabled, false
+config :liddr, Liddr.Rides.OfferLockMonitor, enabled: false
+config :liddr, Liddr.Rides.DispatchEta, enabled: false
 
 # Disable swoosh api client as it is only required for production adapters
 config :swoosh, :api_client, false

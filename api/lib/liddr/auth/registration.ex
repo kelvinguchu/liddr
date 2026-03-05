@@ -12,14 +12,17 @@ defmodule Liddr.Auth.Registration do
   alias Liddr.Auth.Policy
   alias Liddr.Repo
 
+  @allowed_genders ~w(female male other unknown)
+
   def register_user(attrs, user_role) do
     with {:ok, method} <- Input.fetch_method(attrs),
          :ok <- Methods.method_allowed_for_role?(method, user_role),
+         {:ok, profile_seed_attrs} <- extract_profile_seed_attrs(attrs),
          {:ok, identity} <- resolve_identity_for_method(method, attrs),
          {:ok, secret_payload} <- Crypto.build_secret_payload(method, attrs) do
       identifier = identity.identifier
       normalized_identifier = identity.normalized_identifier
-      user_seed_attrs = identity.user_seed_attrs
+      user_seed_attrs = Map.merge(identity.user_seed_attrs, profile_seed_attrs)
 
       now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
 
@@ -161,6 +164,24 @@ defmodule Liddr.Auth.Registration do
       %UserRole{}
       |> UserRole.create_changeset(%{user_id: user_id, role: role, granted_at: now})
       |> repo.insert()
+    end
+  end
+
+  defp extract_profile_seed_attrs(attrs) do
+    gender =
+      attrs
+      |> Input.get_value(:gender)
+      |> Input.to_string_or_nil()
+      |> Input.normalize_text()
+      |> case do
+        nil -> nil
+        value -> String.downcase(value)
+      end
+
+    if is_nil(gender) or gender in @allowed_genders do
+      {:ok, if(is_nil(gender), do: %{}, else: %{gender: gender})}
+    else
+      {:error, :invalid_gender}
     end
   end
 end

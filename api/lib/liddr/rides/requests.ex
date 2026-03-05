@@ -11,6 +11,7 @@ defmodule Liddr.Rides.Requests do
   alias Liddr.Rides.Requests.Metadata, as: RequestMetadata
   alias Liddr.Rides.Requests.Params, as: RequestParams
   alias Liddr.Rides.SharedEligibility
+  alias Liddr.Rides.WomenOnly
 
   @default_offer_limit 3
   @max_offer_limit 10
@@ -34,6 +35,7 @@ defmodule Liddr.Rides.Requests do
            rider = Booking.fetch_rider_for_request!(rider_user_id, now)
            requested_payment_mode = Booking.ensure_request_allowed!(rider, attrs, now)
            category = Lookup.fetch_vehicle_category!(attrs)
+           :ok = WomenOnly.ensure_rider_eligible(rider, category) |> unwrap_or_rollback()
            product_type = resolve_product_type!(attrs)
            ensure_shared_supported!(product_type, category)
            quote = Lookup.fetch_valid_quote!(attrs, rider_user_id, category.id, product_type, now)
@@ -126,4 +128,7 @@ defmodule Liddr.Rides.Requests do
 
   defp dispatch_async_enabled?,
     do: Application.get_env(:liddr, :rides_dispatch_async, true)
+
+  defp unwrap_or_rollback(:ok), do: :ok
+  defp unwrap_or_rollback({:error, reason}), do: Repo.rollback(reason)
 end

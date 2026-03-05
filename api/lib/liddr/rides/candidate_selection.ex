@@ -7,11 +7,12 @@ defmodule Liddr.Rides.CandidateSelection do
   alias Liddr.Location.DriverLocation
   alias Liddr.Repo
   alias Liddr.Rides.CandidatePool
+  alias Liddr.Rides.DispatchEta
+  alias Liddr.Rides.DriverLiveness
   alias Liddr.Rides.DispatchPolicy
   alias Liddr.Rides.VehicleCategory
 
   @blocked_user_statuses ~w(suspended banned deactivated)
-  @location_freshness_seconds 30
 
   def search_radius_km(%VehicleCategory{slug: slug}), do: radius_km_for(slug)
   def search_radius_km(slug) when is_binary(slug), do: radius_km_for(slug)
@@ -26,7 +27,7 @@ defmodule Liddr.Rides.CandidateSelection do
 
   defp do_list_eligible_driver_ids(%VehicleCategory{} = category, pickup, limit, opts) do
     now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
-    freshness_cutoff = DateTime.add(now, -@location_freshness_seconds, :second)
+    freshness_cutoff = DriverLiveness.dispatch_online_cutoff(now)
     radius_km = resolved_radius_km(category, opts)
     exclude_driver_ids = Keyword.get(opts, :exclude_driver_ids, [])
     {min_lat, max_lat, min_lng, max_lng} = bbox(pickup, radius_km)
@@ -60,6 +61,7 @@ defmodule Liddr.Rides.CandidateSelection do
 
     candidates =
       base_query
+      |> maybe_apply_women_only_filter(category)
       |> maybe_apply_supply_prefilter(supply_prefilter)
       |> maybe_exclude_drivers(exclude_driver_ids, supply_prefilter)
       |> Repo.all()
@@ -78,11 +80,14 @@ defmodule Liddr.Rides.CandidateSelection do
 
       %{
         driver_id: row.driver_id,
+        lat: decimal_to_float(row.lat),
+        lng: decimal_to_float(row.lng),
         distance_m: distance_m,
         rating_score: effective_rating_score(row.rating_score, row.rating_count)
       }
     end)
     |> Enum.filter(&(&1.distance_m <= radius_m))
+    |> DispatchEta.annotate(pickup, category.slug, now, limit, opts)
     |> rank_candidates()
     |> Enum.take(limit)
     |> Enum.map(& &1.driver_id)
@@ -134,6 +139,12 @@ defmodule Liddr.Rides.CandidateSelection do
 
   defp maybe_apply_supply_prefilter(query, _prefilter_result), do: query
 
+  defp maybe_apply_women_only_filter(query, %VehicleCategory{slug: "women_only"}) do
+    from [d, u, _dl] in query, where: d.gender_verified == true and u.gender == "female"
+  end
+
+  defp maybe_apply_women_only_filter(query, _category), do: query
+
   defp maybe_exclude_from_prefilter({:ok, ids}, exclude_driver_ids)
        when is_list(exclude_driver_ids) do
     {:ok, Enum.reject(ids, &(&1 in exclude_driver_ids))}
@@ -142,12 +153,54 @@ defmodule Liddr.Rides.CandidateSelection do
   defp maybe_exclude_from_prefilter(prefilter_result, _exclude_driver_ids), do: prefilter_result
 
   defp rank_candidates(candidates) do
+    if Enum.any?(candidates, &(&1.eta_source == "google_routes")) do
+      rank_with_google_eta(candidates)
+    else
+      rank_with_distance(candidates)
+    end
+  end
+
+  defp rank_with_google_eta(candidates) do
+    tiebreak_eta_s = DispatchPolicy.rating_tiebreak_eta_seconds()
+
+    candidates
+    |> Enum.map(fn candidate ->
+      eta_seconds = resolve_eta_seconds(candidate)
+      bucket = floor(eta_seconds / tiebreak_eta_s)
+      eta_score = eta_score(eta_seconds)
+
+      dispatch_score =
+        DispatchPolicy.eta_weight() * eta_score +
+          DispatchPolicy.rating_weight() * candidate.rating_score
+
+      Map.merge(candidate, %{
+        eta_seconds: eta_seconds,
+        distance_bucket: bucket,
+        eta_score: eta_score,
+        dispatch_score: dispatch_score
+      })
+    end)
+    |> Enum.sort_by(
+      fn candidate ->
+        {
+          candidate.distance_bucket,
+          -candidate.dispatch_score,
+          candidate.eta_seconds,
+          candidate.distance_m,
+          -candidate.rating_score
+        }
+      end,
+      :asc
+    )
+  end
+
+  defp rank_with_distance(candidates) do
     tiebreak_distance_m = DispatchPolicy.rating_tiebreak_distance_m()
 
     candidates
     |> Enum.map(fn candidate ->
       bucket = floor(candidate.distance_m / tiebreak_distance_m)
-      eta_score = eta_score(candidate.distance_m)
+      eta_score = eta_score_from_distance(candidate.distance_m)
 
       dispatch_score =
         DispatchPolicy.eta_weight() * eta_score +
@@ -172,9 +225,24 @@ defmodule Liddr.Rides.CandidateSelection do
     )
   end
 
-  defp eta_score(distance_m) do
+  defp eta_score(eta_seconds) do
+    1.0 / (1.0 + eta_seconds / DispatchPolicy.eta_decay_seconds())
+  end
+
+  defp eta_score_from_distance(distance_m) do
     1.0 / (1.0 + distance_m / DispatchPolicy.eta_decay_m())
   end
+
+  defp resolve_eta_seconds(%{eta_seconds: eta_seconds})
+       when is_integer(eta_seconds) and eta_seconds > 0,
+       do: eta_seconds
+
+  defp resolve_eta_seconds(%{distance_m: distance_m}) when is_number(distance_m) do
+    speed_mps = 28.0 * 1000.0 / 3600.0
+    max(trunc(Float.ceil(distance_m / speed_mps)), 1)
+  end
+
+  defp resolve_eta_seconds(_candidate), do: 1
 
   defp effective_rating_score(raw_rating_score, raw_rating_count) do
     rating_count = parse_non_negative_integer(raw_rating_count, 0)

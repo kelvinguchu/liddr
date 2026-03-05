@@ -54,6 +54,9 @@ defmodule Liddr.Rides.PickupWatchdog do
         auto_cancel_due?(elapsed_seconds, reassign_count) ->
           run_auto_cancel(ride, health, now)
 
+        fast_reassign_due?(elapsed_seconds, health) ->
+          run_auto_reassign(ride, health, now)
+
         auto_reassign_due?(elapsed_seconds) ->
           run_auto_reassign(ride, health, now)
 
@@ -110,6 +113,12 @@ defmodule Liddr.Rides.PickupWatchdog do
       elapsed_seconds >= Policy.pickup_auto_reassign_after_seconds()
   end
 
+  defp fast_reassign_due?(elapsed_seconds, health) do
+    Policy.pickup_fast_reassign_enabled() and is_integer(elapsed_seconds) and
+      elapsed_seconds >= Policy.pickup_fast_reassign_after_seconds() and
+      fast_reassign_applicable?(health)
+  end
+
   defp auto_cancel_due?(elapsed_seconds, reassign_count) do
     Policy.pickup_auto_cancel_enabled() and is_integer(elapsed_seconds) and
       elapsed_seconds >= Policy.pickup_auto_cancel_after_seconds() and
@@ -126,6 +135,10 @@ defmodule Liddr.Rides.PickupWatchdog do
       |> maybe_add_threshold(
         Policy.pickup_auto_reassign_enabled(),
         Policy.pickup_auto_reassign_after_seconds()
+      )
+      |> maybe_add_threshold(
+        Policy.pickup_fast_reassign_enabled(),
+        Policy.pickup_fast_reassign_after_seconds()
       )
       |> maybe_add_threshold(
         Policy.pickup_auto_cancel_enabled(),
@@ -185,6 +198,13 @@ defmodule Liddr.Rides.PickupWatchdog do
     do: Map.get(attrs, key) || Map.get(attrs, Atom.to_string(key))
 
   defp get_value(_attrs, _key), do: nil
+
+  defp fast_reassign_applicable?(%{"flags" => flags}) when is_map(flags) do
+    flags["driver_location_stale"] == true or flags["driver_no_progress"] == true or
+      flags["driver_moving_away"] == true
+  end
+
+  defp fast_reassign_applicable?(_health), do: false
 
   defp watchdog_payload(ride, health, action_reason_code) do
     %{

@@ -10,6 +10,7 @@ defmodule Liddr.Rides.Quotes do
   alias Liddr.Rides.SharedEligibility
   alias Liddr.Rides.SharedPricing
   alias Liddr.Rides.VehicleCategory
+  alias Liddr.Rides.WomenOnly
   alias Liddr.Subscriptions.PaymentUtils
 
   @default_quote_ttl_seconds 180
@@ -18,9 +19,10 @@ defmodule Liddr.Rides.Quotes do
   def create_quote(rider_user_id, attrs \\ %{}) do
     now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
 
-    with {:ok, _rider} <- fetch_rider(rider_user_id),
+    with {:ok, rider} <- fetch_rider(rider_user_id),
          {:ok, product_type} <- ProductType.resolve(attrs),
          {:ok, category} <- fetch_vehicle_category(attrs),
+         :ok <- WomenOnly.ensure_rider_eligible(rider, category),
          :ok <- SharedEligibility.ensure_supported_for_category(product_type, category),
          {:ok, origin} <- fetch_point(attrs, :pickup),
          {:ok, destination} <- fetch_point(attrs, :dropoff),

@@ -6,16 +6,29 @@ defmodule LiddrWeb.RideOfferLockControllerTest do
   alias Liddr.TestOfferLock
   alias Liddr.VerificationFixtures
   alias LiddrWeb.AuthFixtures
+  @blocked_event [:liddr, :rides, :offer_lock, :blocked]
 
   setup do
     previous_lock = Application.get_env(:liddr, :ride_offer_lock)
     previous_test_lock = Application.get_env(:liddr, TestOfferLock)
+    handler_id = "ride-offer-lock-controller-test-#{System.unique_integer([:positive])}"
 
     Application.put_env(:liddr, :ride_offer_lock, TestOfferLock)
+
+    :ok =
+      :telemetry.attach(
+        handler_id,
+        @blocked_event,
+        fn event, measurements, metadata, test_pid ->
+          send(test_pid, {:offer_lock_blocked, event, measurements, metadata})
+        end,
+        self()
+      )
 
     on_exit(fn ->
       restore_env(:ride_offer_lock, previous_lock)
       restore_env(TestOfferLock, previous_test_lock)
+      :telemetry.detach(handler_id)
     end)
 
     :ok
@@ -106,6 +119,106 @@ defmodule LiddrWeb.RideOfferLockControllerTest do
     assert %{"data" => %{"offer" => %{"status" => "rejected"}}} = json_response(reject_conn, 200)
 
     assert_receive {:test_offer_lock_released, ^driver_id, ^ride_id}, 1_000
+  end
+
+  test "request flow returns 503 when lock backend is unavailable and fallback is disabled", %{
+    conn: conn
+  } do
+    previous_fallback =
+      Application.get_env(:liddr, :ride_offer_lock_allow_unavailable_fallback, false)
+
+    Application.put_env(:liddr, :ride_offer_lock_allow_unavailable_fallback, false)
+
+    on_exit(fn ->
+      restore_env(:ride_offer_lock_allow_unavailable_fallback, previous_fallback)
+    end)
+
+    %{auth_conn: rider_conn} = AuthFixtures.authenticate_rider!(conn)
+    %{user_id: driver_id} = AuthFixtures.authenticate_driver!(conn)
+    category_id = VerificationFixtures.insert_vehicle_category!()
+
+    _ =
+      create_eligible_driver_profile!(
+        driver_id,
+        category_id,
+        Decimal.new("-1.2921000"),
+        Decimal.new("36.8219000")
+      )
+
+    Application.put_env(:liddr, TestOfferLock,
+      unavailable_driver_ids: [driver_id],
+      test_pid: self()
+    )
+
+    conn =
+      post(rider_conn, "/api/rides/requests", %{
+        "vehicle_category_id" => category_id,
+        "pickup_lat" => "-1.2921",
+        "pickup_lng" => "36.8219",
+        "dropoff_lat" => "-1.3000",
+        "dropoff_lng" => "36.8000",
+        "offer_limit" => 1,
+        "offer_ttl_seconds" => 30
+      })
+
+    assert %{"error" => %{"code" => "DISPATCH_LOCK_BACKEND_UNAVAILABLE"}} =
+             json_response(conn, 503)
+
+    assert_receive {:offer_lock_blocked, @blocked_event, %{count: 1},
+                    %{source: "request_initial_offers"}}
+  end
+
+  test "send request returns 503 when lock backend is unavailable and fallback is disabled", %{
+    conn: conn
+  } do
+    previous_fallback =
+      Application.get_env(:liddr, :ride_offer_lock_allow_unavailable_fallback, false)
+
+    Application.put_env(:liddr, :ride_offer_lock_allow_unavailable_fallback, false)
+
+    on_exit(fn ->
+      restore_env(:ride_offer_lock_allow_unavailable_fallback, previous_fallback)
+    end)
+
+    %{auth_conn: rider_conn} = AuthFixtures.authenticate_rider!(conn)
+    %{user_id: recipient_user_id} = AuthFixtures.authenticate_rider!(conn)
+    recipient_phone = Repo.get!(User, recipient_user_id).phone
+    %{user_id: driver_id} = AuthFixtures.authenticate_driver!(conn)
+    send_category_id = VerificationFixtures.insert_vehicle_category!(%{slug: "send"})
+
+    _ =
+      create_eligible_driver_profile!(
+        driver_id,
+        send_category_id,
+        Decimal.new("-1.2921000"),
+        Decimal.new("36.8219000")
+      )
+
+    Application.put_env(:liddr, TestOfferLock,
+      unavailable_driver_ids: [driver_id],
+      test_pid: self()
+    )
+
+    conn =
+      post(rider_conn, "/api/send/requests", %{
+        "pickup_lat" => "-1.2921",
+        "pickup_lng" => "36.8219",
+        "dropoff_lat" => "-1.3000",
+        "dropoff_lng" => "36.8000",
+        "sender_name" => "Alice",
+        "recipient_name" => "Bob",
+        "recipient_phone" => recipient_phone,
+        "item_description" => "Small package",
+        "item_size" => "small",
+        "payer" => "sender",
+        "payment_timing" => "after"
+      })
+
+    assert %{"error" => %{"code" => "DISPATCH_LOCK_BACKEND_UNAVAILABLE"}} =
+             json_response(conn, 503)
+
+    assert_receive {:offer_lock_blocked, @blocked_event, %{count: 1},
+                    %{source: "request_initial_offers"}}
   end
 
   defp create_eligible_driver_profile!(user_id, category_id, lat, lng) do

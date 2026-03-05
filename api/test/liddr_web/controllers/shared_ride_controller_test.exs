@@ -217,7 +217,7 @@ defmodule LiddrWeb.SharedRideControllerTest do
     assert DateTime.diff(after_dt, before_dt, :second) >= 300
 
     assert %{"data" => %{"notifications" => notifications}} =
-             get(driver_conn, "/api/ride-notifications?limit=20")
+             get(driver_conn, "/api/notifications?limit=20")
              |> json_response(200)
 
     assert Enum.any?(notifications, fn row ->

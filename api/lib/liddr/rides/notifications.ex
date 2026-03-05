@@ -17,6 +17,10 @@ defmodule Liddr.Rides.Notifications do
     trip_cancelled
     ride_completed
     ride_reassigned
+    driver_delayed
+    driver_offline_detected
+    reassigning_driver
+    new_driver_found
     destination_change_requested
     destination_change_accepted
     destination_change_rejected
@@ -27,6 +31,8 @@ defmodule Liddr.Rides.Notifications do
     rating_pending
     rating_submitted
     rating_skipped
+    ride_message_sent
+    ride_message_read
     ride_cancelled
   )
 

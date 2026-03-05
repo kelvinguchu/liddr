@@ -3,6 +3,7 @@ defmodule LiddrWeb.SendController do
 
   alias Ecto.Changeset
   alias Liddr.Rides
+  alias LiddrWeb.Idempotency
   alias LiddrWeb.RideSerializer
 
   @known_errors %{
@@ -57,7 +58,10 @@ defmodule LiddrWeb.SendController do
        "Ride quote vehicle category does not match request"},
     account_suspended: {:forbidden, "ACCOUNT_SUSPENDED", "This account is currently suspended"},
     account_banned: {:forbidden, "ACCOUNT_BANNED", "This account has been permanently banned"},
-    account_deactivated: {:forbidden, "ACCOUNT_DEACTIVATED", "This account has been deactivated"}
+    account_deactivated: {:forbidden, "ACCOUNT_DEACTIVATED", "This account has been deactivated"},
+    offer_lock_backend_unavailable:
+      {:service_unavailable, "DISPATCH_LOCK_BACKEND_UNAVAILABLE",
+       "Ride dispatch is temporarily unavailable. Please retry shortly."}
   }
 
   def quote(conn, params) do
@@ -77,20 +81,27 @@ defmodule LiddrWeb.SendController do
   def request(conn, params) do
     rider_user_id = conn.assigns.current_user.id
 
-    case Rides.request_send_delivery(rider_user_id, params) do
-      {:ok, payload} ->
-        conn
-        |> put_status(:created)
-        |> json(%{
-          data:
-            payload
-            |> RideSerializer.request_payload()
-            |> Map.put(:delivery, payload.delivery)
-        })
+    Idempotency.execute(
+      conn,
+      "send.request",
+      params,
+      fn ->
+        case Rides.request_send_delivery(rider_user_id, params) do
+          {:ok, payload} ->
+            {:ok, 201,
+             %{
+               data:
+                 payload
+                 |> RideSerializer.request_payload()
+                 |> Map.put(:delivery, payload.delivery)
+             }}
 
-      {:error, reason} ->
-        render_error(conn, reason)
-    end
+          {:error, reason} ->
+            {:error, reason}
+        end
+      end,
+      &render_error/2
+    )
   end
 
   def sender_history(conn, params) do

@@ -2,6 +2,7 @@ defmodule Liddr.Rides.Realtime do
   alias Liddr.Ratings.Snapshot
   alias Liddr.Rides.Notifications
   alias Liddr.Rides.Ride
+  alias Liddr.Rides.RideMessage
   alias Liddr.Rides.RideOffer
   alias LiddrWeb.Endpoint
   alias LiddrWeb.RideSerializer
@@ -109,6 +110,104 @@ defmodule Liddr.Rides.Realtime do
 
     broadcast_ride_and_driver(ride, "ride_reassigned", payload)
     maybe_notify_previous_driver(ride, previous_driver_id, "ride_reassigned", payload)
+  end
+
+  def broadcast_driver_delayed(%Ride{} = ride, payload, previous_driver_id \\ nil)
+      when is_map(payload) do
+    status_payload =
+      payload
+      |> Map.put_new(:ride, RideSerializer.ride_payload(ride))
+      |> Map.put_new(:emitted_at, DateTime.utc_now() |> DateTime.truncate(:microsecond))
+
+    broadcast_ride_and_driver(ride, "driver_delayed", status_payload)
+    maybe_notify_previous_driver(ride, previous_driver_id, "driver_delayed", status_payload)
+  end
+
+  def broadcast_driver_offline_detected(%Ride{} = ride, payload, previous_driver_id \\ nil)
+      when is_map(payload) do
+    status_payload =
+      payload
+      |> Map.put_new(:ride, RideSerializer.ride_payload(ride))
+      |> Map.put_new(:emitted_at, DateTime.utc_now() |> DateTime.truncate(:microsecond))
+
+    broadcast_ride_and_driver(ride, "driver_offline_detected", status_payload)
+
+    maybe_notify_previous_driver(
+      ride,
+      previous_driver_id,
+      "driver_offline_detected",
+      status_payload
+    )
+  end
+
+  def broadcast_reassigning_driver(%Ride{} = ride, payload, previous_driver_id \\ nil)
+      when is_map(payload) do
+    status_payload =
+      payload
+      |> Map.put_new(:ride, RideSerializer.ride_payload(ride))
+      |> Map.put_new(:emitted_at, DateTime.utc_now() |> DateTime.truncate(:microsecond))
+
+    broadcast_ride_and_driver(ride, "reassigning_driver", status_payload)
+    maybe_notify_previous_driver(ride, previous_driver_id, "reassigning_driver", status_payload)
+  end
+
+  def broadcast_new_driver_found(%Ride{} = ride, payload) when is_map(payload) do
+    status_payload =
+      payload
+      |> Map.put_new(:ride, RideSerializer.ride_payload(ride))
+      |> Map.put_new(:emitted_at, DateTime.utc_now() |> DateTime.truncate(:microsecond))
+
+    broadcast_ride_and_driver(ride, "new_driver_found", status_payload)
+  end
+
+  def broadcast_ride_message_sent(%Ride{} = ride, %RideMessage{} = message, emitted_at) do
+    payload = %{
+      ride_id: ride.id,
+      message: RideSerializer.message_payload(message),
+      emitted_at: emitted_at
+    }
+
+    recipient_ids =
+      Notifications.queue_event_for_user!(
+        ride.id,
+        message.recipient_user_id,
+        "ride_message_sent",
+        payload,
+        emitted_at
+      )
+
+    Endpoint.broadcast("ride:#{ride.id}", "ride_message_sent", payload)
+    maybe_broadcast_driver(ride.driver_id, "ride_message_sent", payload)
+    _ = Notifications.mark_socket_sent(ride.id, "ride_message_sent", recipient_ids, emitted_at)
+  end
+
+  def broadcast_ride_message_read(
+        %Ride{} = ride,
+        %RideMessage{} = message,
+        reader_user_id,
+        emitted_at
+      ) do
+    payload = %{
+      ride_id: ride.id,
+      message_id: message.id,
+      reader_user_id: reader_user_id,
+      read_at: message.read_at,
+      acked_at: message.acked_at,
+      emitted_at: emitted_at
+    }
+
+    recipient_ids =
+      Notifications.queue_event_for_user!(
+        ride.id,
+        message.sender_user_id,
+        "ride_message_read",
+        payload,
+        emitted_at
+      )
+
+    Endpoint.broadcast("ride:#{ride.id}", "ride_message_read", payload)
+    maybe_broadcast_driver(ride.driver_id, "ride_message_read", payload)
+    _ = Notifications.mark_socket_sent(ride.id, "ride_message_read", recipient_ids, emitted_at)
   end
 
   def broadcast_rating_pending(%Ride{} = ride, due_at) do

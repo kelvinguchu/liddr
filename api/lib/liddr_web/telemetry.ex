@@ -77,6 +77,7 @@ defmodule LiddrWeb.Telemetry do
 
       # Ride dispatch lock metrics
       counter("liddr.rides.offer_lock.acquire.count", tags: [:source, :result]),
+      counter("liddr.rides.offer_lock.blocked.count", tags: [:source]),
       counter("liddr.rides.offer_lock.release.count", tags: [:source]),
 
       # VM Metrics

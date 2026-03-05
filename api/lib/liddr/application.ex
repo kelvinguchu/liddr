@@ -14,6 +14,7 @@ defmodule Liddr.Application do
     children =
       [
         LiddrWeb.Telemetry,
+        Liddr.Rides.OfferLockMonitor,
         Liddr.Repo,
         {Oban, Application.fetch_env!(:liddr, Oban)},
         {DNSCluster, query: Application.get_env(:liddr, :dns_cluster_query) || :ignore},

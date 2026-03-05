@@ -5,9 +5,15 @@ defmodule Liddr.TestOfferLock do
 
   @impl true
   def acquire(driver_id, _ride_id, _ttl_seconds) do
-    locked_driver_ids = Application.get_env(:liddr, __MODULE__, [])[:locked_driver_ids] || []
+    config = Application.get_env(:liddr, __MODULE__, [])
+    locked_driver_ids = config[:locked_driver_ids] || []
+    unavailable_driver_ids = config[:unavailable_driver_ids] || []
 
-    if driver_id in locked_driver_ids, do: :locked, else: :acquired
+    cond do
+      driver_id in unavailable_driver_ids -> :unavailable
+      driver_id in locked_driver_ids -> :locked
+      true -> :acquired
+    end
   end
 
   @impl true

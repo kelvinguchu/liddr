@@ -2,6 +2,7 @@ defmodule LiddrWeb.RatingOpsController do
   use LiddrWeb, :controller
 
   alias Liddr.Ratings
+  alias LiddrWeb.Idempotency
 
   def index(conn, params) do
     with {:ok, ratings} <- Ratings.list_ratings(params) do
@@ -22,25 +23,35 @@ defmodule LiddrWeb.RatingOpsController do
   def nullify(conn, %{"id" => rating_id} = params) do
     actor_user_id = conn.assigns.current_user.id
 
-    case Ratings.nullify_rating(rating_id, params, actor_user_id) do
-      {:ok, payload} ->
-        json(conn, %{data: ops_mutation_payload(payload)})
-
-      {:error, reason} ->
-        render_error(conn, reason)
-    end
+    Idempotency.execute(
+      conn,
+      "ops.rating.nullify:#{rating_id}",
+      params,
+      fn ->
+        case Ratings.nullify_rating(rating_id, params, actor_user_id) do
+          {:ok, payload} -> {:ok, 200, %{data: ops_mutation_payload(payload)}}
+          {:error, reason} -> {:error, reason}
+        end
+      end,
+      &render_error/2
+    )
   end
 
   def reinstate(conn, %{"id" => rating_id} = params) do
     actor_user_id = conn.assigns.current_user.id
 
-    case Ratings.reinstate_rating(rating_id, params, actor_user_id) do
-      {:ok, payload} ->
-        json(conn, %{data: ops_mutation_payload(payload)})
-
-      {:error, reason} ->
-        render_error(conn, reason)
-    end
+    Idempotency.execute(
+      conn,
+      "ops.rating.reinstate:#{rating_id}",
+      params,
+      fn ->
+        case Ratings.reinstate_rating(rating_id, params, actor_user_id) do
+          {:ok, payload} -> {:ok, 200, %{data: ops_mutation_payload(payload)}}
+          {:error, reason} -> {:error, reason}
+        end
+      end,
+      &render_error/2
+    )
   end
 
   def guardrails(conn, %{"rated_user_id" => rated_user_id}) do

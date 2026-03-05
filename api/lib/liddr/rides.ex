@@ -4,7 +4,11 @@ defmodule Liddr.Rides do
   alias Liddr.Rides.Integrity
   alias Liddr.Rides.Lifecycle
   alias Liddr.Rides.DestinationChanges
+  alias Liddr.Rides.CurrentTripStatus
+  alias Liddr.Rides.Messages
   alias Liddr.Rides.Notifications
+  alias Liddr.Rides.OfferLockMonitor
+  alias Liddr.Rides.NotificationSummary
   alias Liddr.Rides.NotificationRetry
   alias Liddr.Rides.SendDeliveries
   alias Liddr.Rides.SharedRides
@@ -66,6 +70,33 @@ defmodule Liddr.Rides do
   defdelegate get_ride_for_user(user_id, ride_id), to: Timeline
   defdelegate list_events_for_user(user_id, ride_id, attrs \\ %{}), to: Timeline
   defdelegate list_incidents_for_user(user_id, ride_id, attrs \\ %{}), to: Timeline
+
+  defdelegate current_trip_status_for_user(user_id, ride_id),
+    to: CurrentTripStatus,
+    as: :fetch_for_user
+
+  defdelegate list_ride_messages(user_id, ride_id, attrs \\ %{}),
+    to: Messages,
+    as: :list_for_user
+
+  defdelegate send_ride_message(user_id, ride_id, attrs \\ %{}),
+    to: Messages,
+    as: :send_for_user
+
+  defdelegate mark_ride_message_read(user_id, ride_id, message_id),
+    to: Messages,
+    as: :mark_read_for_user
+
+  defdelegate quick_action_codes(), to: Messages
+
+  defdelegate hide_ride_message(user_id, ride_id, message_id),
+    to: Messages,
+    as: :hide_for_user
+
+  defdelegate report_ride_message(user_id, ride_id, message_id, attrs \\ %{}),
+    to: Messages,
+    as: :report_for_user
+
   defdelegate rider_history(rider_user_id, attrs \\ %{}), to: History
   defdelegate driver_history(driver_user_id, attrs \\ %{}), to: History
 
@@ -90,6 +121,10 @@ defmodule Liddr.Rides do
   defdelegate list_notifications_for_user(user_id, attrs \\ %{}),
     to: Notifications,
     as: :list_for_user
+
+  defdelegate notifications_summary_for_user(user_id),
+    to: NotificationSummary,
+    as: :for_user
 
   defdelegate shared_context_for_user(user_id, ride_id), to: SharedRides, as: :context_for_user
 
@@ -116,6 +151,8 @@ defmodule Liddr.Rides do
   defdelegate ops_list_notifications_for_ride(ride_id, attrs \\ %{}),
     to: Notifications,
     as: :list_for_ride
+
+  defdelegate ops_offer_lock_health(), to: OfferLockMonitor, as: :health
 
   defdelegate retry_pending_notifications(attrs \\ %{}),
     to: NotificationRetry,

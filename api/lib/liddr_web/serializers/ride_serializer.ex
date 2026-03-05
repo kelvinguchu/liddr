@@ -1,5 +1,6 @@
 defmodule LiddrWeb.RideSerializer do
   alias Liddr.Rides.CancellationOutcome
+  alias Liddr.Rides.MessageQuickActions
   alias Liddr.Ratings.Snapshot
 
   def quote_payload(quote) do
@@ -178,6 +179,29 @@ defmodule LiddrWeb.RideSerializer do
     }
   end
 
+  def message_payload(message, opts \\ []) do
+    locale = Keyword.get(opts, :locale)
+    metadata = message.metadata || %{}
+    quick_action = quick_action_payload(message.message_type, metadata, locale)
+
+    payload = %{
+      id: message.id,
+      ride_id: message.ride_id,
+      sender_user_id: message.sender_user_id,
+      recipient_user_id: message.recipient_user_id,
+      sender_role: message.sender_role,
+      message_type: message.message_type,
+      body: message.body,
+      metadata: metadata,
+      read_at: message.read_at,
+      acked_at: message.acked_at,
+      inserted_at: message.inserted_at,
+      updated_at: message.updated_at
+    }
+
+    if is_map(quick_action), do: Map.put(payload, :quick_action, quick_action), else: payload
+  end
+
   def destination_change_payload(change) do
     %{
       id: change.id,
@@ -238,4 +262,12 @@ defmodule LiddrWeb.RideSerializer do
   defp response_state(%{status: "rejected"}), do: "rejected"
   defp response_state(%{status: "withdrawn"}), do: "withdrawn"
   defp response_state(_offer), do: "unknown"
+
+  defp quick_action_payload("quick_action", metadata, locale) do
+    metadata
+    |> Map.get("quick_action_code")
+    |> MessageQuickActions.payload(locale)
+  end
+
+  defp quick_action_payload(_message_type, _metadata, _locale), do: nil
 end

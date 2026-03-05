@@ -1,6 +1,8 @@
 defmodule LiddrWeb.SendControllerTest do
   use LiddrWeb.ConnCase, async: false
 
+  import Ecto.Query
+
   alias Decimal, as: D
   alias Liddr.Repo
   alias Liddr.Accounts.User
@@ -133,6 +135,63 @@ defmodule LiddrWeb.SendControllerTest do
     assert ride.rider_id == rider_user_id
     assert ride.product_type == "solo"
     assert get_in(ride.metadata, ["delivery", "recipient_phone"]) == recipient_phone
+  end
+
+  test "POST /api/send/requests replays successful response for identical idempotency key", %{
+    conn: conn
+  } do
+    %{auth_conn: auth_conn, user_id: rider_user_id} = AuthFixtures.authenticate_rider!(conn)
+    %{user_id: recipient_user_id} = AuthFixtures.authenticate_rider!(conn)
+    recipient_phone = Repo.get!(User, recipient_user_id).phone
+    _send_category_id = VerificationFixtures.insert_vehicle_category!(%{slug: "send"})
+    key = "send-request-key-001"
+
+    first_conn =
+      auth_conn
+      |> put_req_header("idempotency-key", key)
+      |> post("/api/send/requests", %{
+        "pickup_lat" => "-1.2921",
+        "pickup_lng" => "36.8219",
+        "dropoff_lat" => "-1.3000",
+        "dropoff_lng" => "36.8000",
+        "sender_name" => "Alice",
+        "recipient_name" => "Bob",
+        "recipient_phone" => recipient_phone,
+        "item_description" => "Small package",
+        "item_size" => "small",
+        "payer" => "sender",
+        "payment_timing" => "after"
+      })
+
+    second_conn =
+      auth_conn
+      |> put_req_header("idempotency-key", key)
+      |> post("/api/send/requests", %{
+        "pickup_lat" => "-1.2921",
+        "pickup_lng" => "36.8219",
+        "dropoff_lat" => "-1.3000",
+        "dropoff_lng" => "36.8000",
+        "sender_name" => "Alice",
+        "recipient_name" => "Bob",
+        "recipient_phone" => recipient_phone,
+        "item_description" => "Small package",
+        "item_size" => "small",
+        "payer" => "sender",
+        "payment_timing" => "after"
+      })
+
+    assert %{"data" => %{"ride" => %{"id" => first_ride_id}}} = json_response(first_conn, 201)
+    assert %{"data" => %{"ride" => %{"id" => second_ride_id}}} = json_response(second_conn, 201)
+    assert first_ride_id == second_ride_id
+
+    ride_count =
+      Repo.aggregate(
+        from(r in Ride, where: r.rider_id == ^rider_user_id and r.product_type == "solo"),
+        :count,
+        :id
+      )
+
+    assert ride_count == 1
   end
 
   test "POST /api/send/requests requires recipient to have app account", %{conn: conn} do

@@ -222,7 +222,7 @@ defmodule LiddrWeb.SendDeliveryControllerTest do
              |> json_response(403)
 
     assert %{"data" => %{"notifications" => notifications}} =
-             get(recipient_conn, "/api/ride-notifications")
+             get(recipient_conn, "/api/notifications")
              |> json_response(200)
 
     assert Enum.any?(notifications, fn notification ->

@@ -3,6 +3,7 @@ defmodule LiddrWeb.RideOpsController do
 
   alias Liddr.Rides
   alias Liddr.Rides.RideNotification
+  alias LiddrWeb.Idempotency
 
   def integrity_lookup(conn, %{"user_id" => user_id} = params) do
     with {:ok, parsed_user_id} <- parse_positive_integer(user_id, :invalid_user_id),
@@ -14,22 +15,41 @@ defmodule LiddrWeb.RideOpsController do
   end
 
   def reconcile_prepay_modes(conn, params) do
-    with {:ok, limit} <- parse_reconciliation_limit(params),
-         {:ok, results} <- Rides.expire_due_rider_prepay_modes(%{"limit" => limit}) do
-      json(conn, %{
-        data: %{
-          processed: length(results),
-          reconciled: length(results),
-          results: results
-        }
-      })
-    else
-      {:error, reason} -> render_error(conn, reason)
-    end
+    Idempotency.execute(
+      conn,
+      "ops.ride.reconcile_prepay_modes",
+      params,
+      fn ->
+        with {:ok, limit} <- parse_reconciliation_limit(params),
+             {:ok, results} <- Rides.expire_due_rider_prepay_modes(%{"limit" => limit}) do
+          {:ok, 200,
+           %{
+             data: %{
+               processed: length(results),
+               reconciled: length(results),
+               results: results
+             }
+           }}
+        else
+          {:error, reason} -> {:error, reason}
+        end
+      end,
+      &render_error/2
+    )
   end
 
   def pickup_watchdog_summary(conn, params) do
     case Rides.ops_pickup_watchdog_summary(params) do
+      {:ok, payload} ->
+        json(conn, %{data: payload})
+
+      {:error, reason} ->
+        render_error(conn, reason)
+    end
+  end
+
+  def offer_lock_health(conn, _params) do
+    case Rides.ops_offer_lock_health() do
       {:ok, payload} ->
         json(conn, %{data: payload})
 

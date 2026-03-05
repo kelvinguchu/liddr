@@ -10,7 +10,7 @@ defmodule Liddr.Location do
   alias Liddr.Subscriptions.PaymentUtils
 
   def upsert_driver_location(driver_user_id, attrs \\ %{}) do
-    with %Driver{} <- Repo.get(Driver, driver_user_id),
+    with %Driver{} = driver <- Repo.get(Driver, driver_user_id),
          {:ok, lat} <- parse_coordinate(PaymentUtils.get_value(attrs, :lat), -90.0, 90.0),
          {:ok, lng} <- parse_coordinate(PaymentUtils.get_value(attrs, :lng), -180.0, 180.0) do
       now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
@@ -51,6 +51,7 @@ defmodule Liddr.Location do
       )
       |> case do
         {:ok, _location} = result ->
+          _ = update_driver_last_seen(driver, now)
           _ = sync_driver_supply(driver_user_id)
           _ = LocationEtaRefresh.maybe_refresh_for_driver(driver_user_id, lat, lng, now)
           result
@@ -99,6 +100,12 @@ defmodule Liddr.Location do
   end
 
   def remove_driver_from_supply(_driver_user_id), do: :ok
+
+  defp update_driver_last_seen(%Driver{} = driver, now) do
+    driver
+    |> Driver.create_changeset(%{"last_seen_at" => now})
+    |> Repo.update()
+  end
 
   defp parse_coordinate(value, min, max) when is_binary(value) do
     case Float.parse(String.trim(value)) do

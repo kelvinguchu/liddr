@@ -17,6 +17,10 @@ defmodule Liddr.Rides.Timeline do
     offer_expired
     offer_missed
     offer_withdrawn
+    driver_delayed
+    driver_offline_detected
+    reassigning_driver
+    new_driver_found
     driver_arriving
     driver_arrived
     trip_started

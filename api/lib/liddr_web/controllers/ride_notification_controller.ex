@@ -5,6 +5,8 @@ defmodule LiddrWeb.RideNotificationController do
   alias Liddr.Rides.RideNotification
 
   @error_mappings %{
+    invalid_user_id:
+      {:unprocessable_entity, "INVALID_USER_ID", "User id must be a positive integer"},
     notification_not_found:
       {:not_found, "NOTIFICATION_NOT_FOUND", "Ride notification was not found"}
   }
@@ -28,6 +30,18 @@ defmodule LiddrWeb.RideNotificationController do
     case Rides.ack_notification_for_user(user_id, id, now) do
       {:ok, notification} ->
         json(conn, %{data: %{notification: notification_payload(notification)}})
+
+      {:error, reason} ->
+        render_error(conn, reason)
+    end
+  end
+
+  def summary(conn, _params) do
+    user_id = conn.assigns.current_user.id
+
+    case Rides.notifications_summary_for_user(user_id) do
+      {:ok, summary} ->
+        json(conn, %{data: summary_payload(summary)})
 
       {:error, reason} ->
         render_error(conn, reason)
@@ -64,6 +78,14 @@ defmodule LiddrWeb.RideNotificationController do
       attempt_count: notification.attempt_count,
       payload: notification.payload,
       inserted_at: notification.inserted_at
+    }
+  end
+
+  defp summary_payload(summary) do
+    %{
+      unread_count: summary.unread_count,
+      critical_count: summary.critical_count,
+      latest_notification_at: summary.latest_notification_at
     }
   end
 end

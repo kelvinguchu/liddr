@@ -94,6 +94,23 @@ parse_float_env = fn value, default, min, max ->
   if parsed < min or parsed > max, do: default, else: parsed
 end
 
+offer_lock_monitor_enabled_default = config_env() != :test
+
+offer_lock_allow_unavailable_fallback =
+  if config_env() == :test do
+    true
+  else
+    parse_bool_env.(
+      System.get_env("RIDE_OFFER_LOCK_ALLOW_UNAVAILABLE_FALLBACK"),
+      false
+    )
+  end
+
+dispatch_eta_enabled =
+  if config_env() == :test,
+    do: false,
+    else: parse_bool_env.(System.get_env("RIDE_DISPATCH_ETA_ENABLED"), true)
+
 push_client =
   case String.downcase(System.get_env("RIDE_PUSH_CLIENT") || "fcm") do
     "noop" -> Liddr.Rides.PushClient.Noop
@@ -267,6 +284,10 @@ config :liddr, Liddr.Rides.Integrity.Policy,
     parse_bool_env.(System.get_env("RIDE_PICKUP_AUTO_REASSIGN_ENABLED"), true),
   pickup_auto_reassign_after_seconds:
     parse_int_env.(System.get_env("RIDE_PICKUP_AUTO_REASSIGN_AFTER_SECONDS"), 420, 60, 7_200),
+  pickup_fast_reassign_enabled:
+    parse_bool_env.(System.get_env("RIDE_PICKUP_FAST_REASSIGN_ENABLED"), true),
+  pickup_fast_reassign_after_seconds:
+    parse_int_env.(System.get_env("RIDE_PICKUP_FAST_REASSIGN_AFTER_SECONDS"), 180, 30, 3_600),
   pickup_auto_cancel_enabled:
     parse_bool_env.(System.get_env("RIDE_PICKUP_AUTO_CANCEL_ENABLED"), true),
   pickup_auto_cancel_after_seconds:
@@ -296,6 +317,28 @@ config :liddr, Liddr.Rides.SharedRides.StopEta,
   max_leg_seconds:
     parse_int_env.(System.get_env("RIDE_SHARED_ETA_MAX_LEG_SECONDS"), 7_200, 60, 21_600)
 
+config :liddr, Liddr.Rides.DispatchEta,
+  enabled: dispatch_eta_enabled,
+  probe_limit: parse_int_env.(System.get_env("RIDE_DISPATCH_ETA_PROBE_LIMIT"), 8, 1, 30),
+  max_concurrency: parse_int_env.(System.get_env("RIDE_DISPATCH_ETA_MAX_CONCURRENCY"), 4, 1, 12),
+  timeout_ms: parse_int_env.(System.get_env("RIDE_DISPATCH_ETA_TIMEOUT_MS"), 1_200, 100, 10_000),
+  fallback_speed_kph:
+    parse_float_env.(System.get_env("RIDE_DISPATCH_ETA_FALLBACK_SPEED_KPH"), 28.0, 5.0, 120.0),
+  min_eta_seconds: parse_int_env.(System.get_env("RIDE_DISPATCH_ETA_MIN_SECONDS"), 30, 5, 3_600),
+  max_eta_seconds:
+    parse_int_env.(System.get_env("RIDE_DISPATCH_ETA_MAX_SECONDS"), 7_200, 60, 21_600)
+
+config :liddr, Liddr.Rides.DriverLiveness,
+  online_max_age_seconds:
+    parse_int_env.(System.get_env("RIDE_DRIVER_LIVENESS_ONLINE_MAX_AGE_SECONDS"), 90, 10, 900),
+  offline_after_seconds:
+    parse_int_env.(
+      System.get_env("RIDE_DRIVER_LIVENESS_OFFLINE_AFTER_SECONDS"),
+      240,
+      30,
+      3_600
+    )
+
 config :liddr, Liddr.Rides.SharedRides.LocationEtaRefresh,
   min_interval_seconds:
     parse_int_env.(
@@ -307,6 +350,52 @@ config :liddr, Liddr.Rides.SharedRides.LocationEtaRefresh,
 
 config :liddr, Liddr.Rides.PushClient.FCM,
   timeout_ms: parse_int_env.(System.get_env("FCM_TIMEOUT_MS"), 10_000, 1_000, 60_000)
+
+config :liddr, Liddr.Rides.OfferLockMonitor,
+  enabled:
+    parse_bool_env.(
+      System.get_env("RIDE_OFFER_LOCK_MONITOR_ENABLED"),
+      offer_lock_monitor_enabled_default
+    ),
+  window_ms:
+    parse_int_env.(System.get_env("RIDE_OFFER_LOCK_MONITOR_WINDOW_MS"), 60_000, 5_000, 600_000),
+  min_attempts:
+    parse_int_env.(System.get_env("RIDE_OFFER_LOCK_MONITOR_MIN_ATTEMPTS"), 20, 1, 10_000),
+  unavailable_ratio_alert_threshold:
+    parse_float_env.(
+      System.get_env("RIDE_OFFER_LOCK_UNAVAILABLE_RATIO_ALERT_THRESHOLD"),
+      0.05,
+      0.0,
+      1.0
+    )
+
+config :liddr, Liddr.Rides.OfferLockExternalAlerting,
+  enabled: parse_bool_env.(System.get_env("RIDE_OFFER_LOCK_EXTERNAL_ALERTS_ENABLED"), false),
+  provider: System.get_env("RIDE_OFFER_LOCK_EXTERNAL_ALERT_PROVIDER") || "raw",
+  webhook_url: System.get_env("RIDE_OFFER_LOCK_EXTERNAL_ALERT_WEBHOOK_URL"),
+  min_level: System.get_env("RIDE_OFFER_LOCK_EXTERNAL_ALERT_MIN_LEVEL") || "critical",
+  timeout_ms:
+    parse_int_env.(
+      System.get_env("RIDE_OFFER_LOCK_EXTERNAL_ALERT_TIMEOUT_MS"),
+      3_000,
+      500,
+      30_000
+    ),
+  auth_header: System.get_env("RIDE_OFFER_LOCK_EXTERNAL_ALERT_AUTH_HEADER"),
+  pagerduty_routing_key: System.get_env("RIDE_OFFER_LOCK_EXTERNAL_ALERT_PAGERDUTY_ROUTING_KEY"),
+  slack_channel: System.get_env("RIDE_OFFER_LOCK_EXTERNAL_ALERT_SLACK_CHANNEL"),
+  slack_username: System.get_env("RIDE_OFFER_LOCK_EXTERNAL_ALERT_SLACK_USERNAME")
+
+config :liddr,
+       :ride_offer_lock_allow_unavailable_fallback,
+       offer_lock_allow_unavailable_fallback
+
+config :liddr, Liddr.Rides.MessageModerationPolicy,
+  report_window_days: parse_int_env.(System.get_env("RIDE_MESSAGE_REPORT_WINDOW_DAYS"), 7, 1, 90),
+  auto_restrict_threshold:
+    parse_int_env.(System.get_env("RIDE_MESSAGE_AUTO_RESTRICT_THRESHOLD"), 3, 1, 50),
+  signal_cooldown_days:
+    parse_int_env.(System.get_env("RIDE_MESSAGE_SIGNAL_COOLDOWN_DAYS"), 2, 1, 30)
 
 config :liddr, Liddr.Ratings.Policy,
   rating_window_hours: parse_int_env.(System.get_env("RATING_WINDOW_HOURS"), 24, 1, 168),

@@ -4,6 +4,7 @@ defmodule Liddr.Rides.DriverOfferLock do
   require Logger
 
   @telemetry_event_acquire [:liddr, :rides, :offer_lock, :acquire]
+  @telemetry_event_blocked [:liddr, :rides, :offer_lock, :blocked]
   @telemetry_event_release [:liddr, :rides, :offer_lock, :release]
 
   @type acquire_result :: :acquired | :locked | :unavailable
@@ -45,12 +46,7 @@ defmodule Liddr.Rides.DriverOfferLock do
 
           :unavailable ->
             emit_acquire_telemetry(source, :unavailable)
-
-            %{
-              acc
-              | unavailable_count: acc.unavailable_count + 1,
-                selected_driver_ids: [driver_id | acc.selected_driver_ids]
-            }
+            apply_unavailable_policy(acc, driver_id)
 
           :locked ->
             emit_acquire_telemetry(source, :locked)
@@ -59,7 +55,7 @@ defmodule Liddr.Rides.DriverOfferLock do
       end
     )
     |> then(fn result ->
-      maybe_log_unavailable_fallback(result)
+      maybe_log_unavailable_result(result)
 
       %{
         selected_driver_ids: Enum.reverse(result.selected_driver_ids),
@@ -97,26 +93,63 @@ defmodule Liddr.Rides.DriverOfferLock do
   end
 
   def release(driver_id, ride_id), do: lock_impl().release(driver_id, ride_id)
+  def fallback_allowed?, do: allow_unavailable_fallback?()
+
+  def emit_blocked_telemetry(source, count \\ 1),
+    do: emit_blocked_telemetry_internal(source, count)
+
+  def unavailable_blocked?(%{unavailable_count: count}) when is_integer(count) and count > 0 do
+    not fallback_allowed?()
+  end
+
+  def unavailable_blocked?(_result), do: false
 
   defp lock_impl do
     Application.get_env(:liddr, :ride_offer_lock, Liddr.Rides.DriverOfferLock.Redis)
   end
 
-  defp maybe_log_unavailable_fallback(%{
+  defp maybe_log_unavailable_result(%{
          unavailable_count: count,
          source: source,
          ride_id: ride_id
        })
        when count > 0 do
-    Logger.warning(
-      "[rides.offer_lock] source=#{source} ride_id=#{ride_id} lock_backend=unavailable fallback=allow_without_lock count=#{count}"
-    )
+    if allow_unavailable_fallback?() do
+      Logger.warning(
+        "[rides.offer_lock] source=#{source} ride_id=#{ride_id} lock_backend=unavailable fallback=allow_without_lock count=#{count}"
+      )
+    else
+      Logger.error(
+        "[rides.offer_lock] source=#{source} ride_id=#{ride_id} lock_backend=unavailable fallback=blocked count=#{count}"
+      )
+    end
   end
 
-  defp maybe_log_unavailable_fallback(_result), do: :ok
+  defp maybe_log_unavailable_result(_result), do: :ok
+
+  defp apply_unavailable_policy(acc, driver_id) do
+    next = %{acc | unavailable_count: acc.unavailable_count + 1}
+
+    if allow_unavailable_fallback?() do
+      %{next | selected_driver_ids: [driver_id | next.selected_driver_ids]}
+    else
+      next
+    end
+  end
+
+  defp allow_unavailable_fallback? do
+    Application.get_env(:liddr, :ride_offer_lock_allow_unavailable_fallback, false)
+  end
 
   defp emit_acquire_telemetry(source, result) do
     :telemetry.execute(@telemetry_event_acquire, %{count: 1}, %{source: source, result: result})
+  end
+
+  defp emit_blocked_telemetry_internal(_source, count) when not is_integer(count) or count < 1,
+    do: :ok
+
+  defp emit_blocked_telemetry_internal(source, count) do
+    :telemetry.execute(@telemetry_event_blocked, %{count: count}, %{source: source})
   end
 
   defp emit_release_telemetry(source, count) do

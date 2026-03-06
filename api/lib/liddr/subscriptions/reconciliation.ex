@@ -3,6 +3,7 @@ defmodule Liddr.Subscriptions.Reconciliation do
 
   alias Liddr.Payments.Mpesa.Client
   alias Liddr.Payments.Mpesa.Parser
+  alias Liddr.Payments.Mpesa.Sanitizer
   alias Liddr.Repo
   alias Liddr.Subscriptions.Activation
   alias Liddr.Subscriptions.ReconciliationPolicy
@@ -131,10 +132,7 @@ defmodule Liddr.Subscriptions.Reconciliation do
         payment,
         result_code,
         result_desc,
-        %{
-          "request_payload" => query_result.request_payload,
-          "response_payload" => response_payload
-        },
+        Sanitizer.query_payload(query_result, now),
         now,
         payment_status
       )

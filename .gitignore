@@ -35,5 +35,3 @@ ios/**/*.xcuserstate
 Thumbs.db
 
 secrets
-docs
-api/test

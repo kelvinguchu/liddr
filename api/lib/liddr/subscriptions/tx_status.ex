@@ -4,6 +4,7 @@ defmodule Liddr.Subscriptions.TxStatus do
   alias Liddr.Repo
   alias Liddr.Subscriptions.MpesaCallback
   alias Liddr.Subscriptions.SubscriptionPayment
+  alias Liddr.Payments.Mpesa.Sanitizer
 
   def query_by_checkout(checkout_request_id, attrs, mpesa_client_module) do
     now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
@@ -81,11 +82,7 @@ defmodule Liddr.Subscriptions.TxStatus do
         "originator_conversation_id" =>
           normalize_text(Map.get(response_payload, "OriginatorConversationID")) ||
             payment.originator_conversation_id,
-        "status_query_payload" => %{
-          "requested_at" => now,
-          "request_payload" => query_result.request_payload,
-          "response_payload" => response_payload
-        }
+        "status_query_payload" => Sanitizer.query_payload(query_result, now)
       })
       |> Repo.update()
       |> case do

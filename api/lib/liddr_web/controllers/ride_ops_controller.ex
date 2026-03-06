@@ -3,6 +3,7 @@ defmodule LiddrWeb.RideOpsController do
 
   alias Liddr.Rides
   alias Liddr.Rides.RideNotification
+  alias Liddr.Security.Redaction
   alias LiddrWeb.Idempotency
 
   def integrity_lookup(conn, %{"user_id" => user_id} = params) do
@@ -94,7 +95,7 @@ defmodule LiddrWeb.RideOpsController do
       last_attempt_at: notification.last_attempt_at,
       acked_at: notification.acked_at,
       attempt_count: notification.attempt_count,
-      payload: notification.payload,
+      payload: Redaction.sanitize_payload(notification.payload),
       inserted_at: notification.inserted_at
     }
   end

@@ -13,7 +13,9 @@ defmodule Liddr.Auth.Challenges do
   alias Liddr.Auth.OtpDelivery
   alias Liddr.Auth.Policy
   alias Liddr.Auth.Sessions
+  alias Liddr.Auth.StepUp
   alias Liddr.Repo
+  alias Liddr.Security.Redaction
 
   @challenge_ttl_seconds 300
   @challenge_lock_seconds 300
@@ -40,50 +42,45 @@ defmodule Liddr.Auth.Challenges do
         user = Identities.find_existing_user_by_identifier(Repo, provider, normalized_identifier)
 
         with :ok <- Policy.ensure_user_can_authenticate(user) do
-          challenge_attrs = %{
-            user_id: user && user.id,
-            provider: provider,
-            identity_value: normalized_identifier,
-            purpose: purpose,
-            channel: Methods.provider_to_channel(provider),
-            code_hash: Crypto.otp_hash(code),
-            expires_at: DateTime.add(now, @challenge_ttl_seconds, :second),
-            max_attempts: 5,
-            requested_by_ip: Input.get_value(meta, :ip),
-            requested_by_device: Input.get_value(meta, :device),
-            metadata: %{issued_for_method: provider}
-          }
+          with {:ok, challenge_attrs} <-
+                 build_challenge_attrs(
+                   user,
+                   provider,
+                   normalized_identifier,
+                   purpose,
+                   meta,
+                   now,
+                   code
+                 ),
+               {:ok, challenge} <-
+                 %AuthChallenge{}
+                 |> AuthChallenge.create_changeset(challenge_attrs)
+                 |> Repo.insert() do
+            debug_code = Crypto.maybe_debug_code(code, normalized_identifier)
 
-          case %AuthChallenge{}
-               |> AuthChallenge.create_changeset(challenge_attrs)
-               |> Repo.insert() do
-            {:ok, challenge} ->
-              debug_code = Crypto.maybe_debug_code(code, normalized_identifier)
+            case OtpDelivery.deliver_challenge(
+                   provider,
+                   normalized_identifier,
+                   code,
+                   debug_code
+                 ) do
+              :ok ->
+                {:ok,
+                 %{
+                   challenge_id: challenge.id,
+                   method: provider,
+                   purpose: challenge.purpose,
+                   channel: challenge.channel,
+                   expires_at: challenge.expires_at,
+                   debug_code: debug_code
+                 }}
 
-              case OtpDelivery.deliver_challenge(
-                     provider,
-                     normalized_identifier,
-                     code,
-                     debug_code
-                   ) do
-                :ok ->
-                  {:ok,
-                   %{
-                     challenge_id: challenge.id,
-                     method: provider,
-                     purpose: challenge.purpose,
-                     channel: challenge.channel,
-                     expires_at: challenge.expires_at,
-                     debug_code: debug_code
-                   }}
-
-                {:error, reason} ->
-                  rollback_delivery_failed_challenge(challenge, provider, normalized_identifier)
-                  {:error, reason}
-              end
-
-            {:error, changeset} ->
-              {:error, changeset}
+              {:error, reason} ->
+                rollback_delivery_failed_challenge(challenge, provider, normalized_identifier)
+                {:error, reason}
+            end
+          else
+            {:error, changeset} -> {:error, changeset}
           end
         end
       end
@@ -120,24 +117,9 @@ defmodule Liddr.Auth.Challenges do
                  :ok <- Policy.ensure_user_can_authenticate(user),
                  {:ok, _updated_identity} <-
                    Repo.update(AuthIdentity.touch_last_used_changeset(identity, now)),
-                 {:ok, _consumed_challenge} <-
-                   Repo.update(
-                     Ecto.Changeset.change(challenge, %{
-                       consumed_at: now,
-                       attempts: challenge.attempts + 1
-                     })
-                   ) do
-              {:ok,
-               Sessions.issue_session!(
-                 identity.user_id,
-                 identity.provider,
-                 now,
-                 %{
-                   ip: Input.get_value(meta, :ip),
-                   device: Input.get_value(meta, :device),
-                   user_agent: Input.get_value(meta, :user_agent)
-                 }
-               )}
+                 {:ok, _consumed_challenge} <- consume_challenge(challenge, now),
+                 {:ok, payload} <- issue_success_payload(challenge, identity, user, now, meta) do
+              {:ok, payload}
             end
         end
       end)
@@ -195,7 +177,7 @@ defmodule Liddr.Auth.Challenges do
   defp maybe_log_debug_otp(provider, identifier, purpose, code) do
     if not is_nil(Crypto.maybe_debug_code(code, identifier)) do
       Logger.warning(
-        "[auth.otp] provider=#{provider} identifier=#{identifier} purpose=#{purpose} code=#{code}"
+        "[auth.otp] provider=#{provider} identifier=#{Redaction.mask_phone(identifier) || Redaction.mask_reference(identifier)} purpose=#{purpose} code=#{code}"
       )
     end
   end
@@ -207,8 +189,110 @@ defmodule Liddr.Auth.Challenges do
 
       {:error, reason} ->
         Logger.error(
-          "[auth.otp_delivery] rollback_failed challenge_id=#{challenge.id} provider=#{provider} identifier=#{identifier} reason=#{inspect(reason)}"
+          "[auth.otp_delivery] rollback_failed challenge_id=#{challenge.id} provider=#{provider} identifier=#{Redaction.mask_phone(identifier) || Redaction.mask_reference(identifier)} reason=#{inspect(reason)}"
         )
+    end
+  end
+
+  defp build_challenge_attrs(user, provider, identifier, purpose, meta, now, code) do
+    base_attrs = %{
+      user_id: user && user.id,
+      provider: provider,
+      identity_value: identifier,
+      purpose: purpose,
+      channel: Methods.provider_to_channel(provider),
+      code_hash: Crypto.otp_hash(code),
+      expires_at: DateTime.add(now, @challenge_ttl_seconds, :second),
+      max_attempts: 5,
+      requested_by_ip: Input.get_value(meta, :ip),
+      requested_by_device: Input.get_value(meta, :device),
+      metadata: %{issued_for_method: provider}
+    }
+
+    case purpose do
+      "step_up" -> bind_step_up_attrs(base_attrs, user, meta)
+      _ -> {:ok, base_attrs}
+    end
+  end
+
+  defp bind_step_up_attrs(_attrs, nil, _meta), do: {:error, :step_up_identity_mismatch}
+
+  defp bind_step_up_attrs(attrs, user, meta) do
+    current_user_id = Input.get_value(meta, :current_user_id)
+    current_session_id = Input.get_value(meta, :current_session_id)
+
+    cond do
+      is_nil(current_user_id) or is_nil(current_session_id) ->
+        {:error, :step_up_context_required}
+
+      current_user_id != user.id ->
+        {:error, :step_up_identity_mismatch}
+
+      true ->
+        {:ok,
+         attrs
+         |> Map.put(:user_id, user.id)
+         |> Map.put(:metadata, %{
+           issued_for_method: attrs.provider,
+           step_up_session_id: current_session_id,
+           step_up_user_id: user.id
+         })}
+    end
+  end
+
+  defp consume_challenge(challenge, now) do
+    Repo.update(
+      Ecto.Changeset.change(challenge, %{
+        consumed_at: now,
+        attempts: challenge.attempts + 1
+      })
+    )
+  end
+
+  defp issue_success_payload(challenge, identity, user, now, meta) do
+    case challenge.purpose do
+      "step_up" ->
+        with :ok <- validate_step_up_binding(challenge, user, meta),
+             session_id when not is_nil(session_id) <- Input.get_value(meta, :current_session_id) do
+          {:ok, StepUp.issue_token(user.id, session_id, now)}
+        else
+          nil -> {:error, :step_up_context_required}
+          {:error, reason} -> {:error, reason}
+        end
+
+      _ ->
+        {:ok,
+         Sessions.issue_session!(
+           identity.user_id,
+           identity.provider,
+           now,
+           %{
+             ip: Input.get_value(meta, :ip),
+             device: Input.get_value(meta, :device),
+             user_agent: Input.get_value(meta, :user_agent)
+           }
+         )}
+    end
+  end
+
+  defp validate_step_up_binding(challenge, user, meta) do
+    current_user_id = Input.get_value(meta, :current_user_id)
+    current_session_id = Input.get_value(meta, :current_session_id)
+    metadata = challenge.metadata || %{}
+
+    cond do
+      is_nil(current_user_id) or is_nil(current_session_id) ->
+        {:error, :step_up_context_required}
+
+      challenge.user_id != current_user_id or user.id != current_user_id ->
+        {:error, :step_up_identity_mismatch}
+
+      Map.get(metadata, "step_up_session_id") != current_session_id and
+          Map.get(metadata, :step_up_session_id) != current_session_id ->
+        {:error, :step_up_session_mismatch}
+
+      true ->
+        :ok
     end
   end
 end

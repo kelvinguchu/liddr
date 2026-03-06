@@ -4,6 +4,7 @@ defmodule Liddr.Payments.Mpesa.Client do
   alias Liddr.Payments.Mpesa.Client.Config
   alias Liddr.Payments.Mpesa.Client.Error
   alias Liddr.Payments.Mpesa.Client.Normalize
+  alias Liddr.Payments.Mpesa.Sanitizer
 
   @oauth_path "/oauth/v1/generate?grant_type=client_credentials"
   @stk_path "/mpesa/stkpush/v1/processrequest"
@@ -36,12 +37,16 @@ defmodule Liddr.Payments.Mpesa.Client do
         "TransactionDesc" => transaction_desc
       }
 
-      case post_json(config.base_url <> @stk_path, token, payload, config.timeout_ms) do
-        {:ok, %{status: status, body: body}} when status in 200..299 and is_map(body) ->
-          {:ok, %{request_payload: payload, response_payload: body}}
-
-        _ ->
-          {:error, :mpesa_stk_request_failed}
+      with {:ok, %{status: status, body: body}} <-
+             post_json(:stk_push, config.base_url <> @stk_path, token, payload, config.timeout_ms),
+           :ok <- validate_stk_response(status, body) do
+        {:ok,
+         %{
+           request_payload: Sanitizer.payload(payload),
+           response_payload: Sanitizer.payload(body)
+         }}
+      else
+        {:error, _reason} = error -> error
       end
     end
   end
@@ -64,12 +69,22 @@ defmodule Liddr.Payments.Mpesa.Client do
         "CheckoutRequestID" => normalized_checkout_request_id
       }
 
-      case post_json(config.base_url <> @stk_query_path, token, payload, config.timeout_ms) do
-        {:ok, %{status: status, body: body}} when status in 200..299 and is_map(body) ->
-          {:ok, %{request_payload: payload, response_payload: body}}
-
-        _ ->
-          {:error, :mpesa_stk_query_failed}
+      with {:ok, %{status: status, body: body}} <-
+             post_json(
+               :stk_query,
+               config.base_url <> @stk_query_path,
+               token,
+               payload,
+               config.timeout_ms
+             ),
+           :ok <- validate_stk_query_response(status, body) do
+        {:ok,
+         %{
+           request_payload: Sanitizer.payload(payload),
+           response_payload: Sanitizer.payload(body)
+         }}
+      else
+        {:error, _reason} = error -> error
       end
     end
   end
@@ -92,19 +107,23 @@ defmodule Liddr.Payments.Mpesa.Client do
       }
 
       case post_json(
+             :c2b_register,
              config.base_url <> config.c2b_register_path,
              token,
              payload,
              config.timeout_ms
            ) do
-        {:ok, %{status: status, body: body}} when status in 200..299 and is_map(body) ->
-          {:ok, %{request_payload: payload, response_payload: body}}
-
         {:ok, %{status: status, body: body}} ->
-          {:error, Error.http(:c2b_register, status, body)}
+          with :ok <- validate_c2b_register_response(status, body) do
+            {:ok,
+             %{
+               request_payload: Sanitizer.payload(payload),
+               response_payload: Sanitizer.payload(body)
+             }}
+          end
 
-        {:error, reason} ->
-          {:error, Error.transport(:c2b_register, reason)}
+        {:error, _reason} = error ->
+          error
       end
     end
   end
@@ -145,15 +164,22 @@ defmodule Liddr.Payments.Mpesa.Client do
           )
       }
 
-      case post_json(config.base_url <> @tx_status_query_path, token, payload, config.timeout_ms) do
-        {:ok, %{status: status, body: body}} when status in 200..299 and is_map(body) ->
-          {:ok, %{request_payload: payload, response_payload: body}}
-
-        {:ok, %{status: status, body: body}} ->
-          {:error, Error.http(:transaction_status_query, status, body)}
-
-        {:error, reason} ->
-          {:error, Error.transport(:transaction_status_query, reason)}
+      with {:ok, %{status: status, body: body}} <-
+             post_json(
+               :transaction_status_query,
+               config.base_url <> @tx_status_query_path,
+               token,
+               payload,
+               config.timeout_ms
+             ),
+           :ok <- validate_tx_status_response(status, body) do
+        {:ok,
+         %{
+           request_payload: Sanitizer.payload(payload),
+           response_payload: Sanitizer.payload(body)
+         }}
+      else
+        {:error, _reason} = error -> error
       end
     end
   end
@@ -182,8 +208,67 @@ defmodule Liddr.Payments.Mpesa.Client do
     end
   end
 
-  defp post_json(url, token, payload, timeout_ms) do
-    Req.post(url, auth: {:bearer, token}, json: payload, receive_timeout: timeout_ms)
+  defp post_json(operation, url, token, payload, timeout_ms) do
+    case Req.post(url, auth: {:bearer, token}, json: payload, receive_timeout: timeout_ms) do
+      {:ok, response} -> {:ok, response}
+      {:error, reason} -> {:error, Error.transport(operation, reason)}
+    end
+  end
+
+  defp validate_stk_response(status, body) when status in 200..299 and is_map(body) do
+    with {:ok, _code} <- required_string(body, "ResponseCode", :stk_push, status),
+         {:ok, _merchant_request_id} <-
+           required_string(body, "MerchantRequestID", :stk_push, status),
+         {:ok, _checkout_request_id} <-
+           required_string(body, "CheckoutRequestID", :stk_push, status) do
+      :ok
+    end
+  end
+
+  defp validate_stk_response(status, body), do: {:error, Error.http(:stk_push, status, body)}
+
+  defp validate_stk_query_response(status, body) when status in 200..299 and is_map(body) do
+    with {:ok, _result_code} <- required_string(body, "ResultCode", :stk_query, status),
+         {:ok, _result_desc} <- required_string(body, "ResultDesc", :stk_query, status) do
+      :ok
+    end
+  end
+
+  defp validate_stk_query_response(status, body),
+    do: {:error, Error.http(:stk_query, status, body)}
+
+  defp validate_c2b_register_response(status, body) when status in 200..299 and is_map(body) do
+    required_string(body, "ResponseDescription", :c2b_register, status)
+    |> case do
+      {:ok, _value} -> :ok
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp validate_c2b_register_response(status, body),
+    do: {:error, Error.http(:c2b_register, status, body)}
+
+  defp validate_tx_status_response(status, body) when status in 200..299 and is_map(body) do
+    with {:ok, _response_code} <-
+           required_string(body, "ResponseCode", :transaction_status_query, status),
+         {:ok, _response_desc} <-
+           required_string(body, "ResponseDescription", :transaction_status_query, status),
+         {:ok, _conversation_id} <-
+           required_string(body, "ConversationID", :transaction_status_query, status),
+         {:ok, _originator_conversation_id} <-
+           required_string(body, "OriginatorConversationID", :transaction_status_query, status) do
+      :ok
+    end
+  end
+
+  defp validate_tx_status_response(status, body),
+    do: {:error, Error.http(:transaction_status_query, status, body)}
+
+  defp required_string(body, key, operation, status) do
+    case Normalize.text(Map.get(body, key)) do
+      nil -> {:error, Error.invalid_response(operation, status, body)}
+      value -> {:ok, value}
+    end
   end
 
   # Kenya is UTC+3 year-round.

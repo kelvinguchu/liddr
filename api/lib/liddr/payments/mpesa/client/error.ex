@@ -1,4 +1,6 @@
 defmodule Liddr.Payments.Mpesa.Client.Error do
+  alias Liddr.Payments.Mpesa.Sanitizer
+
   def http(operation, status, body) do
     {:mpesa_http_error, operation, status, normalize_body(body)}
   end
@@ -11,7 +13,7 @@ defmodule Liddr.Payments.Mpesa.Client.Error do
     {:mpesa_transport_error, operation, normalize_reason(reason)}
   end
 
-  defp normalize_body(body) when is_map(body), do: body
+  defp normalize_body(body) when is_map(body), do: Sanitizer.payload(body)
 
   defp normalize_body(body) when is_binary(body) do
     if String.length(body) > 2_000, do: String.slice(body, 0, 2_000), else: body

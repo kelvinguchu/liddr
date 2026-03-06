@@ -74,11 +74,27 @@ defmodule LiddrWeb.Telemetry do
         description:
           "The time the connection spent waiting before being checked out for the query"
       ),
+      summary("liddr.location.driver_update.db.total_time", unit: {:native, :millisecond}),
+      summary("liddr.location.driver_update.db.queue_time", unit: {:native, :millisecond}),
+      summary("liddr.location.driver_update.db.query_time", unit: {:native, :millisecond}),
+      summary("liddr.location.driver_update.db.decode_time", unit: {:native, :millisecond}),
 
       # Ride dispatch lock metrics
       counter("liddr.rides.offer_lock.acquire.count", tags: [:source, :result]),
       counter("liddr.rides.offer_lock.blocked.count", tags: [:source]),
       counter("liddr.rides.offer_lock.release.count", tags: [:source]),
+
+      # Moderation/dispute observability metrics
+      counter("liddr.moderation.report.triage.rate_limited.count"),
+      counter("liddr.moderation.report.review.rate_limited.count"),
+      counter("liddr.moderation.report.triage.success.count", tags: [:status]),
+      counter("liddr.moderation.report.review.success.count", tags: [:decision]),
+      counter("liddr.disputes.create.success.count", tags: [:dispute_type]),
+      counter("liddr.disputes.resolve.success.count", tags: [:resolution_outcome]),
+      counter("liddr.observability.moderation.alert.count", tags: [:code, :level]),
+
+      # Compliance retention telemetry
+      counter("liddr.security.retention.run.count"),
 
       # VM Metrics
       summary("vm.memory.total", unit: {:byte, :kilobyte}),

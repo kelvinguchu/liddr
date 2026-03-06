@@ -7,7 +7,7 @@ defmodule Liddr.Rides.Requests.Lookup do
   alias Liddr.Rides.ProductType
   alias Liddr.Rides.Requests.Params, as: RequestParams
   alias Liddr.Rides.RideQuote
-  alias Liddr.Rides.VehicleCategory
+  alias Liddr.Rides.VehicleCategoryCache
   alias Liddr.Subscriptions.PaymentUtils
 
   def fetch_vehicle_category!(attrs) do
@@ -18,11 +18,10 @@ defmodule Liddr.Rides.Requests.Lookup do
 
     if is_nil(category_id), do: Repo.rollback(:invalid_vehicle_category_id)
 
-    Repo.one(
-      from vc in VehicleCategory,
-        where: vc.id == ^category_id and vc.is_active == true,
-        limit: 1
-    ) || Repo.rollback(:vehicle_category_not_found)
+    case VehicleCategoryCache.fetch_active(category_id) do
+      {:ok, category} -> category
+      {:error, _reason} -> Repo.rollback(:vehicle_category_not_found)
+    end
   end
 
   def fetch_valid_quote!(attrs, rider_user_id, category_id, product_type, now) do

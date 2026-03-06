@@ -2,6 +2,7 @@ defmodule LiddrWeb.ModerationController do
   use LiddrWeb, :controller
 
   alias Liddr.Moderation
+  alias Liddr.Observability.ModerationEvents
   alias LiddrWeb.Idempotency
   alias LiddrWeb.ModerationErrors
   alias LiddrWeb.ModerationPayloads
@@ -19,9 +20,26 @@ defmodule LiddrWeb.ModerationController do
       "moderation.report.triage:#{report_id}",
       params,
       fn ->
-        case Moderation.triage_report(report_id, params, reviewer_user_id) do
-          {:ok, report} -> {:ok, 200, %{data: ModerationPayloads.report(report)}}
-          {:error, reason} -> {:error, reason}
+        with :ok <- Moderation.enforce_report_triage_rate_limit(reviewer_user_id),
+             {:ok, report} <- Moderation.triage_report(report_id, params, reviewer_user_id) do
+          ModerationEvents.report_triage_success(%{
+            report_id: report.id,
+            reviewer_user_id: reviewer_user_id,
+            status: report.status
+          })
+
+          {:ok, 200, %{data: ModerationPayloads.report(report)}}
+        else
+          {:error, :report_triage_rate_limited = reason} ->
+            ModerationEvents.report_triage_rate_limited(%{
+              report_id: report_id,
+              reviewer_user_id: reviewer_user_id
+            })
+
+            {:error, reason}
+
+          {:error, reason} ->
+            {:error, reason}
         end
       end,
       &ModerationErrors.render/2
@@ -36,15 +54,30 @@ defmodule LiddrWeb.ModerationController do
       "moderation.report.review:#{report_id}",
       params,
       fn ->
-        case Moderation.review_report(report_id, params, reviewer_user_id) do
-          {:ok, %{report: report, review: review}} ->
-            {:ok, 201,
-             %{
-               data: %{
-                 report: ModerationPayloads.report(report),
-                 review: ModerationPayloads.review(review)
-               }
-             }}
+        with :ok <- Moderation.enforce_report_review_rate_limit(reviewer_user_id),
+             {:ok, %{report: report, review: review}} <-
+               Moderation.review_report(report_id, params, reviewer_user_id) do
+          ModerationEvents.report_review_success(%{
+            report_id: report.id,
+            reviewer_user_id: reviewer_user_id,
+            decision: review.decision
+          })
+
+          {:ok, 201,
+           %{
+             data: %{
+               report: ModerationPayloads.report(report),
+               review: ModerationPayloads.review(review)
+             }
+           }}
+        else
+          {:error, :report_review_rate_limited = reason} ->
+            ModerationEvents.report_review_rate_limited(%{
+              report_id: report_id,
+              reviewer_user_id: reviewer_user_id
+            })
+
+            {:error, reason}
 
           {:error, reason} ->
             {:error, reason}

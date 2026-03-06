@@ -61,7 +61,7 @@ defmodule LiddrWeb.AuthChallengeRateLimitTest do
              request_challenge(%{
                "method" => "phone_otp",
                "identifier" => identifier,
-               "purpose" => "step_up"
+               "purpose" => "recover_account"
              })
              |> json_response(201)
 
@@ -69,7 +69,7 @@ defmodule LiddrWeb.AuthChallengeRateLimitTest do
              request_challenge(%{
                "method" => "phone_otp",
                "identifier" => identifier,
-               "purpose" => "recover_account"
+               "purpose" => "reset_password"
              })
              |> json_response(429)
   end

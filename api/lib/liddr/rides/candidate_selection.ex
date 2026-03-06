@@ -5,6 +5,7 @@ defmodule Liddr.Rides.CandidateSelection do
   alias Liddr.Accounts.Driver
   alias Liddr.Accounts.User
   alias Liddr.Location.DriverLocation
+  alias Liddr.Ratings.Snapshot
   alias Liddr.Repo
   alias Liddr.Rides.CandidatePool
   alias Liddr.Rides.DispatchEta
@@ -18,14 +19,20 @@ defmodule Liddr.Rides.CandidateSelection do
   def search_radius_km(slug) when is_binary(slug), do: radius_km_for(slug)
 
   def list_eligible_driver_ids(%VehicleCategory{} = category, pickup, limit, opts \\ []) do
+    category
+    |> list_eligible_drivers(pickup, limit, opts)
+    |> Enum.map(& &1.driver_id)
+  end
+
+  def list_eligible_drivers(%VehicleCategory{} = category, pickup, limit, opts \\ []) do
     if not is_number(pickup.lat) or not is_number(pickup.lng) do
       []
     else
-      do_list_eligible_driver_ids(category, pickup, limit, opts)
+      do_list_eligible_drivers(category, pickup, limit, opts)
     end
   end
 
-  defp do_list_eligible_driver_ids(%VehicleCategory{} = category, pickup, limit, opts) do
+  defp do_list_eligible_drivers(%VehicleCategory{} = category, pickup, limit, opts) do
     now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
     freshness_cutoff = DriverLiveness.dispatch_online_cutoff(now)
     radius_km = resolved_radius_km(category, opts)
@@ -83,14 +90,15 @@ defmodule Liddr.Rides.CandidateSelection do
         lat: decimal_to_float(row.lat),
         lng: decimal_to_float(row.lng),
         distance_m: distance_m,
-        rating_score: effective_rating_score(row.rating_score, row.rating_count)
+        rating_score: effective_rating_score(row.rating_score, row.rating_count),
+        driver_rating_snapshot:
+          Snapshot.snapshot_for_values(row.rating_score, row.rating_count, :driver)
       }
     end)
     |> Enum.filter(&(&1.distance_m <= radius_m))
     |> DispatchEta.annotate(pickup, category.slug, now, limit, opts)
     |> rank_candidates()
     |> Enum.take(limit)
-    |> Enum.map(& &1.driver_id)
   end
 
   defp radius_km_for("motorbike"), do: 3.5
@@ -122,9 +130,6 @@ defmodule Liddr.Rides.CandidateSelection do
   end
 
   defp maybe_exclude_drivers(query, [], _prefilter_result), do: query
-
-  defp maybe_exclude_drivers(query, driver_ids, {:ok, _prefiltered_ids}) when is_list(driver_ids),
-    do: query
 
   defp maybe_exclude_drivers(query, driver_ids, _prefilter_result) when is_list(driver_ids) do
     from [d, _u, _dl] in query, where: d.user_id not in ^driver_ids

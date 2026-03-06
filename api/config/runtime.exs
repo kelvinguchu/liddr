@@ -119,10 +119,23 @@ push_client =
 
 config :liddr, :ride_push_client, push_client
 
-config :liddr, Liddr.Location.Redis, url: System.get_env("REDIS_URL")
+config :liddr, Liddr.Location.Redis,
+  url: System.get_env("REDIS_URL"),
+  pool_size: max(System.schedulers_online(), 4)
 
-config :liddr, Liddr.Location.Cells,
-  cell_size_deg: parse_float_env.(System.get_env("RIDE_SUPPLY_CELL_SIZE_DEG"), 0.01, 0.001, 0.1)
+config :liddr, Liddr.Location.DriverLocationWriteGate,
+  min_persist_interval_ms:
+    parse_int_env.(System.get_env("DRIVER_LOCATION_DB_MIN_INTERVAL_MS"), 1_000, 0, 60_000),
+  force_persist_distance_m:
+    parse_float_env.(
+      System.get_env("DRIVER_LOCATION_DB_FORCE_PERSIST_DISTANCE_M"),
+      25.0,
+      0.0,
+      1_000.0
+    )
+
+config :liddr, Liddr.Location.S2,
+  level: parse_int_env.(System.get_env("RIDE_SUPPLY_S2_LEVEL"), 13, 1, 30)
 
 config :liddr, Liddr.Location.SupplyIndex,
   zone_ttl_seconds:
@@ -146,6 +159,37 @@ config :liddr, Liddr.Auth.ChallengeRateLimiter,
     parse_int_env.(System.get_env("AUTH_CHALLENGE_DEVICE_WINDOW_SECONDS"), 900, 60, 86_400),
   device_max_requests:
     parse_int_env.(System.get_env("AUTH_CHALLENGE_DEVICE_MAX_REQUESTS"), 40, 1, 10_000)
+
+config :liddr, Liddr.Moderation.ActionRateLimiter,
+  dispute_create_window_seconds:
+    parse_int_env.(System.get_env("DISPUTE_CREATE_WINDOW_SECONDS"), 3_600, 30, 86_400),
+  dispute_create_max_requests:
+    parse_int_env.(System.get_env("DISPUTE_CREATE_MAX_REQUESTS"), 6, 1, 10_000),
+  report_create_window_seconds:
+    parse_int_env.(System.get_env("REPORT_CREATE_WINDOW_SECONDS"), 3_600, 30, 86_400),
+  report_create_max_requests:
+    parse_int_env.(System.get_env("REPORT_CREATE_MAX_REQUESTS"), 12, 1, 10_000),
+  report_triage_window_seconds:
+    parse_int_env.(System.get_env("REPORT_TRIAGE_WINDOW_SECONDS"), 3_600, 30, 86_400),
+  report_triage_max_requests:
+    parse_int_env.(System.get_env("REPORT_TRIAGE_MAX_REQUESTS"), 120, 1, 10_000),
+  report_review_window_seconds:
+    parse_int_env.(System.get_env("REPORT_REVIEW_WINDOW_SECONDS"), 3_600, 30, 86_400),
+  report_review_max_requests:
+    parse_int_env.(System.get_env("REPORT_REVIEW_MAX_REQUESTS"), 80, 1, 10_000),
+  ride_message_report_window_seconds:
+    parse_int_env.(System.get_env("RIDE_MESSAGE_REPORT_WINDOW_SECONDS"), 3_600, 30, 86_400),
+  ride_message_report_max_requests:
+    parse_int_env.(System.get_env("RIDE_MESSAGE_REPORT_MAX_REQUESTS"), 8, 1, 10_000),
+  dispute_ops_resolution_window_seconds:
+    parse_int_env.(
+      System.get_env("DISPUTE_OPS_RESOLUTION_WINDOW_SECONDS"),
+      3_600,
+      30,
+      86_400
+    ),
+  dispute_ops_resolution_max_requests:
+    parse_int_env.(System.get_env("DISPUTE_OPS_RESOLUTION_MAX_REQUESTS"), 30, 1, 10_000)
 
 parse_csv_env = fn value ->
   case value do
@@ -192,6 +236,33 @@ config :liddr, Liddr.Rides.Execution.GeoPolicy,
     parse_bool_env.(System.get_env("RIDE_REQUIRE_GEOFENCE_ON_ARRIVE"), true),
   require_geofence_on_complete:
     parse_bool_env.(System.get_env("RIDE_REQUIRE_GEOFENCE_ON_COMPLETE"), true)
+
+config :liddr, Liddr.Rides.ActionSecuritySignals,
+  enabled: parse_bool_env.(System.get_env("RIDE_ACTION_SECURITY_SIGNALS_ENABLED"), true),
+  ip_window_seconds:
+    parse_int_env.(System.get_env("RIDE_ACTION_SECURITY_IP_WINDOW_SECONDS"), 600, 30, 86_400),
+  ip_max_events:
+    parse_int_env.(System.get_env("RIDE_ACTION_SECURITY_IP_MAX_EVENTS"), 40, 1, 10_000),
+  ip_max_distinct_users:
+    parse_int_env.(
+      System.get_env("RIDE_ACTION_SECURITY_IP_MAX_DISTINCT_USERS"),
+      8,
+      1,
+      1_000
+    ),
+  device_window_seconds:
+    parse_int_env.(System.get_env("RIDE_ACTION_SECURITY_DEVICE_WINDOW_SECONDS"), 600, 30, 86_400),
+  device_max_events:
+    parse_int_env.(System.get_env("RIDE_ACTION_SECURITY_DEVICE_MAX_EVENTS"), 25, 1, 10_000),
+  device_max_distinct_users:
+    parse_int_env.(
+      System.get_env("RIDE_ACTION_SECURITY_DEVICE_MAX_DISTINCT_USERS"),
+      3,
+      1,
+      1_000
+    ),
+  enforce_ip_on_enforce_mode:
+    parse_bool_env.(System.get_env("RIDE_ACTION_SECURITY_ENFORCE_IP"), false)
 
 config :liddr, Liddr.Rides.Integrity.Policy,
   rolling_window_days:
@@ -351,6 +422,35 @@ config :liddr, Liddr.Rides.SharedRides.LocationEtaRefresh,
 config :liddr, Liddr.Rides.PushClient.FCM,
   timeout_ms: parse_int_env.(System.get_env("FCM_TIMEOUT_MS"), 10_000, 1_000, 60_000)
 
+moderation_monitor_enabled_default = config_env() != :test
+
+config :liddr, Liddr.Observability.ModerationMonitor,
+  enabled:
+    parse_bool_env.(
+      System.get_env("MODERATION_MONITOR_ENABLED"),
+      moderation_monitor_enabled_default
+    ),
+  window_ms:
+    parse_int_env.(System.get_env("MODERATION_MONITOR_WINDOW_MS"), 60_000, 5_000, 600_000),
+  report_triage_rate_limited_alert_count:
+    parse_int_env.(
+      System.get_env("MODERATION_TRIAGE_RATE_LIMITED_ALERT_COUNT"),
+      5,
+      1,
+      10_000
+    ),
+  report_review_rate_limited_alert_count:
+    parse_int_env.(
+      System.get_env("MODERATION_REVIEW_RATE_LIMITED_ALERT_COUNT"),
+      5,
+      1,
+      10_000
+    ),
+  min_throughput_per_window:
+    parse_int_env.(System.get_env("MODERATION_THROUGHPUT_MIN_PER_WINDOW"), 1, 0, 10_000),
+  pending_reports_alert_threshold:
+    parse_int_env.(System.get_env("MODERATION_PENDING_REPORTS_ALERT_THRESHOLD"), 25, 1, 100_000)
+
 config :liddr, Liddr.Rides.OfferLockMonitor,
   enabled:
     parse_bool_env.(
@@ -414,11 +514,26 @@ config :liddr, Liddr.Ratings.Policy,
         "traffic,app_issue,gps_issue,wrong_pickup_pin,co_rider_behavior"
     )
 
+config :liddr, Liddr.Security.DataRetention,
+  auth_challenges_ttl_days:
+    parse_int_env.(System.get_env("RETENTION_AUTH_CHALLENGES_TTL_DAYS"), 7, 1, 3650),
+  idempotency_ttl_days:
+    parse_int_env.(System.get_env("RETENTION_IDEMPOTENCY_TTL_DAYS"), 30, 1, 3650),
+  webhook_events_ttl_days:
+    parse_int_env.(System.get_env("RETENTION_WEBHOOK_EVENTS_TTL_DAYS"), 180, 1, 3650)
+
 if config_env() != :test do
   config :liddr, :auth_debug_otp, parse_bool_env.(System.get_env("AUTH_DEBUG_OTP"), false)
 
   config :liddr, :auth_debug_otp_targets, parse_csv_env.(System.get_env("AUTH_DEBUG_OTP_TARGETS"))
 end
+
+config :liddr, Liddr.Auth.StepUp,
+  ttl_seconds: parse_int_env.(System.get_env("STEP_UP_TTL_SECONDS"), 300, 60, 3600)
+
+config :liddr, Liddr.Auth.Totp,
+  issuer: System.get_env("AUTH_TOTP_ISSUER") || "Liddr",
+  setup_ttl_seconds: parse_int_env.(System.get_env("AUTH_TOTP_SETUP_TTL_SECONDS"), 600, 60, 3600)
 
 if config_env() == :prod do
   database_url =
@@ -434,6 +549,8 @@ if config_env() == :prod do
     # ssl: true,
     url: database_url,
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
+    queue_target: parse_int_env.(System.get_env("DB_QUEUE_TARGET_MS"), 100, 10, 10_000),
+    queue_interval: parse_int_env.(System.get_env("DB_QUEUE_INTERVAL_MS"), 2_000, 100, 60_000),
     # For machines with several cores, consider starting multiple pools of `pool_size`
     # pool_count: 4,
     socket_options: maybe_ipv6

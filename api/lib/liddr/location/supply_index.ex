@@ -1,8 +1,8 @@
 defmodule Liddr.Location.SupplyIndex do
   @moduledoc false
 
-  alias Liddr.Location.Cells
   alias Liddr.Location.Redis
+  alias Liddr.Location.S2
 
   @default_zone_ttl_seconds 180
   @default_driver_ttl_seconds 180
@@ -10,11 +10,23 @@ defmodule Liddr.Location.SupplyIndex do
 
   def upsert_driver(driver_user_id, vehicle_category_id, lat, lng, captured_at)
       when is_integer(driver_user_id) and is_integer(vehicle_category_id) do
-    cell_token = Cells.token(lat, lng)
+    upsert_driver(
+      driver_user_id,
+      vehicle_category_id,
+      lat,
+      lng,
+      captured_at,
+      s2_module().token(lat, lng)
+    )
+  end
+
+  def upsert_driver(_driver_user_id, _vehicle_category_id, _lat, _lng, _captured_at), do: :ok
+
+  def upsert_driver(driver_user_id, vehicle_category_id, lat, lng, captured_at, cell_token)
+      when is_integer(driver_user_id) and is_integer(vehicle_category_id) do
     now_iso = datetime_to_iso8601(captured_at)
 
     with true <- is_binary(cell_token),
-         {:ok, previous} <- fetch_driver_snapshot(driver_user_id),
          commands <-
            upsert_commands(
              driver_user_id,
@@ -22,22 +34,22 @@ defmodule Liddr.Location.SupplyIndex do
              cell_token,
              lat,
              lng,
-             now_iso,
-             previous
+             now_iso
            ),
-         {:ok, _} <- Redis.pipeline(commands) do
+         {:ok, _} <- redis_module().pipeline(commands) do
       :ok
     else
       _ -> :ok
     end
   end
 
-  def upsert_driver(_driver_user_id, _vehicle_category_id, _lat, _lng, _captured_at), do: :ok
+  def upsert_driver(_driver_user_id, _vehicle_category_id, _lat, _lng, _captured_at, _cell_token),
+    do: :ok
 
   def remove_driver(driver_user_id) when is_integer(driver_user_id) do
     with {:ok, previous} <- fetch_driver_snapshot(driver_user_id),
          commands <- remove_commands(driver_user_id, previous),
-         {:ok, _} <- Redis.pipeline(commands) do
+         {:ok, _} <- redis_module().pipeline(commands) do
       :ok
     else
       _ -> :ok
@@ -48,32 +60,15 @@ defmodule Liddr.Location.SupplyIndex do
 
   def candidate_driver_ids(vehicle_category_id, lat, lng, radius_km, max_candidates)
       when is_integer(vehicle_category_id) and is_number(lat) and is_number(lng) do
-    ring_radius = Cells.ring_radius_for_km(radius_km)
-
-    cells =
-      Cells.neighboring_tokens(lat, lng, ring_radius)
-      |> Enum.take(lookup_cell_limit())
-
-    commands =
-      Enum.map(cells, fn cell_token ->
-        ["SMEMBERS", zone_key(cell_token, vehicle_category_id)]
-      end)
-
-    case Redis.pipeline(commands) do
-      {:ok, rows} ->
-        ids =
-          rows
-          |> List.wrap()
-          |> Enum.flat_map(&List.wrap/1)
-          |> Enum.map(&parse_positive_integer/1)
-          |> Enum.reject(&is_nil/1)
-          |> Enum.uniq()
-          |> Enum.take(max(max_candidates, 1))
-
-        {:ok, ids}
-
-      _ ->
-        {:error, :supply_index_unavailable}
+    with {:ok, cells} <- covering_tokens(lat, lng, radius_km),
+         {:ok, ids} <-
+           cells
+           |> zone_commands(vehicle_category_id)
+           |> fetch_candidate_ids(max_candidates) do
+      {:ok, ids}
+    else
+      {:error, :invalid_coordinates} -> {:error, :invalid_supply_lookup}
+      {:error, _reason} -> {:error, :supply_index_unavailable}
     end
   end
 
@@ -81,7 +76,7 @@ defmodule Liddr.Location.SupplyIndex do
     do: {:error, :invalid_supply_lookup}
 
   defp fetch_driver_snapshot(driver_user_id) do
-    case Redis.command(["HGETALL", driver_key(driver_user_id)]) do
+    case redis_module().command(["HGETALL", driver_key(driver_user_id)]) do
       {:ok, fields} when is_list(fields) ->
         {:ok, map_from_hgetall(fields)}
 
@@ -90,30 +85,12 @@ defmodule Liddr.Location.SupplyIndex do
     end
   end
 
-  defp upsert_commands(
-         driver_user_id,
-         vehicle_category_id,
-         cell_token,
-         lat,
-         lng,
-         captured_at_iso,
-         previous
-       ) do
+  defp upsert_commands(driver_user_id, vehicle_category_id, cell_token, lat, lng, captured_at_iso) do
     zone_ttl_seconds = zone_ttl_seconds()
     driver_ttl_seconds = driver_ttl_seconds()
-    old_cell = previous["cell"]
-    old_category_id = parse_positive_integer(previous["vehicle_category_id"])
-
-    old_zone =
-      if is_binary(old_cell) and is_integer(old_category_id),
-        do: zone_key(old_cell, old_category_id),
-        else: nil
-
     new_zone = zone_key(cell_token, vehicle_category_id)
 
-    []
-    |> maybe_prepend_old_zone_removal(old_zone, new_zone, driver_user_id)
-    |> Kernel.++([
+    [
       ["SADD", new_zone, driver_user_id],
       ["EXPIRE", new_zone, zone_ttl_seconds],
       [
@@ -131,7 +108,7 @@ defmodule Liddr.Location.SupplyIndex do
         captured_at_iso
       ],
       ["EXPIRE", driver_key(driver_user_id), driver_ttl_seconds]
-    ])
+    ]
   end
 
   defp remove_commands(driver_user_id, previous) do
@@ -148,16 +125,6 @@ defmodule Liddr.Location.SupplyIndex do
     commands ++ [["DEL", driver_key(driver_user_id)]]
   end
 
-  defp maybe_prepend_old_zone_removal(commands, nil, _new_zone, _driver_user_id), do: commands
-
-  defp maybe_prepend_old_zone_removal(commands, old_zone, new_zone, driver_user_id) do
-    if old_zone == new_zone do
-      commands
-    else
-      [["SREM", old_zone, driver_user_id] | commands]
-    end
-  end
-
   defp map_from_hgetall(fields) do
     fields
     |> Enum.chunk_every(2)
@@ -169,6 +136,33 @@ defmodule Liddr.Location.SupplyIndex do
 
   defp driver_key(driver_user_id), do: "driver:supply:#{driver_user_id}"
   defp zone_key(cell_token, category_id), do: "zone:#{cell_token}:supply:#{category_id}"
+
+  defp zone_commands(cells, vehicle_category_id) do
+    Enum.map(cells, fn cell_token -> ["SMEMBERS", zone_key(cell_token, vehicle_category_id)] end)
+  end
+
+  defp fetch_candidate_ids([], _max_candidates), do: {:ok, []}
+
+  defp fetch_candidate_ids(commands, max_candidates) do
+    case redis_module().pipeline(commands) do
+      {:ok, rows} ->
+        {:ok,
+         rows
+         |> List.wrap()
+         |> Enum.flat_map(&List.wrap/1)
+         |> Enum.map(&parse_positive_integer/1)
+         |> Enum.reject(&is_nil/1)
+         |> Enum.uniq()
+         |> Enum.take(max(max_candidates, 1))}
+
+      _ ->
+        {:error, :supply_index_unavailable}
+    end
+  end
+
+  defp covering_tokens(lat, lng, radius_km) do
+    s2_module().covering_tokens(lat, lng, radius_km, lookup_cell_limit())
+  end
 
   defp datetime_to_iso8601(%DateTime{} = captured_at), do: DateTime.to_iso8601(captured_at)
 
@@ -185,6 +179,14 @@ defmodule Liddr.Location.SupplyIndex do
   end
 
   defp parse_positive_integer(_value), do: nil
+
+  defp s2_module do
+    Application.get_env(:liddr, :location_s2_module, S2)
+  end
+
+  defp redis_module do
+    Application.get_env(:liddr, :location_redis_module, Redis)
+  end
 
   defp zone_ttl_seconds do
     Application.get_env(:liddr, __MODULE__, [])[:zone_ttl_seconds] || @default_zone_ttl_seconds

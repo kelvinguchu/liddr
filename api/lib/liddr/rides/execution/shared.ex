@@ -2,6 +2,7 @@ defmodule Liddr.Rides.Execution.Shared do
   import Ecto.Query
 
   alias Liddr.Accounts.Driver
+  alias Liddr.Location.DriverHotState
   alias Liddr.Repo
   alias Liddr.Rides.Ride
   alias Liddr.Subscriptions.PaymentUtils
@@ -44,6 +45,7 @@ defmodule Liddr.Rides.Execution.Shared do
     |> Driver.create_changeset(%{"dispatch_status" => dispatch_status, "last_seen_at" => now})
     |> Repo.update()
     |> unwrap_or_rollback()
+    |> tap(&DriverHotState.put/1)
   end
 
   def unlock_driver!(driver, now) do
@@ -56,6 +58,7 @@ defmodule Liddr.Rides.Execution.Shared do
     })
     |> Repo.update()
     |> unwrap_or_rollback()
+    |> tap(&DriverHotState.put/1)
   end
 
   def release_driver_after_cancellation!(driver, now, opts \\ %{}) do
@@ -73,6 +76,7 @@ defmodule Liddr.Rides.Execution.Shared do
     |> Driver.create_changeset(attrs)
     |> Repo.update()
     |> unwrap_or_rollback()
+    |> tap(&DriverHotState.put/1)
   end
 
   def maybe_unlock_assigned_driver!(ride, now) do

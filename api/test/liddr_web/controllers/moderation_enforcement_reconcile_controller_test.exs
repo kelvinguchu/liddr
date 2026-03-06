@@ -33,6 +33,7 @@ defmodule LiddrWeb.ModerationEnforcementReconcileControllerTest do
 
   test "POST /api/moderation/enforcements/reconcile-expired rejects invalid limit", %{conn: _conn} do
     %{auth_conn: auth_conn} = AuthFixtures.authenticate_ops!("ops-reconcile-invalid@example.com")
+    auth_conn = AuthFixtures.with_step_up!(auth_conn)
 
     conn = post(auth_conn, "/api/moderation/enforcements/reconcile-expired", %{"limit" => "0"})
 
@@ -44,6 +45,8 @@ defmodule LiddrWeb.ModerationEnforcementReconcileControllerTest do
   } do
     %{auth_conn: auth_conn, user_id: actor_id} =
       AuthFixtures.authenticate_ops!("ops-reconcile-run@example.com")
+
+    auth_conn = AuthFixtures.with_step_up!(auth_conn)
 
     target = Repo.insert!(%User{phone: VerificationFixtures.unique_phone()})
 

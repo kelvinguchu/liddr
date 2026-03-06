@@ -32,11 +32,16 @@ defmodule Liddr.Verification.Onboarding do
       driver = Repo.get(Driver, driver_user_id) || Repo.rollback(:driver_profile_not_found)
       requirement = Requirements.resolve_requirement!(attrs)
       application = ApplicationFlow.resolve_application!(driver_user_id, attrs)
-      storage_key = Uploads.ensure_storage_key_allowed!(attrs) |> unwrap_or_rollback()
+
+      uploaded_object =
+        Uploads.verify_uploaded_object(driver_user_id, requirement.document_type, attrs)
+        |> unwrap_or_rollback()
+
+      storage_key = uploaded_object.storage_key
       scan_result = Malware.scan_storage_key(storage_key) |> unwrap_or_rollback()
       document_status = document_status_for_scan(scan_result)
       rejection_reason = rejection_reason_for_scan(scan_result)
-      file_mime = Shared.get_value(attrs, :file_mime)
+      file_mime = uploaded_object.file_mime
 
       ocr_result =
         if document_status == "pending_review" do
@@ -61,13 +66,14 @@ defmodule Liddr.Verification.Onboarding do
         "capture_source" => Shared.get_value(attrs, :capture_source) || "camera_live",
         "status" => document_status,
         "storage_key" => storage_key,
-        "checksum_sha256" => Shared.get_value(attrs, :checksum_sha256),
+        "checksum_sha256" => nil,
         "file_mime" => file_mime,
-        "file_size_bytes" => Shared.parse_integer(Shared.get_value(attrs, :file_size_bytes)),
+        "file_size_bytes" => uploaded_object.file_size_bytes,
         "expires_on" => Shared.get_value(attrs, :expires_on),
         "ocr_payload" => ocr_result.ocr_payload,
         "extracted_data" => ocr_result.extracted_data,
-        "capture_metadata" => Shared.get_value(attrs, :capture_metadata) || %{},
+        "capture_metadata" =>
+          build_capture_metadata(Shared.get_value(attrs, :capture_metadata), uploaded_object),
         "scan_status" => scan_result.status,
         "scanned_at" => now,
         "scan_engine" => scan_result.engine,
@@ -114,4 +120,12 @@ defmodule Liddr.Verification.Onboarding do
 
   defp rejection_reason_for_scan(%{status: "infected"}), do: "Malware detected"
   defp rejection_reason_for_scan(_scan), do: nil
+
+  defp build_capture_metadata(capture_metadata, uploaded_object) when is_map(capture_metadata) do
+    Map.put(capture_metadata, "gcs_object", uploaded_object.object_metadata)
+  end
+
+  defp build_capture_metadata(_capture_metadata, uploaded_object) do
+    %{"gcs_object" => uploaded_object.object_metadata}
+  end
 end

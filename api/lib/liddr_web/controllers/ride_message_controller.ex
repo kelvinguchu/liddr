@@ -4,6 +4,7 @@ defmodule LiddrWeb.RideMessageController do
   alias Ecto.Changeset
   alias Liddr.Rides
   alias Liddr.Rides.MessageQuickActions
+  alias LiddrWeb.RequestMeta
   alias LiddrWeb.RideSerializer
 
   @error_mappings %{
@@ -28,6 +29,15 @@ defmodule LiddrWeb.RideMessageController do
     ride_message_communication_restricted:
       {:forbidden, "RIDE_MESSAGE_COMMUNICATION_RESTRICTED",
        "Messaging is temporarily restricted for this account"},
+    ride_message_rate_limited:
+      {:too_many_requests, "RIDE_MESSAGE_RATE_LIMITED",
+       "Too many ride messages sent in the current window"},
+    ride_message_report_rate_limited:
+      {:too_many_requests, "RIDE_MESSAGE_REPORT_RATE_LIMITED",
+       "Too many ride message reports submitted in the current window"},
+    ride_action_secondary_rate_limited:
+      {:too_many_requests, "RIDE_ACTION_SECURITY_RATE_LIMITED",
+       "Request pattern is temporarily restricted for security review"},
     ride_message_self_report_not_allowed:
       {:unprocessable_entity, "RIDE_MESSAGE_SELF_REPORT_NOT_ALLOWED",
        "You cannot report your own message"},
@@ -71,12 +81,18 @@ defmodule LiddrWeb.RideMessageController do
     user_id = conn.assigns.current_user.id
     locale = request_locale(conn, params)
 
-    case Rides.send_ride_message(user_id, ride_id, params) do
-      {:ok, payload} ->
-        conn
-        |> put_status(:created)
-        |> json(%{data: message_payload(payload, locale)})
-
+    with :ok <-
+           Rides.enforce_action_security_signals(
+             :ride_message_send,
+             user_id,
+             RequestMeta.security(conn)
+           ),
+         :ok <- Rides.enforce_message_send_rate_limit(user_id),
+         {:ok, payload} <- Rides.send_ride_message(user_id, ride_id, params) do
+      conn
+      |> put_status(:created)
+      |> json(%{data: message_payload(payload, locale)})
+    else
       {:error, reason} ->
         render_error(conn, reason)
     end
@@ -112,12 +128,12 @@ defmodule LiddrWeb.RideMessageController do
     user_id = conn.assigns.current_user.id
     locale = request_locale(conn, params)
 
-    case Rides.report_ride_message(user_id, ride_id, message_id, params) do
-      {:ok, payload} ->
-        conn
-        |> put_status(:created)
-        |> json(%{data: report_payload(payload, locale)})
-
+    with :ok <- Rides.enforce_message_report_rate_limit(user_id),
+         {:ok, payload} <- Rides.report_ride_message(user_id, ride_id, message_id, params) do
+      conn
+      |> put_status(:created)
+      |> json(%{data: report_payload(payload, locale)})
+    else
       {:error, reason} ->
         render_error(conn, reason)
     end

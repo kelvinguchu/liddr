@@ -3,6 +3,7 @@ defmodule Liddr.Subscriptions.WebhookEvents do
 
   alias Liddr.Repo
   alias Liddr.Subscriptions.WebhookEvent
+  alias Liddr.Payments.Mpesa.Sanitizer
 
   def get_or_create!(event_type, external_ref, payload) do
     existing =
@@ -22,7 +23,7 @@ defmodule Liddr.Subscriptions.WebhookEvents do
         "provider" => "mpesa",
         "event_type" => event_type,
         "external_ref" => external_ref,
-        "payload" => payload
+        "payload" => Sanitizer.payload(payload)
       })
       |> Repo.insert()
       |> case do

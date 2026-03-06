@@ -2,12 +2,12 @@ defmodule Liddr.Rides.Requests.Creation do
   @moduledoc false
 
   alias Liddr.Repo
+  alias Liddr.Ratings.Snapshot
   alias Liddr.Rides.CandidateSelection
-  alias Liddr.Rides.DriverOfferLock
   alias Liddr.Rides.Events
   alias Liddr.Rides.Ride
-  alias Liddr.Rides.RideOffer
   alias Liddr.Rides.SharedMatcher
+  alias Liddr.Rides.Requests.OfferCreation
   alias Liddr.Rides.SharedRides.Joiner
   alias Liddr.Rides.SharedRides.Setup, as: SharedSetup
   alias Liddr.Subscriptions.PaymentUtils
@@ -34,6 +34,7 @@ defmodule Liddr.Rides.Requests.Creation do
       do: nil
 
   def build_request_result!(
+        rider,
         rider_user_id,
         attrs,
         category,
@@ -44,8 +45,7 @@ defmodule Liddr.Rides.Requests.Creation do
         metadata,
         shared_match_metadata,
         now,
-        offer_limit,
-        offer_ttl_seconds
+        dispatch_config
       ) do
     case maybe_join_existing_group!(
            rider_user_id,
@@ -59,6 +59,7 @@ defmodule Liddr.Rides.Requests.Creation do
          ) do
       :no_join ->
         create_new_ride_request!(
+          rider,
           rider_user_id,
           attrs,
           category,
@@ -68,8 +69,7 @@ defmodule Liddr.Rides.Requests.Creation do
           dropoff,
           metadata,
           now,
-          offer_limit,
-          offer_ttl_seconds
+          dispatch_config
         )
 
       %{ride: ride, group: group, member: member} ->
@@ -87,6 +87,7 @@ defmodule Liddr.Rides.Requests.Creation do
   end
 
   defp create_new_ride_request!(
+         rider,
          rider_user_id,
          attrs,
          category,
@@ -96,16 +97,17 @@ defmodule Liddr.Rides.Requests.Creation do
          dropoff,
          metadata,
          now,
-         offer_limit,
-         offer_ttl_seconds
+         dispatch_config
        ) do
+    inline_dispatch? = dispatch_config.inline?
+
     ride =
       %Ride{}
       |> Ride.create_changeset(%{
         "rider_id" => rider_user_id,
         "quote_id" => quote && quote.id,
         "vehicle_category_id" => category.id,
-        "status" => "requested",
+        "status" => if(inline_dispatch?, do: "requested", else: "offering"),
         "product_type" => product_type,
         "pickup_lat" => pickup_point.lat,
         "pickup_lng" => pickup_point.lng,
@@ -113,27 +115,24 @@ defmodule Liddr.Rides.Requests.Creation do
         "dropoff_lng" => dropoff.lng,
         "requested_at" => now,
         "notes" => PaymentUtils.get_value(attrs, :notes),
-        "metadata" => metadata
+        "metadata" =>
+          Map.put(metadata, "rider_rating_snapshot", Snapshot.snapshot_for_user(rider, :rider))
       })
       |> Repo.insert()
       |> unwrap_or_rollback()
 
     _ = maybe_setup_shared_ride!(ride, rider_user_id, now)
 
-    eligible_driver_ids =
-      CandidateSelection.list_eligible_driver_ids(category, pickup_point, offer_limit)
-
-    offers = create_offers!(ride.id, eligible_driver_ids, now, offer_ttl_seconds)
-
-    updated_ride =
-      if offers == [] do
-        ride
-      else
-        ride
-        |> Ride.create_changeset(%{"status" => "offering"})
-        |> Repo.update()
-        |> unwrap_or_rollback()
-      end
+    {updated_ride, offers} =
+      maybe_dispatch_inline!(
+        inline_dispatch?,
+        ride,
+        category,
+        pickup_point,
+        now,
+        dispatch_config.offer_limit,
+        dispatch_config.offer_ttl_seconds
+      )
 
     _ =
       Events.record_event(updated_ride.id, "ride_requested", now,
@@ -145,17 +144,7 @@ defmodule Liddr.Rides.Requests.Creation do
       )
       |> unwrap_or_rollback()
 
-    _ =
-      if offers == [] do
-        Events.record_event(updated_ride.id, "ride_no_drivers_found", now,
-          payload: %{"vehicle_category_id" => category.id}
-        )
-      else
-        Events.record_event(updated_ride.id, "ride_offers_dispatched", now,
-          payload: %{"offers_count" => length(offers)}
-        )
-      end
-      |> unwrap_or_rollback()
+    maybe_record_inline_dispatch_event!(inline_dispatch?, updated_ride, category.id, offers, now)
 
     %{ride: updated_ride, offers: offers}
   end
@@ -193,73 +182,52 @@ defmodule Liddr.Rides.Requests.Creation do
        ),
        do: :no_join
 
-  defp create_offers!(ride_id, driver_ids, now, offer_ttl_seconds) do
-    expires_at = DateTime.add(now, offer_ttl_seconds, :second)
-
-    lock_result =
-      DriverOfferLock.acquire_many(driver_ids, ride_id, offer_ttl_seconds,
-        source: "request_initial_offers"
-      )
-
-    if DriverOfferLock.unavailable_blocked?(lock_result) do
-      DriverOfferLock.emit_blocked_telemetry("request_initial_offers", 1)
-      Repo.rollback(:offer_lock_backend_unavailable)
-    end
-
-    selected_driver_ids = lock_result.selected_driver_ids
-    locked_driver_ids = lock_result.locked_driver_ids
-
-    if selected_driver_ids == [] do
-      []
-    else
-      rows =
-        Enum.map(selected_driver_ids, fn driver_id ->
-          %{
-            ride_id: ride_id,
-            driver_id: driver_id,
-            status: "offered",
-            offered_at: now,
-            expires_at: expires_at,
-            inserted_at: now,
-            updated_at: now
-          }
-        end)
-
-      {_, returning_rows} =
-        Repo.insert_all(RideOffer, rows,
-          on_conflict: :nothing,
-          conflict_target: [:ride_id, :driver_id],
-          returning: [:id, :ride_id, :driver_id, :status, :offered_at, :expires_at, :inserted_at]
-        )
-
-      offers =
-        returning_rows
-        |> normalize_rows()
-        |> Enum.map(fn
-          %RideOffer{} = offer -> offer
-          row when is_map(row) -> struct(RideOffer, row)
-        end)
-
-      inserted_driver_ids = offers |> Enum.map(& &1.driver_id) |> MapSet.new()
-
-      locked_driver_ids
-      |> Enum.reject(&MapSet.member?(inserted_driver_ids, &1))
-      |> Enum.map(&{&1, ride_id})
-      |> DriverOfferLock.release_many(source: "request_insert_conflict")
-
-      offers
-    end
-  end
-
   defp maybe_setup_shared_ride!(%Ride{product_type: "shared"} = ride, rider_user_id, now),
     do: SharedSetup.ensure_group_for_ride!(ride, rider_user_id, now)
 
   defp maybe_setup_shared_ride!(_ride, _rider_user_id, _now), do: :ok
 
+  defp maybe_dispatch_inline!(false, ride, _category, _pickup_point, _now, _offer_limit, _ttl),
+    do: {ride, []}
+
+  defp maybe_dispatch_inline!(true, ride, category, pickup_point, now, offer_limit, ttl) do
+    eligible_drivers =
+      CandidateSelection.list_eligible_drivers(category, pickup_point, offer_limit,
+        dispatch_eta_enabled: false
+      )
+
+    offers = OfferCreation.create_initial_offers!(ride.id, eligible_drivers, now, ttl)
+
+    updated_ride =
+      if offers == [] do
+        ride
+      else
+        ride
+        |> Ride.create_changeset(%{"status" => "offering"})
+        |> Repo.update()
+        |> unwrap_or_rollback()
+      end
+
+    {updated_ride, offers}
+  end
+
+  defp maybe_record_inline_dispatch_event!(false, _ride, _category_id, _offers, _now), do: :ok
+
+  defp maybe_record_inline_dispatch_event!(true, ride, category_id, offers, now) do
+    event =
+      if offers == [] do
+        Events.record_event(ride.id, "ride_no_drivers_found", now,
+          payload: %{"vehicle_category_id" => category_id}
+        )
+      else
+        Events.record_event(ride.id, "ride_offers_dispatched", now,
+          payload: %{"offers_count" => length(offers)}
+        )
+      end
+
+    event |> unwrap_or_rollback()
+  end
+
   defp unwrap_or_rollback({:ok, value}), do: value
   defp unwrap_or_rollback({:error, changeset}), do: Repo.rollback(changeset)
-
-  defp normalize_rows(nil), do: []
-  defp normalize_rows(rows) when is_list(rows), do: rows
-  defp normalize_rows(row), do: [row]
 end

@@ -49,7 +49,8 @@ defmodule Liddr.Payments.Mpesa.Parser do
       transaction_time_raw: to_trimmed_string(Map.get(payload, "TransTime"))
     }
 
-    if is_nil(parsed.transaction_id) do
+    if is_nil(parsed.transaction_id) or is_nil(parsed.amount_kes) or
+         is_nil(parsed.bill_ref_number) do
       {:error, :invalid_c2b_callback_payload}
     else
       {:ok, parsed}
@@ -62,16 +63,26 @@ defmodule Liddr.Payments.Mpesa.Parser do
     result = Map.get(payload, "Result")
 
     if is_map(result) do
-      {:ok,
-       %{
-         result_type: to_integer(Map.get(result, "ResultType"), 0),
-         result_code: to_integer(Map.get(result, "ResultCode"), -1),
-         result_desc: to_trimmed_string(Map.get(result, "ResultDesc")),
-         originator_conversation_id:
-           to_trimmed_string(Map.get(result, "OriginatorConversationID")),
-         conversation_id: to_trimmed_string(Map.get(result, "ConversationID")),
-         transaction_id: to_trimmed_string(Map.get(result, "TransactionID"))
-       }}
+      parsed = %{
+        result_type: to_integer(Map.get(result, "ResultType"), 0),
+        result_code: to_integer(Map.get(result, "ResultCode"), -1),
+        result_desc: to_trimmed_string(Map.get(result, "ResultDesc")),
+        originator_conversation_id:
+          to_trimmed_string(Map.get(result, "OriginatorConversationID")),
+        conversation_id: to_trimmed_string(Map.get(result, "ConversationID")),
+        transaction_id: to_trimmed_string(Map.get(result, "TransactionID"))
+      }
+
+      if parsed.result_code == -1 or
+           is_nil(parsed.result_desc) or
+           Enum.all?(
+             [parsed.transaction_id, parsed.conversation_id, parsed.originator_conversation_id],
+             &is_nil/1
+           ) do
+        {:error, :invalid_transaction_status_callback_payload}
+      else
+        {:ok, parsed}
+      end
     else
       {:error, :invalid_transaction_status_callback_payload}
     end

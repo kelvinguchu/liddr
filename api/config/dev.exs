@@ -56,6 +56,7 @@ config :liddr, LiddrWeb.Endpoint,
 
 # Enable dev routes for dashboard and mailbox
 config :liddr, dev_routes: true
+config :liddr, :api_docs_enabled, true
 
 # Do not include metadata nor timestamps in development logs
 config :logger, :default_formatter, format: "[$level] $message\n"
@@ -69,3 +70,6 @@ config :phoenix, :plug_init_mode, :runtime
 
 # Disable swoosh api client as it is only required for production adapters.
 config :swoosh, :api_client, false
+
+# Avoid stale OpenAPI output while routes/controllers change in development.
+config :open_api_spex, :cache_adapter, OpenApiSpex.Plug.NoneCache

@@ -2,6 +2,7 @@ defmodule LiddrWeb.SharedRideController do
   use LiddrWeb, :controller
 
   alias Liddr.Rides
+  alias LiddrWeb.RequestMeta
   alias LiddrWeb.SharedRideSerializer
 
   @known_errors %{
@@ -35,6 +36,15 @@ defmodule LiddrWeb.SharedRideController do
     invalid_cancel_reason:
       {:unprocessable_entity, "INVALID_CANCEL_REASON",
        "Cancellation reason is not allowed for this action"},
+    rider_cancel_rate_limited:
+      {:too_many_requests, "RIDER_CANCEL_RATE_LIMITED",
+       "Too many rider cancellation attempts in the current window"},
+    driver_no_show_rate_limited:
+      {:too_many_requests, "DRIVER_NO_SHOW_RATE_LIMITED",
+       "Too many no-show actions in the current window"},
+    ride_action_secondary_rate_limited:
+      {:too_many_requests, "RIDE_ACTION_SECURITY_RATE_LIMITED",
+       "Request pattern is temporarily restricted for security review"},
     ride_not_cancellable:
       {:unprocessable_entity, "RIDE_NOT_CANCELLABLE",
        "Ride cannot be cancelled from current status"}
@@ -52,8 +62,17 @@ defmodule LiddrWeb.SharedRideController do
   def cancel_member(conn, %{"ride_id" => ride_id, "member_id" => member_id}) do
     rider_user_id = conn.assigns.current_user.id
 
-    case Rides.rider_cancel_shared_member(rider_user_id, ride_id, member_id, conn.body_params) do
-      {:ok, context} -> json(conn, %{data: SharedRideSerializer.context_payload(context)})
+    with :ok <-
+           Rides.enforce_action_security_signals(
+             :rider_cancel,
+             rider_user_id,
+             RequestMeta.security(conn)
+           ),
+         :ok <- Rides.enforce_rider_cancel_rate_limit(rider_user_id),
+         {:ok, context} <-
+           Rides.rider_cancel_shared_member(rider_user_id, ride_id, member_id, conn.body_params) do
+      json(conn, %{data: SharedRideSerializer.context_payload(context)})
+    else
       {:error, reason} -> render_error(conn, reason)
     end
   end
@@ -61,13 +80,22 @@ defmodule LiddrWeb.SharedRideController do
   def mark_member_no_show(conn, %{"ride_id" => ride_id, "member_id" => member_id}) do
     driver_user_id = conn.assigns.current_user.id
 
-    case Rides.driver_mark_shared_member_no_show(
-           driver_user_id,
-           ride_id,
-           member_id,
-           conn.body_params
-         ) do
-      {:ok, context} -> json(conn, %{data: SharedRideSerializer.context_payload(context)})
+    with :ok <-
+           Rides.enforce_action_security_signals(
+             :driver_no_show,
+             driver_user_id,
+             RequestMeta.security(conn)
+           ),
+         :ok <- Rides.enforce_driver_no_show_rate_limit(driver_user_id),
+         {:ok, context} <-
+           Rides.driver_mark_shared_member_no_show(
+             driver_user_id,
+             ride_id,
+             member_id,
+             conn.body_params
+           ) do
+      json(conn, %{data: SharedRideSerializer.context_payload(context)})
+    else
       {:error, reason} -> render_error(conn, reason)
     end
   end

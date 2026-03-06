@@ -2,6 +2,7 @@ defmodule Liddr.Subscriptions.Activation do
   import Ecto.Query
 
   alias Liddr.Accounts.Driver
+  alias Liddr.Location.DriverHotState
   alias Liddr.Repo
   alias Liddr.Subscriptions.Subscription
   alias Liddr.Verification.DriverActivityEvent
@@ -9,9 +10,10 @@ defmodule Liddr.Subscriptions.Activation do
   def activate_subscription!(payment, now) do
     subscription =
       Repo.one(
-        from s in Subscription,
+        from(s in Subscription,
           where: s.id == ^payment.subscription_id,
           lock: "FOR UPDATE"
+        )
       ) || Repo.rollback(:subscription_not_found)
 
     _updated_subscription =
@@ -40,6 +42,8 @@ defmodule Liddr.Subscriptions.Activation do
         {:ok, value} -> value
         {:error, changeset} -> Repo.rollback(changeset)
       end
+
+    :ok = DriverHotState.put(updated_driver)
 
     if previous_status != updated_driver.subscription_status do
       %DriverActivityEvent{}

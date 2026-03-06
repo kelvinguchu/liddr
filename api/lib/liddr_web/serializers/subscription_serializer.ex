@@ -1,4 +1,6 @@
 defmodule LiddrWeb.SubscriptionSerializer do
+  alias Liddr.Security.Redaction
+
   def current_payload(payload) do
     %{
       driver: %{
@@ -14,8 +16,7 @@ defmodule LiddrWeb.SubscriptionSerializer do
   def payment_created_payload(payload) do
     %{
       subscription: subscription_payload(payload.subscription),
-      payment: payment_history_payload(payload.payment),
-      callback_url: payload.callback_url
+      payment: payment_history_payload(payload.payment)
     }
   end
 
@@ -68,10 +69,11 @@ defmodule LiddrWeb.SubscriptionSerializer do
       payment_channel: payment.payment_channel,
       amount_kes: payment.amount_kes,
       currency: payment.currency,
-      phone_e164: payment.phone_e164,
-      merchant_request_id: payment.merchant_request_id,
+      phone_e164_masked: Redaction.mask_phone(payment.phone_e164),
+      merchant_request_id_masked: Redaction.mask_reference(payment.merchant_request_id),
       checkout_request_id: payment.checkout_request_id,
-      mpesa_receipt_number: payment.mpesa_receipt_number,
+      mpesa_receipt_number_masked: Redaction.mask_reference(payment.mpesa_receipt_number),
+      transaction_id_masked: Redaction.mask_reference(payment.transaction_id),
       result_code: payment.result_code,
       result_desc: payment.result_desc,
       callback_received_at: payment.callback_received_at,

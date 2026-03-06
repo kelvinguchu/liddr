@@ -7,6 +7,7 @@ defmodule LiddrWeb.RideOpsControllerTest do
   alias Liddr.Rides.Notifications
   alias Liddr.Rides.PickupWatchdog
   alias Liddr.Rides.Ride
+  alias Liddr.Security.Redaction
   alias Liddr.VerificationFixtures
   alias LiddrWeb.AuthFixtures
 
@@ -28,6 +29,15 @@ defmodule LiddrWeb.RideOpsControllerTest do
   test "GET /api/ops/rides/integrity/users/:user_id requires auth", %{conn: conn} do
     conn = get(conn, "/api/ops/rides/integrity/users/1")
     assert %{"error" => %{"code" => "AUTH_REQUIRED"}} = json_response(conn, 401)
+  end
+
+  test "GET /api/ops/rides/integrity/users/:user_id requires ops totp enrollment", %{conn: _conn} do
+    %{auth_conn: ops_conn} =
+      AuthFixtures.authenticate_ops!("ops-rides-no-totp@example.com", enroll_totp: false)
+
+    conn = get(ops_conn, "/api/ops/rides/integrity/users/1")
+
+    assert %{"error" => %{"code" => "OPS_MFA_ENROLLMENT_REQUIRED"}} = json_response(conn, 403)
   end
 
   test "GET /api/ops/rides/integrity/users/:user_id returns counters and prepay mode", %{
@@ -65,6 +75,8 @@ defmodule LiddrWeb.RideOpsControllerTest do
     %{auth_conn: ops_conn} =
       AuthFixtures.authenticate_ops!("ops-rides-integrity-limit@example.com")
 
+    ops_conn = AuthFixtures.with_step_up!(ops_conn)
+
     conn = post(ops_conn, "/api/ops/rides/integrity/reconcile-prepay-modes", %{"limit" => "0"})
 
     assert %{"error" => %{"code" => "INVALID_PREPAY_RECONCILIATION_LIMIT"}} =
@@ -74,6 +86,8 @@ defmodule LiddrWeb.RideOpsControllerTest do
   test "POST /api/ops/rides/integrity/reconcile-prepay-modes reconciles due users", %{conn: _conn} do
     %{auth_conn: ops_conn} =
       AuthFixtures.authenticate_ops!("ops-rides-integrity-reconcile@example.com")
+
+    ops_conn = AuthFixtures.with_step_up!(ops_conn)
 
     now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
     due_user = Repo.insert!(%User{phone: VerificationFixtures.unique_phone()})
@@ -243,7 +257,13 @@ defmodule LiddrWeb.RideOpsControllerTest do
       Notifications.queue_realtime_event!(
         ride,
         "driver_arrived",
-        %{"ride_id" => ride.id, "reason_code" => "driver_arrived"},
+        %{
+          "ride_id" => ride.id,
+          "reason_code" => "driver_arrived",
+          "phone" => "254725799783",
+          "pickup_lat" => "-1.2921",
+          "message" => "driver is outside"
+        },
         now
       )
 
@@ -253,6 +273,14 @@ defmodule LiddrWeb.RideOpsControllerTest do
     assert length(rows) == 2
     assert Enum.all?(rows, &(&1["ride_id"] == ride.id))
     assert Enum.all?(rows, &(&1["event_type"] == "driver_arrived"))
+
+    assert Enum.all?(rows, fn row ->
+             payload = row["payload"] || %{}
+
+             payload["phone"] in [nil, Redaction.mask_phone("254725799783")] and
+               payload["pickup_lat"] in [nil, "[redacted]"] and
+               payload["message"] in [nil, "[redacted]"]
+           end)
   end
 
   test "GET /api/ops/rides/:ride_id/notifications validates ride_id", %{conn: _conn} do

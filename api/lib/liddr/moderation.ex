@@ -1,8 +1,29 @@
 defmodule Liddr.Moderation do
+  alias Liddr.Moderation.ActionRateLimiter
   alias Liddr.Moderation.Categories
   alias Liddr.Moderation.EnforcementLifecycle
   alias Liddr.Moderation.Enforcements
   alias Liddr.Moderation.Reports
+
+  defdelegate enforce_report_create_rate_limit(user_id),
+    to: ActionRateLimiter,
+    as: :enforce_report_create
+
+  defdelegate enforce_report_triage_rate_limit(user_id),
+    to: ActionRateLimiter,
+    as: :enforce_report_triage
+
+  defdelegate enforce_report_review_rate_limit(user_id),
+    to: ActionRateLimiter,
+    as: :enforce_report_review
+
+  defdelegate enforce_message_report_rate_limit(user_id),
+    to: ActionRateLimiter,
+    as: :enforce_ride_message_report
+
+  defdelegate enforce_dispute_ops_resolution_rate_limit(user_id),
+    to: ActionRateLimiter,
+    as: :enforce_dispute_ops_resolution
 
   defdelegate list_report_categories(attrs \\ %{}), to: Categories
   defdelegate submit_report(attrs), to: Reports

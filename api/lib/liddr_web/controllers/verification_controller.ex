@@ -43,6 +43,17 @@ defmodule LiddrWeb.VerificationController do
       {:unprocessable_entity, "INVALID_UPLOAD_TTL", "Configured upload TTL is invalid"},
     gcs_signing_failed:
       {:unprocessable_entity, "GCS_SIGNING_FAILED", "Unable to sign upload URL"},
+    uploaded_file_not_found:
+      {:unprocessable_entity, "UPLOADED_FILE_NOT_FOUND", "Uploaded file could not be found"},
+    uploaded_file_unavailable:
+      {:service_unavailable, "UPLOADED_FILE_UNAVAILABLE",
+       "Uploaded file metadata could not be verified"},
+    uploaded_file_mime_mismatch:
+      {:unprocessable_entity, "UPLOADED_FILE_MIME_MISMATCH",
+       "Uploaded file type does not match the prepared upload"},
+    uploaded_file_size_mismatch:
+      {:unprocessable_entity, "UPLOADED_FILE_SIZE_MISMATCH",
+       "Uploaded file size does not match the prepared upload"},
     malware_scan_unavailable:
       {:service_unavailable, "MALWARE_SCAN_UNAVAILABLE",
        "Malware scanning service is temporarily unavailable"},

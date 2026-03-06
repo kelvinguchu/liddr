@@ -5,6 +5,7 @@ defmodule LiddrWeb.VerificationOpsControllerTest do
 
   alias Liddr.Accounts.Driver
   alias Liddr.Repo
+  alias Liddr.Security.Redaction
   alias Liddr.Verification.DriverActivityEvent
   alias Liddr.VerificationFixtures
   alias LiddrWeb.AuthFixtures
@@ -20,7 +21,11 @@ defmodule LiddrWeb.VerificationOpsControllerTest do
   end
 
   test "GET /api/moderation/verification/applications lists and filters", %{conn: _conn} do
-    ops_conn = AuthFixtures.authenticate_with_role!("ops") |> Map.fetch!(:auth_conn)
+    ops_conn =
+      AuthFixtures.authenticate_with_role!("ops")
+      |> Map.fetch!(:auth_conn)
+      |> AuthFixtures.with_step_up!()
+
     {_driver_one, _app_one} = create_driver_and_application!("pending")
     {_driver_two, _app_two} = create_driver_and_application!("approved")
 
@@ -34,7 +39,11 @@ defmodule LiddrWeb.VerificationOpsControllerTest do
   test "GET /api/moderation/verification/documents lists, filters, paginates and sorts", %{
     conn: _conn
   } do
-    ops_conn = AuthFixtures.authenticate_with_role!("ops") |> Map.fetch!(:auth_conn)
+    ops_conn =
+      AuthFixtures.authenticate_with_role!("ops")
+      |> Map.fetch!(:auth_conn)
+      |> AuthFixtures.with_step_up!()
+
     {driver, application, _document} = create_driver_application_and_document!("pending_review")
 
     _second_document =
@@ -63,11 +72,17 @@ defmodule LiddrWeb.VerificationOpsControllerTest do
     assert length(documents) == 1
     assert hd(documents)["status"] == "pending_review"
     assert hd(documents)["document_type"] == "national_id_front"
+    refute Map.has_key?(hd(documents), "storage_key")
+    refute Map.has_key?(hd(documents), "scan_signature")
   end
 
   test "POST /api/moderation/verification/applications/:id/reviews approve updates driver and logs event",
        %{conn: _conn} do
-    ops_conn = AuthFixtures.authenticate_with_role!("ops") |> Map.fetch!(:auth_conn)
+    ops_conn =
+      AuthFixtures.authenticate_with_role!("ops")
+      |> Map.fetch!(:auth_conn)
+      |> AuthFixtures.with_step_up!()
+
     {driver, application} = create_driver_and_application!("under_review")
 
     conn =
@@ -91,6 +106,12 @@ defmodule LiddrWeb.VerificationOpsControllerTest do
              }
            } = json_response(conn, 201)
 
+    driver_payload = json_response(conn, 201)["data"]["driver"]
+    assert driver_payload["license_no_masked"] == Redaction.mask_license(driver.license_no)
+    assert driver_payload["plate_no_masked"] == Redaction.mask_vehicle_plate(driver.plate_no)
+    refute Map.has_key?(driver_payload, "license_no")
+    refute Map.has_key?(driver_payload, "plate_no")
+
     updated_application = Repo.get!(VerificationApplication, application.id)
     assert updated_application.status == "approved"
 
@@ -113,7 +134,11 @@ defmodule LiddrWeb.VerificationOpsControllerTest do
   test "POST /api/moderation/verification/applications/:id/reviews rejects invalid decision", %{
     conn: _conn
   } do
-    ops_conn = AuthFixtures.authenticate_with_role!("ops") |> Map.fetch!(:auth_conn)
+    ops_conn =
+      AuthFixtures.authenticate_with_role!("ops")
+      |> Map.fetch!(:auth_conn)
+      |> AuthFixtures.with_step_up!()
+
     {_driver, application} = create_driver_and_application!("pending")
 
     conn =
@@ -131,7 +156,11 @@ defmodule LiddrWeb.VerificationOpsControllerTest do
   test "POST /api/moderation/verification/documents/:id/reviews approve validates document", %{
     conn: _conn
   } do
-    ops_conn = AuthFixtures.authenticate_with_role!("ops") |> Map.fetch!(:auth_conn)
+    ops_conn =
+      AuthFixtures.authenticate_with_role!("ops")
+      |> Map.fetch!(:auth_conn)
+      |> AuthFixtures.with_step_up!()
+
     {_driver, _application, document} = create_driver_application_and_document!("pending_review")
 
     conn =
@@ -162,7 +191,11 @@ defmodule LiddrWeb.VerificationOpsControllerTest do
        %{
          conn: _conn
        } do
-    ops_conn = AuthFixtures.authenticate_with_role!("ops") |> Map.fetch!(:auth_conn)
+    ops_conn =
+      AuthFixtures.authenticate_with_role!("ops")
+      |> Map.fetch!(:auth_conn)
+      |> AuthFixtures.with_step_up!()
+
     {driver, application, document} = create_driver_application_and_document!("pending_review")
 
     conn =
@@ -206,7 +239,10 @@ defmodule LiddrWeb.VerificationOpsControllerTest do
 
   test "POST /api/moderation/verification/documents/reviews/bulk approves all documents atomically",
        %{conn: _conn} do
-    ops_conn = AuthFixtures.authenticate_with_role!("ops") |> Map.fetch!(:auth_conn)
+    ops_conn =
+      AuthFixtures.authenticate_with_role!("ops")
+      |> Map.fetch!(:auth_conn)
+      |> AuthFixtures.with_step_up!()
 
     {_driver, _application, document_one} =
       create_driver_application_and_document!("pending_review")
@@ -235,7 +271,11 @@ defmodule LiddrWeb.VerificationOpsControllerTest do
 
   test "POST /api/moderation/verification/documents/reviews/bulk rolls back if any document fails",
        %{conn: _conn} do
-    ops_conn = AuthFixtures.authenticate_with_role!("ops") |> Map.fetch!(:auth_conn)
+    ops_conn =
+      AuthFixtures.authenticate_with_role!("ops")
+      |> Map.fetch!(:auth_conn)
+      |> AuthFixtures.with_step_up!()
+
     {_driver, _application, document} = create_driver_application_and_document!("pending_review")
 
     conn =

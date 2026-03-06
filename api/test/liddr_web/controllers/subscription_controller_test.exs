@@ -154,13 +154,11 @@ defmodule LiddrWeb.SubscriptionControllerTest do
                  "status" => "pending_callback",
                  "phone_e164" => @test_phone,
                  "checkout_request_id" => checkout_request_id
-               },
-               "callback_url" => callback_url
+               }
              }
            } = json_response(conn, 201)
 
     assert is_binary(checkout_request_id)
-    assert String.contains?(callback_url, "/api/payments/mpesa/stk-callback")
     assert Repo.aggregate(SubscriptionPayment, :count, :id) == 1
   end
 

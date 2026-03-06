@@ -6,12 +6,15 @@ defmodule Liddr.Storage.GCS do
   @service "storage"
   @request_type "goog4_request"
   @max_ttl_seconds 604_800
+  @max_object_key_bytes 1_024
+  @object_key_pattern ~r/\A[a-zA-Z0-9][a-zA-Z0-9\/._-]*\z/
 
   def presign_put_upload(object_key, content_type, opts \\ []) do
     ttl_seconds = Keyword.get(opts, :ttl_seconds, 900)
     now = Keyword.get(opts, :now, DateTime.utc_now())
 
-    with {:ok, bucket} <- fetch_env("GCS_BUCKET_VERIFICATION"),
+    with {:ok, bucket} <- fetch_verification_bucket(),
+         {:ok, object_key} <- validate_object_key(object_key),
          {:ok, creds} <- ServiceAccount.credentials(),
          {:ok, expires} <- normalize_ttl(ttl_seconds),
          {:ok, canonical} <-
@@ -34,7 +37,8 @@ defmodule Liddr.Storage.GCS do
     ttl_seconds = Keyword.get(opts, :ttl_seconds, 300)
     now = Keyword.get(opts, :now, DateTime.utc_now())
 
-    with {:ok, bucket} <- fetch_env("GCS_BUCKET_VERIFICATION"),
+    with {:ok, bucket} <- fetch_verification_bucket(),
+         {:ok, object_key} <- validate_object_key(object_key),
          {:ok, creds} <- ServiceAccount.credentials(),
          {:ok, expires} <- normalize_ttl(ttl_seconds) do
       amz_datetime = format_datetime(now)
@@ -92,6 +96,34 @@ defmodule Liddr.Storage.GCS do
       end
     end
   end
+
+  def fetch_verification_bucket, do: fetch_env("GCS_BUCKET_VERIFICATION")
+
+  def validate_object_key(object_key) when is_binary(object_key) do
+    normalized = String.trim(object_key)
+
+    cond do
+      normalized == "" ->
+        {:error, :invalid_storage_key}
+
+      byte_size(normalized) > @max_object_key_bytes ->
+        {:error, :invalid_storage_key}
+
+      String.starts_with?(normalized, "/") or String.ends_with?(normalized, "/") ->
+        {:error, :invalid_storage_key}
+
+      String.contains?(normalized, ["..", "//", "\\", "?", "#"]) ->
+        {:error, :invalid_storage_key}
+
+      not String.match?(normalized, @object_key_pattern) ->
+        {:error, :invalid_storage_key}
+
+      true ->
+        {:ok, normalized}
+    end
+  end
+
+  def validate_object_key(_object_key), do: {:error, :invalid_storage_key}
 
   defp build_canonical_request(bucket, object_key, content_type, now, expires, creds) do
     amz_datetime = format_datetime(now)

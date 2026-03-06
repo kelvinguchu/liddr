@@ -5,6 +5,7 @@ defmodule LiddrWeb.MpesaWebhookControllerTest do
 
   alias Decimal, as: D
   alias Liddr.Accounts.User
+  alias Liddr.Security.Redaction
   alias Liddr.Repo
   alias Liddr.Subscriptions.Subscription
   alias Liddr.Subscriptions.SubscriptionPayment
@@ -65,10 +66,23 @@ defmodule LiddrWeb.MpesaWebhookControllerTest do
     assert updated_payment.phone_e164 == @callback_phone
     assert not is_nil(updated_payment.paid_at)
 
+    assert updated_payment.callback_payload["Body"]["stkCallback"]["MerchantRequestID"] ==
+             Redaction.mask_reference(payment.merchant_request_id)
+
+    assert updated_payment.callback_payload["Body"]["stkCallback"]["CallbackMetadata"]["Item"]
+           |> Enum.any?(fn item ->
+             item["Name"] == "PhoneNumber" and
+               item["Value"] == Redaction.mask_phone(@callback_phone)
+           end)
+
     assert updated_subscription.status == "active"
     assert updated_driver.subscription_status == "active"
 
     assert Repo.aggregate(WebhookEvent, :count, :id) == 1
+    event = Repo.one!(from e in WebhookEvent, limit: 1)
+
+    assert event.payload["Body"]["stkCallback"]["MerchantRequestID"] ==
+             Redaction.mask_reference(payment.merchant_request_id)
   end
 
   test "POST /api/payments/mpesa/stk-callback is idempotent for duplicate callbacks", %{
@@ -314,6 +328,8 @@ defmodule LiddrWeb.MpesaWebhookControllerTest do
 
     assert c2b_payment.status == "success"
     assert c2b_payment.payment_channel == "c2b"
+    assert c2b_payment.callback_payload["TransID"] == Redaction.mask_reference("SIK2W3AR4T")
+    assert c2b_payment.callback_payload["MSISDN"] == Redaction.mask_phone(@callback_phone)
     assert updated_subscription.status == "active"
   end
 
@@ -400,6 +416,10 @@ defmodule LiddrWeb.MpesaWebhookControllerTest do
 
     assert updated_payment.status == "success"
     assert updated_payment.transaction_id == "SIK2W3AR4Z"
+
+    assert updated_payment.callback_payload["Result"]["TransactionID"] ==
+             Redaction.mask_reference("SIK2W3AR4Z")
+
     assert updated_subscription.status == "active"
     assert updated_driver.subscription_status == "active"
   end
@@ -408,6 +428,8 @@ defmodule LiddrWeb.MpesaWebhookControllerTest do
        %{
          conn: _conn
        } do
+    parent = self()
+
     %{payment: payment} =
       create_pending_subscription_payment!(%{
         "transaction_id" => "SIK2W3AR#{System.unique_integer([:positive])}"
@@ -419,6 +441,8 @@ defmodule LiddrWeb.MpesaWebhookControllerTest do
       Task.async_stream(
         1..5,
         fn _ ->
+          Ecto.Adapters.SQL.Sandbox.allow(Repo, parent, self())
+
           build_conn()
           |> put_req_header("content-type", "application/json")
           |> post("/api/payments/mpesa/tx-status-callback?token=#{@callback_token}", payload)

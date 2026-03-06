@@ -5,6 +5,11 @@ defmodule LiddrWeb.Router do
     plug :accepts, ["json"]
   end
 
+  pipeline :api_docs do
+    plug :accepts, ["json", "html"]
+    plug OpenApiSpex.Plug.PutApiSpec, module: LiddrWeb.OpenApiSpec
+  end
+
   pipeline :api_auth do
     plug LiddrWeb.Plugs.AuthenticateAccessToken
   end
@@ -23,6 +28,14 @@ defmodule LiddrWeb.Router do
 
   pipeline :require_ops_or_admin do
     plug LiddrWeb.Plugs.RequireAnyRole, roles: ["ops", "admin"]
+  end
+
+  pipeline :require_ops_mfa_enrollment do
+    plug LiddrWeb.Plugs.RequireTotpEnrollment
+  end
+
+  pipeline :require_step_up do
+    plug LiddrWeb.Plugs.RequireStepUpAuth
   end
 
   pipeline :require_ops_ip do
@@ -51,6 +64,15 @@ defmodule LiddrWeb.Router do
     get "/reports/categories", ReportController, :categories
   end
 
+  if Application.compile_env(:liddr, :api_docs_enabled, false) do
+    scope "/api" do
+      pipe_through :api_docs
+
+      get "/openapi", OpenApiSpex.Plug.RenderSpec, []
+      get "/docs", OpenApiSpex.Plug.SwaggerUI, path: "/api/openapi"
+    end
+  end
+
   scope "/api", LiddrWeb do
     pipe_through [:api, :mpesa_webhook_security]
 
@@ -66,6 +88,9 @@ defmodule LiddrWeb.Router do
   scope "/api", LiddrWeb do
     pipe_through [:api, :api_auth, :require_rider_or_driver]
 
+    post "/disputes", DisputeController, :create
+    get "/disputes/me", DisputeController, :index
+    get "/disputes/me/compensations", DisputeController, :compensations
     post "/reports", ReportController, :create
     get "/notifications/summary", RideNotificationController, :summary
     get "/notifications", RideNotificationController, :index
@@ -162,26 +187,75 @@ defmodule LiddrWeb.Router do
   scope "/api", LiddrWeb do
     pipe_through [:api, :require_ops_ip, :api_auth, :require_ops_or_admin]
 
+    post "/auth/step-up/challenges", AuthController, :request_step_up_challenge
+    post "/auth/step-up/verify", AuthController, :verify_step_up_challenge
+  end
+
+  scope "/api", LiddrWeb do
+    pipe_through [:api, :require_ops_ip, :api_auth, :require_ops_or_admin, :require_step_up]
+
+    post "/auth/mfa/totp/setup", AuthController, :request_totp_setup
+    post "/auth/mfa/totp/confirm", AuthController, :confirm_totp_setup
+  end
+
+  scope "/api", LiddrWeb do
+    pipe_through [
+      :api,
+      :require_ops_ip,
+      :api_auth,
+      :require_ops_or_admin,
+      :require_ops_mfa_enrollment
+    ]
+
+    get "/ops/disputes", DisputeOpsController, :index
+    get "/ops/disputes/compensations", DisputeOpsController, :compensations
     get "/ops/subscriptions/drivers/:driver_user_id", SubscriptionOpsController, :driver_lookup
 
     get "/ops/subscriptions/payments/checkout/:checkout_request_id",
         SubscriptionOpsController,
         :payment_lookup
 
-    post "/ops/mpesa/c2b/register-urls", SubscriptionOpsController, :register_c2b_urls
-
-    post "/ops/mpesa/payments/checkout/:checkout_request_id/query-tx-status",
-         SubscriptionOpsController,
-         :query_tx_status
-
     get "/ops/rides/integrity/users/:user_id", RideOpsController, :integrity_lookup
-    post "/ops/rides/integrity/reconcile-prepay-modes", RideOpsController, :reconcile_prepay_modes
     get "/ops/rides/pickup-watchdog/summary", RideOpsController, :pickup_watchdog_summary
     get "/ops/rides/offer-lock/health", RideOpsController, :offer_lock_health
     get "/ops/rides/:ride_id/notifications", RideOpsController, :ride_notifications
 
     get "/moderation/verification/applications", VerificationOpsController, :list_applications
     get "/moderation/verification/documents", VerificationOpsController, :list_documents
+
+    get "/moderation/reports", ModerationController, :list_reports
+    get "/moderation/enforcements", ModerationController, :list_enforcements
+    get "/moderation/enforcements/metrics", ModerationController, :enforcement_metrics
+
+    get "/ops/ratings", RatingOpsController, :index
+    get "/ops/ratings/excluded", RatingOpsController, :excluded
+    get "/ops/ratings/users/:rated_user_id/guardrails", RatingOpsController, :guardrails
+  end
+
+  scope "/api", LiddrWeb do
+    pipe_through [
+      :api,
+      :require_ops_ip,
+      :api_auth,
+      :require_ops_or_admin,
+      :require_ops_mfa_enrollment,
+      :require_step_up
+    ]
+
+    post "/ops/disputes/:id/resolve", DisputeOpsController, :resolve
+
+    post "/ops/disputes/compensations/:id/mark-paid",
+         DisputeOpsController,
+         :mark_compensation_paid
+
+    post "/ops/disputes/compensations/:id/cancel", DisputeOpsController, :cancel_compensation
+    post "/ops/mpesa/c2b/register-urls", SubscriptionOpsController, :register_c2b_urls
+
+    post "/ops/mpesa/payments/checkout/:checkout_request_id/query-tx-status",
+         SubscriptionOpsController,
+         :query_tx_status
+
+    post "/ops/rides/integrity/reconcile-prepay-modes", RideOpsController, :reconcile_prepay_modes
 
     post "/moderation/verification/applications/:id/reviews",
          VerificationOpsController,
@@ -195,20 +269,14 @@ defmodule LiddrWeb.Router do
          VerificationOpsController,
          :review_documents_bulk
 
-    get "/moderation/reports", ModerationController, :list_reports
     patch "/moderation/reports/:id/triage", ModerationController, :triage_report
     post "/moderation/reports/:id/reviews", ModerationController, :review_report
-    get "/moderation/enforcements", ModerationController, :list_enforcements
-    get "/moderation/enforcements/metrics", ModerationController, :enforcement_metrics
     post "/moderation/enforcements", ModerationController, :create_enforcement
 
     post "/moderation/enforcements/reconcile-expired",
          ModerationController,
          :reconcile_enforcements
 
-    get "/ops/ratings", RatingOpsController, :index
-    get "/ops/ratings/excluded", RatingOpsController, :excluded
-    get "/ops/ratings/users/:rated_user_id/guardrails", RatingOpsController, :guardrails
     post "/ops/ratings/:id/nullify", RatingOpsController, :nullify
     post "/ops/ratings/:id/reinstate", RatingOpsController, :reinstate
   end

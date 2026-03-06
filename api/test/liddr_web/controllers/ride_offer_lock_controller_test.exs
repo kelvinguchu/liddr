@@ -3,6 +3,7 @@ defmodule LiddrWeb.RideOfferLockControllerTest do
 
   alias Liddr.Accounts.User
   alias Liddr.Repo
+  alias Liddr.Rides.Dispatcher
   alias Liddr.TestOfferLock
   alias Liddr.VerificationFixtures
   alias LiddrWeb.AuthFixtures
@@ -114,6 +115,8 @@ defmodule LiddrWeb.RideOfferLockControllerTest do
                "offers" => [%{"id" => offer_id, "driver_id" => ^driver_id}]
              }
            } = json_response(request_conn, 201)
+
+    :ok = Dispatcher.stop(ride_id)
 
     reject_conn = post(driver_conn, "/api/rides/offers/#{offer_id}/reject", %{})
     assert %{"data" => %{"offer" => %{"status" => "rejected"}}} = json_response(reject_conn, 200)

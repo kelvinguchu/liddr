@@ -2,6 +2,7 @@ defmodule Liddr.Verification.Documents.ReviewWorkflow do
   import Ecto.Query
 
   alias Liddr.Accounts.Driver
+  alias Liddr.Location.DriverHotState
   alias Liddr.Repo
   alias Liddr.Verification.DriverActivityEvent
   alias Liddr.Verification.Shared
@@ -14,16 +15,18 @@ defmodule Liddr.Verification.Documents.ReviewWorkflow do
   def review_document_locked(parsed_document_id, decision, attrs, reviewer_user_id, now) do
     document =
       Repo.one(
-        from d in VerificationDocument,
+        from(d in VerificationDocument,
           where: d.id == ^parsed_document_id,
           lock: "FOR UPDATE"
+        )
       ) || Repo.rollback(:document_not_found)
 
     application =
       Repo.one(
-        from a in VerificationApplication,
+        from(a in VerificationApplication,
           where: a.id == ^document.application_id,
           lock: "FOR UPDATE"
+        )
       ) || Repo.rollback(:application_not_found)
 
     driver = Repo.get(Driver, document.driver_id) || Repo.rollback(:driver_profile_not_found)
@@ -57,6 +60,8 @@ defmodule Liddr.Verification.Documents.ReviewWorkflow do
           {:ok, updated} -> updated
           {:error, changeset} -> Repo.rollback(changeset)
         end
+
+      :ok = DriverHotState.put(updated_driver)
 
       review =
         %VerificationReview{}

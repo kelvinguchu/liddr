@@ -4,6 +4,7 @@ defmodule Liddr.Subscriptions.C2BCallback do
   alias Decimal, as: D
   alias Liddr.Accounts.Driver
   alias Liddr.Payments.Mpesa.Parser
+  alias Liddr.Payments.Mpesa.Sanitizer
   alias Liddr.Repo
   alias Liddr.Subscriptions.Activation
   alias Liddr.Subscriptions.Subscription
@@ -97,7 +98,7 @@ defmodule Liddr.Subscriptions.C2BCallback do
       "requested_at" => now,
       "callback_received_at" => now,
       "paid_at" => now,
-      "callback_payload" => payload
+      "callback_payload" => Sanitizer.payload(payload)
     }
 
     if existing do

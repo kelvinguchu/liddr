@@ -9,11 +9,18 @@ defmodule Liddr.Rides.Realtime do
 
   def broadcast_offer_created(%Ride{} = ride, %RideOffer{} = offer) do
     emitted_at = DateTime.utc_now() |> DateTime.truncate(:microsecond)
-    snapshot_index = Snapshot.build_index([ride.rider_id, ride.driver_id, offer.driver_id])
+    snapshot_index = realtime_snapshot_index(ride, offer)
+    rider_snapshot = cached_ride_rider_snapshot(ride)
 
     payload = %{
       ride: RideSerializer.ride_payload(ride, snapshot_index),
-      offer: RideSerializer.offer_payload(offer, snapshot_index, ride.rider_id),
+      offer:
+        RideSerializer.offer_payload(
+          offer,
+          snapshot_index,
+          ride.rider_id,
+          rider_rating_snapshot: rider_snapshot
+        ),
       reason_code: "dispatch_offer_created",
       emitted_at: emitted_at
     }
@@ -24,11 +31,18 @@ defmodule Liddr.Rides.Realtime do
 
   def broadcast_offer_expired(%Ride{} = ride, %RideOffer{} = offer) do
     emitted_at = DateTime.utc_now() |> DateTime.truncate(:microsecond)
-    snapshot_index = Snapshot.build_index([ride.rider_id, ride.driver_id, offer.driver_id])
+    snapshot_index = realtime_snapshot_index(ride, offer)
+    rider_snapshot = cached_ride_rider_snapshot(ride)
 
     payload = %{
       ride: RideSerializer.ride_payload(ride, snapshot_index),
-      offer: RideSerializer.offer_payload(offer, snapshot_index, ride.rider_id),
+      offer:
+        RideSerializer.offer_payload(
+          offer,
+          snapshot_index,
+          ride.rider_id,
+          rider_rating_snapshot: rider_snapshot
+        ),
       reason_code: "offer_ttl_expired",
       emitted_at: emitted_at
     }
@@ -52,12 +66,19 @@ defmodule Liddr.Rides.Realtime do
   end
 
   def broadcast_ride_assigned(%Ride{} = ride, %RideOffer{} = offer) do
-    snapshot_index = Snapshot.build_index([ride.rider_id, ride.driver_id, offer.driver_id])
+    snapshot_index = realtime_snapshot_index(ride, offer)
     emitted_at = DateTime.utc_now() |> DateTime.truncate(:microsecond)
+    rider_snapshot = cached_ride_rider_snapshot(ride)
 
     payload = %{
       ride: RideSerializer.ride_payload(ride, snapshot_index),
-      offer: RideSerializer.offer_payload(offer, snapshot_index, ride.rider_id),
+      offer:
+        RideSerializer.offer_payload(
+          offer,
+          snapshot_index,
+          ride.rider_id,
+          rider_rating_snapshot: rider_snapshot
+        ),
       emitted_at: emitted_at
     }
 
@@ -382,4 +403,30 @@ defmodule Liddr.Rides.Realtime do
       delivery_status: delivery.delivery_status
     }
   end
+
+  defp cached_ride_rider_snapshot(%Ride{metadata: %{} = metadata}) do
+    case Map.get(metadata, "rider_rating_snapshot") do
+      %{} = snapshot -> snapshot
+      _ -> nil
+    end
+  end
+
+  defp cached_ride_rider_snapshot(_ride), do: nil
+
+  defp realtime_snapshot_index(%Ride{} = ride, %RideOffer{} = offer) do
+    [ride.rider_id, ride.driver_id, offer.driver_id]
+    |> Enum.filter(&is_integer/1)
+    |> Enum.reject(&(&1 == ride.rider_id and is_map(cached_ride_rider_snapshot(ride))))
+    |> Enum.reject(&(&1 == offer.driver_id and is_map(cached_offer_driver_snapshot(offer))))
+    |> Snapshot.build_index()
+  end
+
+  defp cached_offer_driver_snapshot(%RideOffer{metadata: %{} = metadata}) do
+    case Map.get(metadata, "driver_rating_snapshot") do
+      %{} = snapshot -> snapshot
+      _ -> nil
+    end
+  end
+
+  defp cached_offer_driver_snapshot(_offer), do: nil
 end

@@ -2,6 +2,7 @@ defmodule Liddr.Verification.Applications.Review do
   import Ecto.Query
 
   alias Liddr.Accounts.Driver
+  alias Liddr.Location.DriverHotState
   alias Liddr.Repo
   alias Liddr.Verification.DriverActivityEvent
   alias Liddr.Verification.Shared
@@ -19,9 +20,10 @@ defmodule Liddr.Verification.Applications.Review do
       Repo.transaction(fn ->
         application =
           Repo.one(
-            from a in VerificationApplication,
+            from(a in VerificationApplication,
               where: a.id == ^parsed_application_id,
               lock: "FOR UPDATE"
+            )
           ) || Repo.rollback(:application_not_found)
 
         driver =
@@ -68,6 +70,8 @@ defmodule Liddr.Verification.Applications.Review do
               {:ok, updated} -> updated
               {:error, changeset} -> Repo.rollback(changeset)
             end
+
+          :ok = DriverHotState.put(updated_driver)
 
           _activity =
             %DriverActivityEvent{}

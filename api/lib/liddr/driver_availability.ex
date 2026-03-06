@@ -4,6 +4,7 @@ defmodule Liddr.DriverAvailability do
   import Ecto.Query
 
   alias Liddr.Accounts.Driver
+  alias Liddr.Location.DriverHotState
   alias Liddr.Location
   alias Liddr.Repo
   alias Liddr.Rides.ActiveRides
@@ -110,8 +111,12 @@ defmodule Liddr.DriverAvailability do
     })
     |> Repo.insert()
     |> case do
-      {:ok, _event} -> updated_driver
-      {:error, changeset} -> Repo.rollback(changeset)
+      {:ok, _event} ->
+        :ok = DriverHotState.put(updated_driver)
+        updated_driver
+
+      {:error, changeset} ->
+        Repo.rollback(changeset)
     end
   end
 

@@ -16,9 +16,23 @@ config :liddr, :google_routes_client, Liddr.Maps.RoutesClient
 config :liddr, :ride_market_multiplier, Liddr.Rides.MarketMultiplier
 config :liddr, :auth_debug_otp, false
 config :liddr, :auth_debug_otp_targets, []
+config :liddr, :api_docs_enabled, false
 config :liddr, :otp_sms_client, Liddr.Auth.OtpDelivery.HostPinnacle
 config :liddr, :ride_supply_index, Liddr.Location.SupplyIndex
 config :liddr, :ride_push_client, Liddr.Rides.PushClient.FCM
+
+config :liddr, Liddr.Observability.ModerationMonitor,
+  enabled: true,
+  window_ms: 60_000,
+  report_triage_rate_limited_alert_count: 5,
+  report_review_rate_limited_alert_count: 5,
+  min_throughput_per_window: 1,
+  pending_reports_alert_threshold: 25
+
+config :liddr, Liddr.Security.DataRetention,
+  auth_challenges_ttl_days: 7,
+  idempotency_ttl_days: 30,
+  webhook_events_ttl_days: 180
 
 config :liddr, Liddr.Auth.ChallengeRateLimiter,
   cooldown_seconds: 30,
@@ -29,7 +43,7 @@ config :liddr, Liddr.Auth.ChallengeRateLimiter,
   device_window_seconds: 900,
   device_max_requests: 40
 
-config :liddr, Liddr.Location.Cells, cell_size_deg: 0.01
+config :liddr, Liddr.Location.S2, level: 13
 
 config :liddr, Liddr.Location.SupplyIndex,
   zone_ttl_seconds: 180,
@@ -186,7 +200,8 @@ config :liddr, Oban,
        {"*/10 * * * *", Liddr.Rides.Integrity.ModeLifecycleWorker},
        {"* * * * *", Liddr.Rides.PickupWatchdogWorker},
        {"* * * * *", Liddr.Rides.NotificationRetryWorker},
-       {"30 1 * * *", Liddr.Verification.ExpiryMonitorWorker}
+       {"30 1 * * *", Liddr.Verification.ExpiryMonitorWorker},
+       {"15 2 * * *", Liddr.Security.DataRetentionWorker}
      ]}
   ],
   queues: [

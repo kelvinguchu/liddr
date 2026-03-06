@@ -20,8 +20,9 @@ defmodule Liddr.Rides.DispatchEta do
              is_integer(limit) and limit > 0 and is_struct(now, DateTime) do
     config = policy()
     fallback_all = fallback_for_all(candidates, config)
+    eta_enabled = Keyword.get(opts, :dispatch_eta_enabled, true)
 
-    if config.enabled and candidates != [] do
+    if config.enabled and eta_enabled and candidates != [] do
       probe_limit = resolve_probe_limit(limit, opts, config)
 
       candidates

@@ -7,6 +7,7 @@ defmodule LiddrWeb.RideController do
   alias LiddrWeb.RideControllerReadActions
   alias LiddrWeb.RideControllerResponses
   alias LiddrWeb.RideSerializer
+  alias LiddrWeb.RequestMeta
 
   def quote(conn, params),
     do: RideControllerResponses.with_rider(conn, params, &Rides.create_quote/2, 201, :quote)
@@ -19,8 +20,16 @@ defmodule LiddrWeb.RideController do
       "ride.request",
       params,
       fn ->
-        case Rides.request_ride(rider_user_id, params) do
-          {:ok, payload} -> {:ok, 201, %{data: RideSerializer.request_payload(payload)}}
+        with :ok <-
+               Rides.enforce_action_security_signals(
+                 :ride_request,
+                 rider_user_id,
+                 RequestMeta.security(conn)
+               ),
+             :ok <- Rides.enforce_rider_request_rate_limit(rider_user_id),
+             {:ok, payload} <- Rides.request_ride(rider_user_id, params) do
+          {:ok, 201, %{data: RideSerializer.request_payload(payload)}}
+        else
           {:error, reason} -> {:error, reason}
         end
       end,
@@ -142,8 +151,16 @@ defmodule LiddrWeb.RideController do
       "ride.rider_cancel:#{ride_id}",
       conn.body_params,
       fn ->
-        case Rides.rider_cancel_ride(rider_user_id, ride_id, conn.body_params) do
-          {:ok, ride} -> {:ok, 200, %{data: %{ride: RideSerializer.ride_payload(ride)}}}
+        with :ok <-
+               Rides.enforce_action_security_signals(
+                 :rider_cancel,
+                 rider_user_id,
+                 RequestMeta.security(conn)
+               ),
+             :ok <- Rides.enforce_rider_cancel_rate_limit(rider_user_id),
+             {:ok, ride} <- Rides.rider_cancel_ride(rider_user_id, ride_id, conn.body_params) do
+          {:ok, 200, %{data: %{ride: RideSerializer.ride_payload(ride)}}}
+        else
           {:error, reason} -> {:error, reason}
         end
       end,
@@ -188,8 +205,16 @@ defmodule LiddrWeb.RideController do
       "ride.driver_cancel:#{ride_id}",
       conn.body_params,
       fn ->
-        case Rides.driver_cancel_ride(driver_user_id, ride_id, conn.body_params) do
-          {:ok, ride} -> {:ok, 200, %{data: %{ride: RideSerializer.ride_payload(ride)}}}
+        with :ok <-
+               Rides.enforce_action_security_signals(
+                 :driver_cancel,
+                 driver_user_id,
+                 RequestMeta.security(conn)
+               ),
+             :ok <- Rides.enforce_driver_cancel_rate_limit(driver_user_id),
+             {:ok, ride} <- Rides.driver_cancel_ride(driver_user_id, ride_id, conn.body_params) do
+          {:ok, 200, %{data: %{ride: RideSerializer.ride_payload(ride)}}}
+        else
           {:error, reason} -> {:error, reason}
         end
       end,
@@ -200,8 +225,16 @@ defmodule LiddrWeb.RideController do
   def rider_no_show(conn, %{"ride_id" => ride_id}) do
     driver_user_id = conn.assigns.current_user.id
 
-    case Rides.mark_rider_no_show(driver_user_id, ride_id, conn.body_params) do
-      {:ok, ride} -> json(conn, %{data: %{ride: RideSerializer.ride_payload(ride)}})
+    with :ok <-
+           Rides.enforce_action_security_signals(
+             :driver_no_show,
+             driver_user_id,
+             RequestMeta.security(conn)
+           ),
+         :ok <- Rides.enforce_driver_no_show_rate_limit(driver_user_id),
+         {:ok, ride} <- Rides.mark_rider_no_show(driver_user_id, ride_id, conn.body_params) do
+      json(conn, %{data: %{ride: RideSerializer.ride_payload(ride)}})
+    else
       {:error, reason} -> render_error(conn, reason)
     end
   end

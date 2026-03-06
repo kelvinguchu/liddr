@@ -5,6 +5,7 @@ defmodule Liddr.Verification.ExpiryMonitorWorker do
 
   import Ecto.Query
 
+  alias Liddr.Location.DriverHotState
   alias Liddr.Repo
 
   @expirable_document_statuses [
@@ -73,6 +74,8 @@ defmodule Liddr.Verification.ExpiryMonitorWorker do
             updated_at: now
           ]
         )
+
+      :ok = DriverHotState.invalidate_many(driver_ids_to_suspend)
 
       activity_events =
         Enum.map(driver_ids_to_suspend, fn driver_id ->

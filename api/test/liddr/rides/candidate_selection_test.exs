@@ -187,6 +187,35 @@ defmodule Liddr.Rides.CandidateSelectionTest do
     assert driver_id == near_driver_id
   end
 
+  test "excluded drivers stay excluded when prefilter collapses to an empty list" do
+    previous_index = Application.get_env(:liddr, :ride_supply_index)
+    previous_mode = Application.get_env(:liddr, TestSupplyIndex)
+
+    on_exit(fn ->
+      restore_env(:ride_supply_index, previous_index)
+      restore_env(TestSupplyIndex, previous_mode)
+    end)
+
+    Application.put_env(:liddr, :ride_supply_index, TestSupplyIndex)
+    category_id = VerificationFixtures.insert_vehicle_category!()
+    pickup = %{lat: -1.2921, lng: 36.8219}
+
+    excluded_driver_id =
+      create_eligible_driver!(category_id,
+        lat: "-1.2921000",
+        lng: "36.8219000",
+        rating_score: "4.8",
+        rating_count: 60
+      )
+
+    Application.put_env(:liddr, TestSupplyIndex, mode: {:ok, [excluded_driver_id]})
+
+    assert [] ==
+             CandidateSelection.list_eligible_driver_ids(category(category_id), pickup, 1,
+               exclude_driver_ids: [excluded_driver_id]
+             )
+  end
+
   defp create_eligible_driver!(category_id, opts) do
     user = VerificationFixtures.create_user!()
 

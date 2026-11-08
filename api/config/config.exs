@@ -18,6 +18,7 @@ config :liddr, :auth_debug_otp, false
 config :liddr, :auth_debug_otp_targets, []
 config :liddr, :api_docs_enabled, false
 config :liddr, :otp_sms_client, Liddr.Auth.OtpDelivery.HostPinnacle
+config :liddr, :otp_email_client, Liddr.Auth.OtpDelivery.Resend
 config :liddr, :ride_supply_index, Liddr.Location.SupplyIndex
 config :liddr, :ride_push_client, Liddr.Rides.PushClient.FCM
 

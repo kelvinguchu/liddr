@@ -10,30 +10,25 @@ defmodule Liddr.Auth.OtpDelivery do
         :ok
 
       provider == "phone_otp" ->
-        sms_client().send_otp(identifier, otp_message(code))
-        |> case do
-          :ok ->
-            :ok
+        identifier
+        |> sms_client().send_otp(otp_message(code))
+        |> delivery_result(provider)
 
-          {:error, reason} ->
-            Logger.error(
-              "[auth.otp_delivery] failed provider=phone_otp reason=#{inspect(reason)}"
-            )
-
-            {:error, :otp_delivery_unavailable}
-        end
+      provider == "email_otp" ->
+        identifier
+        |> email_client().send_otp(email_subject(), email_message(code))
+        |> delivery_result(provider)
 
       true ->
-        :ok
+        delivery_result({:error, :unsupported_otp_provider}, provider)
     end
   end
 
   def otp_message(code) do
-    app_name = System.get_env("OTP_APP_NAME") || @default_app_name
     app_domain = System.get_env("OTP_APP_DOMAIN") || @default_app_domain
 
     """
-    #{app_name} Security Code
+    #{app_name()} Security Code
 
     Your verification code is: #{code}
 
@@ -44,7 +39,33 @@ defmodule Liddr.Auth.OtpDelivery do
     |> String.trim()
   end
 
+  def email_subject, do: "Your #{app_name()} security code"
+
+  def email_message(code) do
+    """
+    Your #{app_name()} verification code is: #{code}
+
+    This code expires in 5 minutes. Do not share this code with anyone.
+
+    If you did not request this code, you can ignore this email.
+    """
+    |> String.trim()
+  end
+
+  defp delivery_result(:ok, _provider), do: :ok
+
+  defp delivery_result({:error, reason}, provider) do
+    Logger.error("[auth.otp_delivery] failed provider=#{provider} reason=#{inspect(reason)}")
+    {:error, :otp_delivery_unavailable}
+  end
+
+  defp app_name, do: System.get_env("OTP_APP_NAME") || @default_app_name
+
   defp sms_client do
     Application.get_env(:liddr, :otp_sms_client, Liddr.Auth.OtpDelivery.HostPinnacle)
+  end
+
+  defp email_client do
+    Application.get_env(:liddr, :otp_email_client, Liddr.Auth.OtpDelivery.Resend)
   end
 end

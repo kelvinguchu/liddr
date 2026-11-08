@@ -12,16 +12,24 @@ defmodule LiddrWeb.AuthOtpDeliveryTest do
     previous_client = Application.get_env(:liddr, :otp_sms_client)
     previous_test_pid = Application.get_env(:liddr, :otp_sms_test_pid)
     previous_test_result = Application.get_env(:liddr, :otp_sms_test_result)
+    previous_email_client = Application.get_env(:liddr, :otp_email_client)
+    previous_email_pid = Application.get_env(:liddr, :otp_email_test_pid)
+    previous_email_result = Application.get_env(:liddr, :otp_email_test_result)
 
     Application.put_env(:liddr, :auth_debug_otp, false)
     Application.put_env(:liddr, :otp_sms_client, Liddr.TestSupport.OtpSmsTestClient)
     Application.put_env(:liddr, :otp_sms_test_pid, self())
+    Application.put_env(:liddr, :otp_email_client, Liddr.TestSupport.OtpEmailTestClient)
+    Application.put_env(:liddr, :otp_email_test_pid, self())
 
     on_exit(fn ->
       restore_env(:auth_debug_otp, previous_debug)
       restore_env(:otp_sms_client, previous_client)
       restore_env(:otp_sms_test_pid, previous_test_pid)
       restore_env(:otp_sms_test_result, previous_test_result)
+      restore_env(:otp_email_client, previous_email_client)
+      restore_env(:otp_email_test_pid, previous_email_pid)
+      restore_env(:otp_email_test_result, previous_email_result)
     end)
 
     :ok
@@ -65,24 +73,52 @@ defmodule LiddrWeb.AuthOtpDeliveryTest do
     refute persisted_challenge_id(identifier)
   end
 
-  defp request_challenge(identifier) do
+  test "POST /api/auth/challenges sends the OTP by email and hides the debug code" do
+    email = AuthFixtures.unique_email("otp")
+    {:ok, normalized_email} = Liddr.Auth.normalize_identifier_for_method("email_otp", email)
+
+    assert %{"data" => %{"method" => "email_otp", "debug_code" => nil, "challenge_id" => id}} =
+             email |> request_challenge("email_otp") |> json_response(201)
+
+    assert_receive {:otp_email_sent, ^normalized_email, subject, message}
+    refute subject =~ ~r/\d{6}/
+    assert message =~ ~r/verification code is: \d{6}/
+    assert %AuthChallenge{id: ^id} = Repo.get(AuthChallenge, id)
+  end
+
+  test "POST /api/auth/challenges fails when email delivery fails and rolls back challenge" do
+    Application.put_env(:liddr, :otp_email_test_result, {:error, :provider_down})
+    email = AuthFixtures.unique_email("otp-fail")
+
+    assert %{"error" => %{"code" => "OTP_DELIVERY_UNAVAILABLE"}} =
+             email |> request_challenge("email_otp") |> json_response(503)
+
+    refute persisted_challenge_id(email, "email_otp")
+  end
+
+  test "an unsupported OTP provider is never reported as delivered" do
+    assert {:error, :otp_delivery_unavailable} =
+             Liddr.Auth.OtpDelivery.deliver_challenge("unknown", "someone", "123456", nil)
+  end
+
+  defp request_challenge(identifier, method \\ "phone_otp") do
     build_conn()
     |> put_req_header("content-type", "application/json")
     |> post("/api/auth/challenges", %{
-      "method" => "phone_otp",
+      "method" => method,
       "identifier" => identifier,
       "purpose" => "login"
     })
   end
 
-  defp persisted_challenge_id(identifier) do
+  defp persisted_challenge_id(identifier, provider \\ "phone_otp") do
     {:ok, normalized_identifier} =
-      Liddr.Auth.normalize_identifier_for_method("phone_otp", identifier)
+      Liddr.Auth.normalize_identifier_for_method(provider, identifier)
 
     Repo.one(
       from challenge in AuthChallenge,
         where:
-          challenge.provider == "phone_otp" and
+          challenge.provider == ^provider and
             challenge.identity_value == ^normalized_identifier and
             challenge.purpose == "login",
         select: challenge.id

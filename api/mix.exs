@@ -50,10 +50,10 @@ defmodule Liddr.MixProject do
       {:telemetry_poller, "~> 1.0"},
       {:gettext, "~> 1.0"},
       {:jason, "~> 1.2"},
+      {:open_api_spex, "~> 3.22"},
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
       {:oban, "~> 2.19"},
-      {:resend, "~> 0.4.0"},
       {:redix, "~> 1.5"}
     ]
   end

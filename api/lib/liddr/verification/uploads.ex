@@ -1,6 +1,7 @@
 defmodule Liddr.Verification.Uploads do
   alias Liddr.Repo
   alias Liddr.Storage.GCS
+  alias Liddr.Storage.GCS.ObjectMetadata
   alias Liddr.Verification.Shared
   alias Liddr.Verification.VerificationRequirement
 
@@ -18,7 +19,11 @@ defmodule Liddr.Verification.Uploads do
          {:ok, storage_key} <-
            generate_storage_key(driver_user_id, requirement.document_type, content_type),
          {:ok, signed} <-
-           GCS.presign_put_upload(storage_key, content_type, ttl_seconds: upload_ttl_seconds()) do
+           gcs_presigner().presign_put_upload(
+             storage_key,
+             content_type,
+             ttl_seconds: upload_ttl_seconds()
+           ) do
       {:ok,
        %{
          document_type: requirement.document_type,
@@ -32,7 +37,31 @@ defmodule Liddr.Verification.Uploads do
     end
   end
 
-  def ensure_storage_key_allowed!(attrs) do
+  def verify_uploaded_object(driver_user_id, document_type, attrs) do
+    with {:ok, storage_key} <- ensure_storage_key_allowed(driver_user_id, document_type, attrs),
+         {:ok, claimed_content_type} <- resolve_content_type(attrs),
+         {:ok, claimed_file_size_bytes} <- resolve_file_size(attrs),
+         {:ok, metadata} <- metadata_fetcher().fetch_object_metadata(storage_key),
+         :ok <- validate_content_type(metadata.content_type),
+         :ok <- validate_file_size(metadata.file_size_bytes),
+         :ok <- validate_claimed_content_type(claimed_content_type, metadata.content_type),
+         :ok <- validate_claimed_file_size(claimed_file_size_bytes, metadata.file_size_bytes) do
+      {:ok,
+       %{
+         storage_key: storage_key,
+         file_mime: metadata.content_type,
+         file_size_bytes: metadata.file_size_bytes,
+         object_metadata: %{
+           generation: metadata.generation,
+           etag: metadata.etag,
+           md5_hash: metadata.md5_hash,
+           crc32c: metadata.crc32c
+         }
+       }}
+    end
+  end
+
+  def ensure_storage_key_allowed(driver_user_id, document_type, attrs) do
     storage_key =
       attrs
       |> Shared.get_value(:storage_key)
@@ -42,14 +71,24 @@ defmodule Liddr.Verification.Uploads do
       is_nil(storage_key) ->
         {:error, :missing_storage_key}
 
-      not String.starts_with?(storage_key, upload_prefix() <> "/") ->
-        {:error, :invalid_storage_key}
-
-      String.contains?(storage_key, "..") ->
-        {:error, :invalid_storage_key}
-
       true ->
-        {:ok, storage_key}
+        validate_storage_key_scope(storage_key, driver_user_id, document_type)
+    end
+  end
+
+  defp validate_storage_key_scope(storage_key, driver_user_id, document_type) do
+    with {:ok, storage_key} <- GCS.validate_object_key(storage_key),
+         [driver_segment, document_segment, filename] <-
+           storage_key
+           |> String.split("/", trim: true)
+           |> Enum.drop(prefix_segments_length()),
+         true <- driver_segment == to_string(driver_user_id),
+         true <- document_segment == document_type,
+         true <- valid_filename?(filename) do
+      {:ok, storage_key}
+    else
+      _ ->
+        {:error, :invalid_storage_key}
     end
   end
 
@@ -95,6 +134,14 @@ defmodule Liddr.Verification.Uploads do
     if content_type in allowed_mime_types(), do: :ok, else: {:error, :invalid_file_mime}
   end
 
+  defp validate_claimed_content_type(content_type, content_type), do: :ok
+
+  defp validate_claimed_content_type(_claimed, _actual),
+    do: {:error, :uploaded_file_mime_mismatch}
+
+  defp validate_claimed_file_size(size, size), do: :ok
+  defp validate_claimed_file_size(_claimed, _actual), do: {:error, :uploaded_file_size_mismatch}
+
   defp generate_storage_key(driver_user_id, document_type, content_type) do
     extension =
       case content_type do
@@ -118,6 +165,24 @@ defmodule Liddr.Verification.Uploads do
       |> Enum.join("/")
 
     {:ok, key}
+  end
+
+  defp metadata_fetcher do
+    Application.get_env(:liddr, :gcs_object_metadata_fetcher, ObjectMetadata)
+  end
+
+  defp gcs_presigner do
+    Application.get_env(:liddr, :gcs_upload_presigner, GCS)
+  end
+
+  defp prefix_segments_length do
+    upload_prefix()
+    |> String.split("/", trim: true)
+    |> length()
+  end
+
+  defp valid_filename?(filename) do
+    filename != "" and not String.contains?(filename, ["/", "\\"])
   end
 
   defp upload_prefix do

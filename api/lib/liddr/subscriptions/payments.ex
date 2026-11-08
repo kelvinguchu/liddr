@@ -5,6 +5,7 @@ defmodule Liddr.Subscriptions.Payments do
   alias Liddr.Accounts.Driver
   alias Liddr.Accounts.User
   alias Liddr.Payments.Mpesa.Client
+  alias Liddr.Payments.Mpesa.Sanitizer
   alias Liddr.Repo
   alias Liddr.Subscriptions.MpesaCallback
   alias Liddr.Subscriptions.PaymentUtils
@@ -112,7 +113,7 @@ defmodule Liddr.Subscriptions.Payments do
       "result_code" => response_code,
       "result_desc" =>
         PaymentUtils.normalize_text(Map.get(response_payload, "ResponseDescription")),
-      "request_payload" => mpesa_result.request_payload
+      "request_payload" => Sanitizer.payload(mpesa_result.request_payload)
     })
     |> Repo.update()
   end

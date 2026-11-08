@@ -3,6 +3,9 @@ defmodule LiddrWeb.AuthController do
 
   alias Ecto.Changeset
   alias Liddr.Auth
+  alias Liddr.Auth.StepUp
+  alias Liddr.Auth.TotpEnrollment
+  alias LiddrWeb.RequestMeta
 
   @error_mappings %{
     invalid_method:
@@ -76,7 +79,33 @@ defmodule LiddrWeb.AuthController do
       {:unprocessable_entity, "INVALID_GOOGLE_ID_TOKEN", "Google ID token is invalid"},
     google_auth_unavailable:
       {:service_unavailable, "GOOGLE_AUTH_UNAVAILABLE",
-       "Google token verification is temporarily unavailable"}
+       "Google token verification is temporarily unavailable"},
+    step_up_email_required:
+      {:unprocessable_entity, "STEP_UP_EMAIL_REQUIRED",
+       "An email address is required for privileged step-up verification"},
+    step_up_context_required:
+      {:forbidden, "STEP_UP_CONTEXT_REQUIRED",
+       "Step-up verification must be tied to an authenticated session"},
+    step_up_identity_mismatch:
+      {:forbidden, "STEP_UP_IDENTITY_MISMATCH",
+       "Step-up verification must use the authenticated operator identity"},
+    step_up_session_mismatch:
+      {:forbidden, "STEP_UP_SESSION_MISMATCH",
+       "Step-up challenge does not belong to the current session"},
+    totp_email_required:
+      {:unprocessable_entity, "TOTP_EMAIL_REQUIRED",
+       "An email address is required to enroll an authenticator app"},
+    missing_setup_token:
+      {:unprocessable_entity, "MISSING_SETUP_TOKEN", "setup_token is required"},
+    invalid_totp_code: {:unauthorized, "INVALID_TOTP_CODE", "Invalid authenticator app code"},
+    invalid_totp_token:
+      {:unprocessable_entity, "INVALID_TOTP_TOKEN", "Invalid TOTP enrollment or challenge token"},
+    totp_session_mismatch:
+      {:forbidden, "TOTP_SESSION_MISMATCH",
+       "TOTP verification must be completed from the same authenticated session"},
+    totp_secret_unavailable:
+      {:service_unavailable, "TOTP_SECRET_UNAVAILABLE",
+       "Stored authenticator secret is unavailable"}
   }
 
   def methods(conn, _params) do
@@ -100,6 +129,39 @@ defmodule LiddrWeb.AuthController do
 
   def verify_challenge(conn, params) do
     Auth.verify_challenge(params, request_meta(conn))
+    |> handle_result(conn, :ok)
+  end
+
+  def request_step_up_challenge(conn, _params) do
+    StepUp.request_challenge(
+      conn.assigns.current_user,
+      conn.assigns.current_session_id,
+      request_meta(conn)
+    )
+    |> handle_result(conn, :created)
+  end
+
+  def verify_step_up_challenge(conn, params) do
+    StepUp.verify_challenge(
+      conn.assigns.current_user,
+      conn.assigns.current_session_id,
+      params,
+      request_meta(conn)
+    )
+    |> handle_result(conn, :ok)
+  end
+
+  def request_totp_setup(conn, _params) do
+    TotpEnrollment.request_setup(conn.assigns.current_user, conn.assigns.current_session_id)
+    |> handle_result(conn, :created)
+  end
+
+  def confirm_totp_setup(conn, params) do
+    TotpEnrollment.confirm_setup(
+      conn.assigns.current_user,
+      conn.assigns.current_session_id,
+      params
+    )
     |> handle_result(conn, :ok)
   end
 
@@ -152,19 +214,8 @@ defmodule LiddrWeb.AuthController do
   end
 
   defp request_meta(conn) do
-    %{
-      ip: remote_ip_to_string(conn.remote_ip),
-      device: List.first(get_req_header(conn, "x-device-id")),
-      user_agent: List.first(get_req_header(conn, "user-agent"))
-    }
+    RequestMeta.auth(conn)
   end
-
-  defp remote_ip_to_string({a, b, c, d}), do: "#{a}.#{b}.#{c}.#{d}"
-
-  defp remote_ip_to_string({a, b, c, d, e, f, g, h}),
-    do: "#{a}:#{b}:#{c}:#{d}:#{e}:#{f}:#{g}:#{h}"
-
-  defp remote_ip_to_string(_), do: nil
 
   defp handle_result({:ok, payload}, conn, status) do
     conn

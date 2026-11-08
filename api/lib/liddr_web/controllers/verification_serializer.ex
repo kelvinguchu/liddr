@@ -1,4 +1,6 @@
 defmodule LiddrWeb.VerificationSerializer do
+  alias Liddr.Security.Redaction
+
   def start_application(payload) do
     %{
       driver: driver(payload.driver),
@@ -81,12 +83,10 @@ defmodule LiddrWeb.VerificationSerializer do
       status: document.status,
       scan_status: document.scan_status,
       scan_engine: document.scan_engine,
-      scan_signature: document.scan_signature,
       scanned_at: document.scanned_at,
       reviewed_at: document.reviewed_at,
       rejection_reason: document.rejection_reason,
       expires_on: Map.get(document, :expires_on),
-      storage_key: document.storage_key,
       inserted_at: document.inserted_at
     }
   end
@@ -97,8 +97,8 @@ defmodule LiddrWeb.VerificationSerializer do
       account_status: driver.account_status,
       verification_status: driver.verification_status,
       vehicle_category_id: Map.get(driver, :vehicle_category_id),
-      license_no: Map.get(driver, :license_no),
-      plate_no: Map.get(driver, :plate_no),
+      license_no_masked: Redaction.mask_license(Map.get(driver, :license_no)),
+      plate_no_masked: Redaction.mask_vehicle_plate(Map.get(driver, :plate_no)),
       activated_at: Map.get(driver, :activated_at),
       suspended_at: Map.get(driver, :suspended_at),
       is_available: Map.get(driver, :is_available)

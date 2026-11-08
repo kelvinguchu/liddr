@@ -1,5 +1,15 @@
 # syntax=docker/dockerfile:1.7
 
+FROM golang:1.25.2-bookworm AS s2cover_builder
+
+WORKDIR /src
+
+COPY native/s2cover/go.mod native/s2cover/go.sum ./
+RUN go mod download
+
+COPY native/s2cover ./
+RUN CGO_ENABLED=0 go build -o /out/s2cover .
+
 FROM elixir:1.17.3-otp-27 AS builder
 
 RUN apt-get update -y && \
@@ -20,8 +30,10 @@ RUN mix deps.compile
 
 COPY lib lib
 COPY priv priv
+COPY --from=s2cover_builder /out/s2cover priv/bin/s2cover
 
 RUN mix compile
+RUN mix liddr.security.prod_guard
 RUN mix release
 
 FROM debian:bookworm-slim AS runtime

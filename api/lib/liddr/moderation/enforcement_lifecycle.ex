@@ -3,6 +3,7 @@ defmodule Liddr.Moderation.EnforcementLifecycle do
 
   alias Liddr.Accounts.Driver
   alias Liddr.Accounts.User
+  alias Liddr.Location.DriverHotState
   alias Liddr.Moderation.Query
   alias Liddr.Moderation.UserEnforcement
   alias Liddr.Repo
@@ -17,12 +18,13 @@ defmodule Liddr.Moderation.EnforcementLifecycle do
 
     due_ids =
       Repo.all(
-        from ue in UserEnforcement,
+        from(ue in UserEnforcement,
           where:
             ue.status == "active" and ue.action == "temporary_suspension" and ue.ends_at <= ^now,
           order_by: [asc: ue.ends_at, asc: ue.id],
           select: ue.id,
           limit: ^limit
+        )
       )
 
     {:ok, Enum.map(due_ids, &expire_single_enforcement(&1, now))}
@@ -32,9 +34,10 @@ defmodule Liddr.Moderation.EnforcementLifecycle do
     Repo.transaction(fn ->
       enforcement =
         Repo.one(
-          from ue in UserEnforcement,
+          from(ue in UserEnforcement,
             where: ue.id == ^enforcement_id,
             lock: "FOR UPDATE"
+          )
         ) || Repo.rollback(:enforcement_not_found)
 
       cond do
@@ -82,18 +85,20 @@ defmodule Liddr.Moderation.EnforcementLifecycle do
 
   defp fetch_active_enforcements_for_user!(user_id) do
     Repo.all(
-      from ue in UserEnforcement,
+      from(ue in UserEnforcement,
         where: ue.user_id == ^user_id and ue.status == "active",
         order_by: [desc: ue.starts_at, desc: ue.id],
         lock: "FOR UPDATE"
+      )
     )
   end
 
   defp fetch_user_for_update!(user_id) do
     Repo.one(
-      from u in User,
+      from(u in User,
         where: u.id == ^user_id,
         lock: "FOR UPDATE"
+      )
     ) || Repo.rollback(:user_not_found)
   end
 
@@ -175,9 +180,10 @@ defmodule Liddr.Moderation.EnforcementLifecycle do
   defp sync_driver_state!(user_id, user_state, now) do
     driver =
       Repo.one(
-        from d in Driver,
+        from(d in Driver,
           where: d.user_id == ^user_id,
           lock: "FOR UPDATE"
+        )
       )
 
     if driver do
@@ -191,6 +197,8 @@ defmodule Liddr.Moderation.EnforcementLifecycle do
           |> Driver.create_changeset(attrs)
           |> Repo.update()
           |> unwrap_or_rollback()
+
+        :ok = DriverHotState.put(updated_driver)
 
         %DriverActivityEvent{}
         |> DriverActivityEvent.create_changeset(%{

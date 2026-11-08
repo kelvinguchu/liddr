@@ -19,5 +19,8 @@ config :swoosh, local: false
 # Do not print debug messages in production
 config :logger, level: :info
 
+# API docs/openapi routes must stay disabled in production builds.
+config :liddr, :api_docs_enabled, false
+
 # Runtime production configuration, including reading
 # of environment variables, is done on config/runtime.exs.

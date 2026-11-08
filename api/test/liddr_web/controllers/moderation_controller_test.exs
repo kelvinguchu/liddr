@@ -41,8 +41,9 @@ defmodule LiddrWeb.ModerationControllerTest do
   test "POST /api/moderation/enforcements allows ops and updates target account status", %{
     conn: _conn
   } do
-    %{auth_conn: auth_conn, user_id: actor_id} =
-      AuthFixtures.authenticate_ops!("ops2@example.com")
+    ops_auth = AuthFixtures.authenticate_ops!("ops2@example.com")
+    auth_conn = AuthFixtures.with_step_up!(ops_auth.auth_conn)
+    actor_id = ops_auth.user_id
 
     target = Repo.insert!(%User{phone: "254701000201"})
     ends_at = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.truncate(:microsecond)
@@ -73,7 +74,11 @@ defmodule LiddrWeb.ModerationControllerTest do
   end
 
   test "POST /api/moderation/enforcements forces driver offline when suspended", %{conn: _conn} do
-    %{auth_conn: auth_conn} = AuthFixtures.authenticate_ops!("ops-driver-suspend@example.com")
+    auth_conn =
+      AuthFixtures.authenticate_ops!("ops-driver-suspend@example.com")
+      |> Map.fetch!(:auth_conn)
+      |> AuthFixtures.with_step_up!()
+
     category_id = VerificationFixtures.insert_vehicle_category!()
     target = Repo.insert!(%User{phone: "254701000301"})
 
@@ -199,8 +204,9 @@ defmodule LiddrWeb.ModerationControllerTest do
   test "PATCH /api/moderation/reports/:id/triage updates report status and reviewer", %{
     conn: _conn
   } do
-    %{auth_conn: auth_conn, user_id: reviewer_id} =
-      AuthFixtures.authenticate_ops!("ops-triage@example.com")
+    ops_auth = AuthFixtures.authenticate_ops!("ops-triage@example.com")
+    auth_conn = AuthFixtures.with_step_up!(ops_auth.auth_conn)
+    reviewer_id = ops_auth.user_id
 
     category = insert_report_category!("unsafe_driving")
     {reporter, reported} = insert_report_users!()
@@ -237,8 +243,9 @@ defmodule LiddrWeb.ModerationControllerTest do
   test "POST /api/moderation/reports/:id/reviews creates review and resolves report", %{
     conn: _conn
   } do
-    %{auth_conn: auth_conn, user_id: reviewer_id} =
-      AuthFixtures.authenticate_ops!("ops-review@example.com")
+    ops_auth = AuthFixtures.authenticate_ops!("ops-review@example.com")
+    auth_conn = AuthFixtures.with_step_up!(ops_auth.auth_conn)
+    reviewer_id = ops_auth.user_id
 
     category = insert_report_category!("harassment_or_abuse")
     {reporter, reported} = insert_report_users!()
@@ -284,8 +291,9 @@ defmodule LiddrWeb.ModerationControllerTest do
   test "POST /api/moderation/reports/:id/reviews auto-applies permanent ban enforcement", %{
     conn: _conn
   } do
-    %{auth_conn: auth_conn, user_id: reviewer_id} =
-      AuthFixtures.authenticate_ops!("ops-review-ban@example.com")
+    ops_auth = AuthFixtures.authenticate_ops!("ops-review-ban@example.com")
+    auth_conn = AuthFixtures.with_step_up!(ops_auth.auth_conn)
+    reviewer_id = ops_auth.user_id
 
     category_id = VerificationFixtures.insert_vehicle_category!()
     reporter = Repo.insert!(%User{phone: AuthFixtures.unique_phone()})
@@ -350,7 +358,11 @@ defmodule LiddrWeb.ModerationControllerTest do
   test "POST /api/moderation/reports/:id/reviews requires ends_at for temporary suspension", %{
     conn: _conn
   } do
-    %{auth_conn: auth_conn} = AuthFixtures.authenticate_ops!("ops-review-temp@example.com")
+    auth_conn =
+      AuthFixtures.authenticate_ops!("ops-review-temp@example.com")
+      |> Map.fetch!(:auth_conn)
+      |> AuthFixtures.with_step_up!()
+
     category = insert_report_category!("temp_suspend_case")
     {reporter, reported} = insert_report_users!()
 

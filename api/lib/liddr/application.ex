@@ -14,8 +14,15 @@ defmodule Liddr.Application do
     children =
       [
         LiddrWeb.Telemetry,
+        Liddr.Location.DriverHotState,
+        Liddr.Location.DriverLocationWriteGate,
+        Liddr.Location.DriverLocationRepoTelemetry,
+        Liddr.Location.S2Native,
+        Liddr.Observability.ModerationMonitor,
         Liddr.Rides.OfferLockMonitor,
         Liddr.Repo,
+        Liddr.Rides.VehicleCategoryCache,
+        Liddr.Location.DriverHotStateWarmup,
         {Oban, Application.fetch_env!(:liddr, Oban)},
         {DNSCluster, query: Application.get_env(:liddr, :dns_cluster_query) || :ignore},
         {Phoenix.PubSub, name: Liddr.PubSub}

@@ -24,8 +24,10 @@ defmodule LiddrWeb.ReportController do
       "report.create",
       report_params,
       fn ->
-        case Moderation.submit_report(report_params) do
-          {:ok, report} -> {:ok, 201, %{data: report_payload(report)}}
+        with :ok <- Moderation.enforce_report_create_rate_limit(reporter_id),
+             {:ok, report} <- Moderation.submit_report(report_params) do
+          {:ok, 201, %{data: report_payload(report)}}
+        else
           {:error, reason} -> {:error, reason}
         end
       end,
@@ -67,6 +69,15 @@ defmodule LiddrWeb.ReportController do
         :unprocessable_entity,
         "SELF_REPORT_NOT_ALLOWED",
         "You cannot report yourself"
+      )
+
+  defp render_error(conn, :report_create_rate_limited),
+    do:
+      error_response(
+        conn,
+        :too_many_requests,
+        "REPORT_CREATE_RATE_LIMITED",
+        "Too many reports created in the current window"
       )
 
   defp render_error(conn, %Changeset{} = changeset) do

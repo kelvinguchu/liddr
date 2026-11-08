@@ -48,15 +48,18 @@ defmodule LiddrWeb.RideSerializer do
   end
 
   def request_payload(payload) do
-    snapshot_index =
-      build_snapshot_index([
-        payload.ride.rider_id,
-        payload.ride.driver_id | Enum.map(payload.offers, & &1.driver_id)
-      ])
+    rider_snapshot = cached_snapshot(payload.ride.metadata, "rider_rating_snapshot")
+    snapshot_index = request_snapshot_index(payload, rider_snapshot)
 
     base = %{
       ride: ride_payload(payload.ride, snapshot_index),
-      offers: Enum.map(payload.offers, &offer_payload(&1, snapshot_index, payload.ride.rider_id)),
+      offers:
+        Enum.map(
+          payload.offers,
+          &offer_payload(&1, snapshot_index, payload.ride.rider_id,
+            rider_rating_snapshot: rider_snapshot
+          )
+        ),
       offers_count: length(payload.offers)
     }
 
@@ -67,16 +70,15 @@ defmodule LiddrWeb.RideSerializer do
   end
 
   def accept_payload(payload) do
-    snapshot_index =
-      build_snapshot_index([
-        payload.ride.rider_id,
-        payload.ride.driver_id,
-        payload.offer.driver_id
-      ])
+    rider_snapshot = cached_snapshot(payload.ride.metadata, "rider_rating_snapshot")
+    snapshot_index = request_snapshot_index(payload, rider_snapshot)
 
     %{
       ride: ride_payload(payload.ride, snapshot_index),
-      offer: offer_payload(payload.offer, snapshot_index, payload.ride.rider_id)
+      offer:
+        offer_payload(payload.offer, snapshot_index, payload.ride.rider_id,
+          rider_rating_snapshot: rider_snapshot
+        )
     }
   end
 
@@ -138,16 +140,28 @@ defmodule LiddrWeb.RideSerializer do
       final_fare_kes: ride.final_fare_kes,
       final_pricing_payload: ride.final_pricing_payload,
       notes: ride.notes,
-      rider_rating_snapshot: Snapshot.snapshot_for_role(ride.rider_id, :rider, snapshot_index),
-      driver_rating_snapshot: Snapshot.snapshot_for_role(ride.driver_id, :driver, snapshot_index),
+      rider_rating_snapshot:
+        cached_snapshot(ride.metadata, "rider_rating_snapshot") ||
+          Snapshot.snapshot_for_role(ride.rider_id, :rider, snapshot_index),
+      driver_rating_snapshot:
+        cached_snapshot(ride.metadata, "driver_rating_snapshot") ||
+          Snapshot.snapshot_for_role(ride.driver_id, :driver, snapshot_index),
       inserted_at: ride.inserted_at
     }
   end
 
-  def offer_payload(offer), do: offer_payload(offer, build_snapshot_index([offer.driver_id]), nil)
+  def offer_payload(offer),
+    do: offer_payload(offer, build_snapshot_index([offer.driver_id]), nil, [])
 
-  def offer_payload(offer, snapshot_index, rider_user_id) do
+  def offer_payload(offer, snapshot_index, rider_user_id),
+    do: offer_payload(offer, snapshot_index, rider_user_id, [])
+
+  def offer_payload(offer, snapshot_index, rider_user_id, opts) do
     window_seconds = response_window_seconds(offer)
+
+    rider_snapshot =
+      Keyword.get(opts, :rider_rating_snapshot) ||
+        Snapshot.snapshot_for_role(rider_user_id, :rider, snapshot_index)
 
     %{
       id: offer.id,
@@ -161,8 +175,9 @@ defmodule LiddrWeb.RideSerializer do
       response_window_seconds: window_seconds,
       response_window_remaining_seconds: response_window_remaining_seconds(offer),
       driver_rating_snapshot:
-        Snapshot.snapshot_for_role(offer.driver_id, :driver, snapshot_index),
-      rider_rating_snapshot: Snapshot.snapshot_for_role(rider_user_id, :rider, snapshot_index),
+        cached_snapshot(offer.metadata, "driver_rating_snapshot") ||
+          Snapshot.snapshot_for_role(offer.driver_id, :driver, snapshot_index),
+      rider_rating_snapshot: rider_snapshot,
       inserted_at: offer.inserted_at
     }
   end
@@ -230,6 +245,54 @@ defmodule LiddrWeb.RideSerializer do
       %{} = payload -> Map.get(payload, key)
       _ -> nil
     end
+  end
+
+  defp request_snapshot_index(payload, rider_snapshot) do
+    offers = Map.get(payload, :offers, [])
+    offer = Map.get(payload, :offer)
+
+    offer_candidates =
+      cond do
+        is_list(offers) -> offers
+        offer -> [offer]
+        true -> []
+      end
+
+    cached_driver_ids =
+      offer_candidates
+      |> Enum.filter(
+        &(is_map(&1.metadata) and is_map(cached_snapshot(&1.metadata, "driver_rating_snapshot")))
+      )
+      |> Enum.map(& &1.driver_id)
+
+    ids_to_query =
+      [payload.ride.rider_id, payload.ride.driver_id | Enum.map(offer_candidates, & &1.driver_id)]
+      |> Enum.filter(&is_integer/1)
+      |> Enum.reject(&(&1 == payload.ride.rider_id and is_map(rider_snapshot)))
+      |> Enum.reject(&(&1 in cached_driver_ids))
+
+    build_snapshot_index(ids_to_query)
+  end
+
+  defp cached_snapshot(%{} = metadata, key) when is_binary(key) do
+    case Map.get(metadata, key) do
+      %{} = snapshot -> atomize_snapshot(snapshot)
+      _ -> nil
+    end
+  end
+
+  defp cached_snapshot(_metadata, _key), do: nil
+
+  defp atomize_snapshot(snapshot) do
+    %{
+      rating_score: Map.get(snapshot, "rating_score", Map.get(snapshot, :rating_score)),
+      rating_count: Map.get(snapshot, "rating_count", Map.get(snapshot, :rating_count, 0)),
+      confidence_band: Map.get(snapshot, "confidence_band", Map.get(snapshot, :confidence_band)),
+      is_new_driver: Map.get(snapshot, "is_new_driver", Map.get(snapshot, :is_new_driver)),
+      is_new_rider: Map.get(snapshot, "is_new_rider", Map.get(snapshot, :is_new_rider))
+    }
+    |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+    |> Map.new()
   end
 
   defp build_snapshot_index(user_ids), do: Snapshot.build_index(user_ids)

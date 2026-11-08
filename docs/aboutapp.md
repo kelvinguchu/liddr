@@ -1305,3 +1305,79 @@ Version	1.3
 Market	Kenya (Nairobi first)
 Target Launch	Phase 1 MVP
 Document Status	Draft — Active Development
+
+---
+
+## 2026-03-05 Implementation Reality Addendum (Backend Source Of Truth)
+
+This addendum supersedes conflicting text in the sections above for the current API implementation.
+Use this as the authoritative view for backend behavior until the main body is fully rewritten.
+
+### A) Geographic Indexing And Live Location
+- Live supply indexing is implemented directly with the S2 location engine and canonical hex cell tokens in Redis (`Liddr.Location.S2`, `Liddr.Location.SupplyIndex`).
+- Radius covering is produced by the official `golang/geo/s2` `RegionCoverer` helper, while Elixir stores and queries the canonical S2 tokens it returns.
+- Driver location ingest is HTTP (`POST /api/drivers/me/location`), not WebSocket write ingestion.
+- Passenger/driver live ride updates are delivered through Phoenix Channels for ride/driver topics.
+
+Primary evidence:
+- `api/lib/liddr/location/s2.ex`
+- `api/lib/liddr/location/s2_native.ex`
+- `api/native/s2cover/main.go`
+- `api/lib/liddr/location/supply_index.ex`
+- `api/lib/liddr_web/controllers/driver_location_controller.ex`
+
+### B) Ride Completion And Payments
+- Ride completion is supported (`POST /api/rides/:ride_id/complete`).
+- Subscription payment uses in-app M-Pesa with webhook + reconciliation workflows.
+- Driver subscription status is enforced for availability/acceptance gates.
+
+Primary evidence:
+- `api/lib/liddr/subscriptions/payments.ex`
+- `api/lib/liddr/subscriptions/reconciliation.ex`
+- `api/lib/liddr_web/controllers/subscription_controller.ex`
+
+### C) Dispute And Compensation Workflow (Implemented)
+- Riders/drivers can submit ride disputes: `POST /api/disputes`.
+- Ops resolves disputes with outcomes: `POST /api/ops/disputes/:id/resolve`.
+- Refund outcomes (`refund_full`, `refund_partial`, `credit_note`) create a compensation record.
+- Ops can process compensation:
+  - mark paid: `POST /api/ops/disputes/compensations/:id/mark-paid`
+  - cancel approved compensation: `POST /api/ops/disputes/compensations/:id/cancel`
+- Paid transition requires settlement metadata:
+  - `processing_reference` (required for `paid`)
+  - `processing_channel` (`manual_ops|mpesa_reversal|wallet_credit|bank_transfer`)
+- Compensation records include audit fields (`processed_at`, `processed_by_user_id`, processing metadata).
+
+Primary evidence:
+- `api/lib/liddr/disputes/cases.ex`
+- `api/lib/liddr/disputes/compensations.ex`
+- `api/lib/liddr_web/controllers/dispute_controller.ex`
+- `api/lib/liddr_web/controllers/dispute_ops_controller.ex`
+- `api/priv/repo/migrations/20260305185202_add_dispute_compensation_processing_reference_fields.exs`
+
+### D) API Contract Drift
+The route table in the earlier API contract section is incomplete for current backend scope.
+For canonical routes, use:
+- `api/lib/liddr_web/router.ex`
+
+Notable implemented surfaces include:
+- shared rides + member actions
+- ride messaging + moderation
+- destination change requests
+- dispute/compensation ops
+- ratings ops and moderation ops endpoints
+
+### E) Development Environment (Current)
+- API runtime uses Docker-first local development with `.env` / `.env.example`.
+- Runtime configuration is in `api/config/runtime.exs`.
+- Compose is at repository root (`docker-compose.yml`) to orchestrate API + Postgres + Redis + ClamAV as one stack.
+
+### F) CI/Workflow Reality
+- Git workflow conventions are documented.
+- `.github/workflows` is currently not present in this repository snapshot; treat CI workflow examples above as target-state guidance.
+
+### G) Practical Rule For Future Edits
+When design prose conflicts with implemented code, backend behavior is defined by:
+1. `api/lib/liddr_web/router.ex`
+2. domain modules under `api/lib/liddr/`
+3. schema/migrations under `api/priv/repo/migrations/`

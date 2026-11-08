@@ -67,8 +67,9 @@ defmodule LiddrWeb.RatingOpsControllerTest do
     %{auth_conn: rider_conn} = AuthFixtures.authenticate_rider!(conn)
     %{auth_conn: driver_conn, user_id: driver_user_id} = AuthFixtures.authenticate_driver!(conn)
 
-    %{auth_conn: ops_conn, user_id: ops_user_id} =
-      AuthFixtures.authenticate_ops!("ops-ratings-mutate@example.com")
+    ops_auth = AuthFixtures.authenticate_ops!("ops-ratings-mutate@example.com")
+    ops_conn = AuthFixtures.with_step_up!(ops_auth.auth_conn)
+    ops_user_id = ops_auth.user_id
 
     category_id = VerificationFixtures.insert_vehicle_category!()
     _ = create_eligible_driver_profile!(driver_user_id, category_id)

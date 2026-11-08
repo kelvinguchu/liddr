@@ -3,18 +3,17 @@ defmodule Liddr.Rides.DispatchWorker do
 
   import Ecto.Query
 
-  alias Decimal, as: D
   alias Liddr.Repo
   alias Liddr.Rides.CandidateSelection
+  alias Liddr.Rides.DispatchWorkerSupport
   alias Liddr.Rides.DriverOfferLock
-  alias Liddr.Rides.Events
-  alias Liddr.Rides.Realtime
   alias Liddr.Rides.Ride
   alias Liddr.Rides.RideOffer
   alias Liddr.Rides.VehicleCategory
 
   @default_offer_limit 3
   @default_offer_ttl_seconds 15
+  @default_initial_delay_ms 500
   @max_offer_limit 10
   @max_offer_ttl_seconds 120
   @minimum_loop_delay_ms 500
@@ -49,11 +48,13 @@ defmodule Liddr.Rides.DispatchWorker do
           @default_offer_ttl_seconds,
           @max_offer_ttl_seconds
         ),
+      initial_delay_ms:
+        clamp_non_negative_int(Keyword.get(opts, :initial_delay_ms), @default_initial_delay_ms),
       wave_index: 0,
       timer_ref: nil
     }
 
-    {:ok, schedule_dispatch(state, 0)}
+    {:ok, schedule_dispatch(state, state.initial_delay_ms)}
   end
 
   @impl true
@@ -90,7 +91,7 @@ defmodule Liddr.Rides.DispatchWorker do
 
     case Repo.transaction(fn -> dispatch_transaction(state, now) end) do
       {:ok, {result, events}} ->
-        publish_events(events)
+        DispatchWorkerSupport.publish_events(events)
         result
 
       {:error, _reason} ->
@@ -148,7 +149,7 @@ defmodule Liddr.Rides.DispatchWorker do
         {{:reschedule, @retry_delay_ms, next_wave_index(state.wave_index)}, []}
       else
         offers = create_offers!(ride.id, candidate_ids, now, state.offer_ttl_seconds)
-        record_offer_events!(ride.id, "offer_created", offers, now)
+        DispatchWorkerSupport.record_offer_events!(ride.id, "offer_created", offers, now)
         created_events = Enum.map(offers, &{:offer_created, ride, &1})
 
         if ride.status == "requested" do
@@ -176,8 +177,10 @@ defmodule Liddr.Rides.DispatchWorker do
       Repo.rollback(:offer_lock_backend_unavailable)
     end
 
-    selected_driver_ids = normalize_driver_ids(lock_result.selected_driver_ids)
-    locked_driver_ids = normalize_driver_ids(lock_result.locked_driver_ids)
+    selected_driver_ids =
+      DispatchWorkerSupport.normalize_driver_ids(lock_result.selected_driver_ids)
+
+    locked_driver_ids = DispatchWorkerSupport.normalize_driver_ids(lock_result.locked_driver_ids)
 
     if selected_driver_ids == [] do
       []
@@ -204,7 +207,7 @@ defmodule Liddr.Rides.DispatchWorker do
 
       offers =
         returning_rows
-        |> normalize_rows()
+        |> DispatchWorkerSupport.normalize_rows()
         |> Enum.map(fn
           %RideOffer{} = offer -> offer
           row when is_map(row) -> struct(RideOffer, row)
@@ -238,8 +241,8 @@ defmodule Liddr.Rides.DispatchWorker do
           set: [status: "expired", responded_at: now, updated_at: now]
         )
 
-      record_offer_events!(ride_id, "offer_expired", expired_offers, now)
-      record_offer_events!(ride_id, "offer_missed", expired_offers, now)
+      DispatchWorkerSupport.record_offer_events!(ride_id, "offer_expired", expired_offers, now)
+      DispatchWorkerSupport.record_offer_events!(ride_id, "offer_missed", expired_offers, now)
       DriverOfferLock.release_many(expired_offers, source: "dispatch_expire")
     end
 
@@ -290,58 +293,8 @@ defmodule Liddr.Rides.DispatchWorker do
 
   defp clamp_int(_value, default, _max), do: default
 
-  defp decimal_to_float(%D{} = value), do: D.to_float(value)
-  defp decimal_to_float(value) when is_float(value), do: value
-  defp decimal_to_float(value) when is_integer(value), do: value * 1.0
-  defp decimal_to_float(_value), do: 0.0
+  defp clamp_non_negative_int(value, _default) when is_integer(value) and value >= 0, do: value
+  defp clamp_non_negative_int(_value, default), do: default
 
-  defp normalize_rows(nil), do: []
-  defp normalize_rows(rows) when is_list(rows), do: rows
-  defp normalize_rows(row), do: [row]
-
-  defp normalize_driver_ids(driver_ids) do
-    driver_ids
-    |> List.wrap()
-    |> Enum.flat_map(fn
-      driver_id when is_integer(driver_id) and driver_id > 0 ->
-        [driver_id]
-
-      %RideOffer{driver_id: driver_id} when is_integer(driver_id) and driver_id > 0 ->
-        [driver_id]
-
-      %{"driver_id" => driver_id} when is_integer(driver_id) and driver_id > 0 ->
-        [driver_id]
-
-      %{driver_id: driver_id} when is_integer(driver_id) and driver_id > 0 ->
-        [driver_id]
-
-      _ ->
-        []
-    end)
-    |> Enum.uniq()
-  end
-
-  defp publish_events(events) do
-    Enum.each(events, fn
-      {:offer_created, ride, offer} ->
-        Realtime.broadcast_offer_created(ride, offer)
-
-      {:offer_expired, ride, offer} ->
-        Realtime.broadcast_offer_expired(ride, offer)
-
-      _ ->
-        :ok
-    end)
-  end
-
-  defp record_offer_events!(ride_id, event_type, offers, occurred_at) do
-    Enum.each(offers, fn offer ->
-      payload = %{"offer_id" => offer.id, "driver_id" => offer.driver_id}
-
-      case Events.record_event(ride_id, event_type, occurred_at, payload: payload) do
-        {:ok, _event} -> :ok
-        {:error, changeset} -> Repo.rollback(changeset)
-      end
-    end)
-  end
+  defp decimal_to_float(value), do: DispatchWorkerSupport.decimal_to_float(value)
 end

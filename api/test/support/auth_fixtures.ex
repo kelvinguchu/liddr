@@ -6,6 +6,8 @@ defmodule LiddrWeb.AuthFixtures do
 
   alias Liddr.Accounts.User
   alias Liddr.Accounts.UserRole
+  alias Liddr.Auth.AuthIdentity
+  alias Liddr.Auth.Crypto
   alias Liddr.Auth.Sessions
   alias Liddr.Repo
 
@@ -49,6 +51,71 @@ defmodule LiddrWeb.AuthFixtures do
     }
   end
 
+  def issue_step_up_token!(auth_conn) do
+    challenge_conn = post(auth_conn, "/api/auth/step-up/challenges", %{})
+
+    %{"data" => %{"challenge_id" => challenge_id, "method" => method} = data} =
+      Phoenix.ConnTest.json_response(challenge_conn, 201)
+
+    code =
+      case method do
+        "totp" ->
+          secret = auth_conn.assigns[:test_totp_secret] || raise "missing test totp secret"
+          allow_totp_code_reuse!(secret)
+          Liddr.Auth.Totp.current_code(secret)
+
+        _other ->
+          Map.fetch!(data, "debug_code")
+      end
+
+    verify_conn =
+      post(auth_conn, "/api/auth/step-up/verify", %{
+        "challenge_id" => challenge_id,
+        "code" => code
+      })
+
+    %{"data" => %{"step_up_token" => token}} = Phoenix.ConnTest.json_response(verify_conn, 200)
+    token
+  end
+
+  # Fixtures can request several step-ups inside one 30-second TOTP period.
+  defp allow_totp_code_reuse!(secret) do
+    identity =
+      Repo.get_by!(AuthIdentity, provider: "totp", secret_hash: Crypto.token_hash(secret))
+
+    identity
+    |> Ecto.Changeset.change(metadata: Map.delete(identity.metadata, "totp_last_counter"))
+    |> Repo.update!()
+  end
+
+  def with_step_up!(auth_conn) do
+    step_up_token = issue_step_up_token!(auth_conn)
+    put_req_header(auth_conn, "x-step-up-token", step_up_token)
+  end
+
+  def enroll_totp!(auth_conn) do
+    step_up_token = issue_step_up_token!(auth_conn)
+    step_up_conn = put_req_header(auth_conn, "x-step-up-token", step_up_token)
+
+    setup_conn =
+      step_up_conn
+      |> post("/api/auth/mfa/totp/setup", %{})
+
+    %{"data" => %{"setup_token" => setup_token, "secret" => secret}} =
+      Phoenix.ConnTest.json_response(setup_conn, 201)
+
+    confirm_conn =
+      step_up_conn
+      |> post("/api/auth/mfa/totp/confirm", %{
+        "setup_token" => setup_token,
+        "code" => Liddr.Auth.Totp.current_code(secret)
+      })
+
+    _ = Phoenix.ConnTest.json_response(confirm_conn, 200)
+
+    %{setup_token: setup_token, secret: secret}
+  end
+
   def authenticate_rider!(conn, phone \\ unique_phone()) do
     authenticate_via_phone_otp!(conn, "rider", phone)
   end
@@ -57,8 +124,8 @@ defmodule LiddrWeb.AuthFixtures do
     authenticate_via_phone_otp!(conn, "driver", phone)
   end
 
-  def authenticate_ops!(email \\ unique_email("ops")) do
-    authenticate_with_role!("ops", email: email)
+  def authenticate_ops!(email \\ unique_email("ops"), opts \\ []) do
+    authenticate_with_role!("ops", Keyword.put_new(opts, :email, email))
   end
 
   def authenticate_with_role!(role, opts \\ []) do
@@ -71,11 +138,23 @@ defmodule LiddrWeb.AuthFixtures do
         if(role in ["ops", "admin"], do: "email_password", else: "phone_otp")
 
     session = Sessions.issue_session!(user.id, auth_method, now, %{})
+    auth_conn = bearer_conn(session.access_token)
+
+    {auth_conn, totp_secret} =
+      maybe_enroll_totp(role, auth_conn, opts)
+
+    auth_conn =
+      if is_binary(totp_secret) do
+        assign(auth_conn, :test_totp_secret, totp_secret)
+      else
+        auth_conn
+      end
 
     %{
-      auth_conn: bearer_conn(session.access_token),
+      auth_conn: auth_conn,
       user_id: user.id,
-      access_token: session.access_token
+      access_token: session.access_token,
+      totp_secret: totp_secret
     }
   end
 
@@ -122,4 +201,15 @@ defmodule LiddrWeb.AuthFixtures do
     build_conn()
     |> put_req_header("content-type", "application/json")
   end
+
+  defp maybe_enroll_totp(role, auth_conn, opts) when role in ["ops", "admin"] do
+    if Keyword.get(opts, :enroll_totp, true) do
+      %{secret: secret} = enroll_totp!(auth_conn)
+      {auth_conn, secret}
+    else
+      {auth_conn, nil}
+    end
+  end
+
+  defp maybe_enroll_totp(_role, auth_conn, _opts), do: {auth_conn, nil}
 end

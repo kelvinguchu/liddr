@@ -3,6 +3,7 @@ defmodule LiddrWeb.Plugs.AuthenticateAccessToken do
   import Phoenix.Controller, only: [json: 2]
 
   alias Liddr.Auth
+  alias LiddrWeb.RequestMeta
 
   def init(opts), do: opts
 
@@ -43,19 +44,8 @@ defmodule LiddrWeb.Plugs.AuthenticateAccessToken do
   defp parse_bearer(_), do: {:error, :auth_required}
 
   defp request_meta(conn) do
-    %{
-      ip: remote_ip_to_string(conn.remote_ip),
-      device: List.first(get_req_header(conn, "x-device-id")),
-      user_agent: List.first(get_req_header(conn, "user-agent"))
-    }
+    RequestMeta.auth(conn)
   end
-
-  defp remote_ip_to_string({a, b, c, d}), do: "#{a}.#{b}.#{c}.#{d}"
-
-  defp remote_ip_to_string({a, b, c, d, e, f, g, h}),
-    do: "#{a}:#{b}:#{c}:#{d}:#{e}:#{f}:#{g}:#{h}"
-
-  defp remote_ip_to_string(_), do: nil
 
   defp status_for(:auth_required), do: :unauthorized
   defp status_for(:invalid_access_token), do: :unauthorized

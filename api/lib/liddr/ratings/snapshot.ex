@@ -51,6 +51,19 @@ defmodule Liddr.Ratings.Snapshot do
     end
   end
 
+  def snapshot_for_user(%User{} = user, role) do
+    snapshot_for_values(user.rating_score, user.rating_count, role)
+  end
+
+  def snapshot_for_values(rating_score, rating_count, role) do
+    %{
+      rating_score: rating_score,
+      rating_count: rating_count
+    }
+    |> base_snapshot()
+    |> add_role_flag(role)
+  end
+
   defp base_snapshot(nil) do
     %{
       rating_score: nil,
@@ -68,6 +81,16 @@ defmodule Liddr.Ratings.Snapshot do
       confidence_band: confidence_band(normalized_count)
     }
   end
+
+  defp add_role_flag(base, :driver) do
+    Map.put(base, :is_new_driver, base.rating_count < DispatchPolicy.new_driver_min_rated_rides())
+  end
+
+  defp add_role_flag(base, :rider) do
+    Map.put(base, :is_new_rider, base.rating_count < DispatchPolicy.new_user_min_rated_rides())
+  end
+
+  defp add_role_flag(base, _role), do: base
 
   defp confidence_band(count) do
     cond do

@@ -1,5 +1,6 @@
 defmodule Liddr.Verification.Onboarding.DriverProfile do
   alias Liddr.Accounts.Driver
+  alias Liddr.Location.DriverHotState
   alias Liddr.Repo
   alias Liddr.Verification.Shared
 
@@ -34,8 +35,12 @@ defmodule Liddr.Verification.Onboarding.DriverProfile do
         |> Driver.create_changeset(driver_attrs)
         |> Repo.insert()
         |> case do
-          {:ok, driver} -> driver
-          {:error, changeset} -> Repo.rollback(changeset)
+          {:ok, driver} ->
+            :ok = DriverHotState.put(driver)
+            driver
+
+          {:error, changeset} ->
+            Repo.rollback(changeset)
         end
 
       %Driver{} = driver ->
@@ -59,8 +64,12 @@ defmodule Liddr.Verification.Onboarding.DriverProfile do
           |> Driver.create_changeset(update_attrs)
           |> Repo.update()
           |> case do
-            {:ok, updated_driver} -> updated_driver
-            {:error, changeset} -> Repo.rollback(changeset)
+            {:ok, updated_driver} ->
+              :ok = DriverHotState.put(updated_driver)
+              updated_driver
+
+            {:error, changeset} ->
+              Repo.rollback(changeset)
           end
         end
     end
@@ -92,8 +101,12 @@ defmodule Liddr.Verification.Onboarding.DriverProfile do
       })
       |> Repo.update()
       |> case do
-        {:ok, updated_driver} -> updated_driver
-        {:error, changeset} -> Repo.rollback(changeset)
+        {:ok, updated_driver} ->
+          :ok = DriverHotState.put(updated_driver)
+          updated_driver
+
+        {:error, changeset} ->
+          Repo.rollback(changeset)
       end
     end
   end

@@ -19,8 +19,39 @@ defmodule Liddr.Rides do
   alias Liddr.Rides.PickupWatchdogSummary
   alias Liddr.Rides.Send
   alias Liddr.Rides.Trips
+  alias Liddr.Rides.ActionRateLimiter
+  alias Liddr.Rides.ActionSecuritySignals
 
   defdelegate request_ride(rider_user_id, attrs \\ %{}), to: Requests
+
+  defdelegate enforce_rider_request_rate_limit(user_id),
+    to: ActionRateLimiter,
+    as: :enforce_rider_request
+
+  defdelegate enforce_rider_cancel_rate_limit(user_id),
+    to: ActionRateLimiter,
+    as: :enforce_rider_cancel
+
+  defdelegate enforce_driver_cancel_rate_limit(user_id),
+    to: ActionRateLimiter,
+    as: :enforce_driver_cancel
+
+  defdelegate enforce_driver_no_show_rate_limit(user_id),
+    to: ActionRateLimiter,
+    as: :enforce_driver_no_show
+
+  defdelegate enforce_message_send_rate_limit(user_id),
+    to: ActionRateLimiter,
+    as: :enforce_message_send
+
+  defdelegate enforce_message_report_rate_limit(user_id),
+    to: Liddr.Moderation,
+    as: :enforce_message_report_rate_limit
+
+  defdelegate enforce_action_security_signals(action, user_id, request_meta),
+    to: ActionSecuritySignals,
+    as: :enforce
+
   defdelegate create_quote(rider_user_id, attrs \\ %{}), to: Quotes
   defdelegate create_send_quote(rider_user_id, attrs \\ %{}), to: Send, as: :create_quote
   defdelegate request_send_delivery(rider_user_id, attrs \\ %{}), to: Send, as: :request_delivery

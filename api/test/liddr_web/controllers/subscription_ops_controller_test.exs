@@ -5,6 +5,7 @@ defmodule LiddrWeb.SubscriptionOpsControllerTest do
   alias Decimal, as: D
   alias Liddr.Accounts.User
   alias Liddr.Repo
+  alias Liddr.Security.Redaction
   alias Liddr.Subscriptions.Subscription
   alias Liddr.Subscriptions.SubscriptionPayment
   alias Liddr.VerificationFixtures
@@ -111,6 +112,21 @@ defmodule LiddrWeb.SubscriptionOpsControllerTest do
     assert driver_user_id == driver.user_id
     assert payment_id == payment.id
     assert checkout_request_id == payment.checkout_request_id
+
+    payment_row = json_response(conn, 200)["data"]["payments"] |> hd()
+    assert payment_row["phone_e164_masked"] == Redaction.mask_phone(payment.phone_e164)
+
+    assert payment_row["merchant_request_id_masked"] ==
+             Redaction.mask_reference(payment.merchant_request_id)
+
+    assert payment_row["mpesa_receipt_number_masked"] ==
+             Redaction.mask_reference(payment.mpesa_receipt_number)
+
+    assert Map.has_key?(payment_row, "transaction_id_masked")
+    refute Map.has_key?(payment_row, "phone_e164")
+    refute Map.has_key?(payment_row, "merchant_request_id")
+    refute Map.has_key?(payment_row, "mpesa_receipt_number")
+    refute Map.has_key?(payment_row, "transaction_id")
   end
 
   test "GET /api/ops/subscriptions/payments/checkout/:checkout_request_id returns payment details",
@@ -139,7 +155,9 @@ defmodule LiddrWeb.SubscriptionOpsControllerTest do
     System.put_env("SECURITY_MODE", "enforce")
     System.put_env("OPS_IP_ALLOWLIST", "203.0.113.10/32")
 
-    %{auth_conn: auth_conn} = AuthFixtures.authenticate_ops!("ops-ip-enforce@example.com")
+    %{auth_conn: auth_conn} =
+      AuthFixtures.authenticate_ops!("ops-ip-enforce@example.com", enroll_totp: false)
+
     %{driver: driver} = create_pending_subscription_payment!()
 
     conn =
@@ -151,7 +169,10 @@ defmodule LiddrWeb.SubscriptionOpsControllerTest do
   end
 
   test "POST /api/ops/mpesa/c2b/register-urls registers c2b callback urls", %{conn: _conn} do
-    %{auth_conn: auth_conn} = AuthFixtures.authenticate_ops!("ops-register-c2b@example.com")
+    auth_conn =
+      AuthFixtures.authenticate_ops!("ops-register-c2b@example.com")
+      |> Map.fetch!(:auth_conn)
+      |> AuthFixtures.with_step_up!()
 
     conn = post(auth_conn, "/api/ops/mpesa/c2b/register-urls", %{})
 
@@ -176,7 +197,11 @@ defmodule LiddrWeb.SubscriptionOpsControllerTest do
 
   test "POST /api/ops/mpesa/payments/checkout/:checkout_request_id/query-tx-status updates query payload",
        %{conn: _conn} do
-    %{auth_conn: auth_conn} = AuthFixtures.authenticate_ops!("ops-query-tx-status@example.com")
+    auth_conn =
+      AuthFixtures.authenticate_ops!("ops-query-tx-status@example.com")
+      |> Map.fetch!(:auth_conn)
+      |> AuthFixtures.with_step_up!()
+
     %{payment: payment} = create_pending_subscription_payment!()
 
     conn =
@@ -205,8 +230,10 @@ defmodule LiddrWeb.SubscriptionOpsControllerTest do
        %{conn: _conn} do
     System.delete_env("MPESA_CALLBACK_TOKEN")
 
-    %{auth_conn: auth_conn} =
+    auth_conn =
       AuthFixtures.authenticate_ops!("ops-missing-callback-token@example.com")
+      |> Map.fetch!(:auth_conn)
+      |> AuthFixtures.with_step_up!()
 
     conn = post(auth_conn, "/api/ops/mpesa/c2b/register-urls", %{})
 

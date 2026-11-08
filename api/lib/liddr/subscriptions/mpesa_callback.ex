@@ -1,4 +1,6 @@
 defmodule Liddr.Subscriptions.MpesaCallback do
+  alias Liddr.Payments.Mpesa.Client.Normalize
+
   @stk_callback_path "/api/payments/mpesa/stk-callback"
   @c2b_validation_path "/api/payments/c2b-validation"
   @c2b_confirmation_path "/api/payments/c2b-confirmation"
@@ -47,7 +49,7 @@ defmodule Liddr.Subscriptions.MpesaCallback do
 
     case custom_url do
       nil -> callback_url_for_path(@tx_status_callback_path)
-      value -> {:ok, value}
+      value -> Normalize.url(value, :result_url)
     end
   end
 
@@ -60,7 +62,7 @@ defmodule Liddr.Subscriptions.MpesaCallback do
 
     case custom_url do
       nil -> callback_url_for_path(@tx_status_callback_path)
-      value -> {:ok, value}
+      value -> Normalize.url(value, :timeout_url)
     end
   end
 
@@ -87,7 +89,10 @@ defmodule Liddr.Subscriptions.MpesaCallback do
       System.get_env("MPESA_CALLBACK_BASE_URL")
       |> normalize_text()
 
-    if is_nil(base), do: {:error, :missing_mpesa_callback_base_url}, else: {:ok, base}
+    case base do
+      nil -> {:error, :missing_mpesa_callback_base_url}
+      value -> Normalize.url(value, :callback_base_url)
+    end
   end
 
   defp fetch_callback_token do

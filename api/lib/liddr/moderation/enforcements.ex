@@ -3,6 +3,7 @@ defmodule Liddr.Moderation.Enforcements do
 
   alias Liddr.Accounts.Driver
   alias Liddr.Accounts.User
+  alias Liddr.Location.DriverHotState
   alias Liddr.Moderation.Query
   alias Liddr.Moderation.UserEnforcement
   alias Liddr.Repo
@@ -79,10 +80,11 @@ defmodule Liddr.Moderation.Enforcements do
 
       by_action_status =
         Repo.all(
-          from ue in base_query,
+          from(ue in base_query,
             group_by: [ue.action, ue.status],
             select: %{action: ue.action, status: ue.status, count: count(ue.id)},
             order_by: [asc: ue.action, asc: ue.status]
+          )
         )
 
       active_total =
@@ -93,10 +95,11 @@ defmodule Liddr.Moderation.Enforcements do
         )
 
       active_temporary_query =
-        from ue in base_query,
+        from(ue in base_query,
           where:
             ue.status == "active" and ue.action == "temporary_suspension" and
               not is_nil(ue.ends_at)
+        )
 
       due_soon_temporary_suspensions =
         Repo.aggregate(
@@ -147,6 +150,8 @@ defmodule Liddr.Moderation.Enforcements do
           |> Driver.create_changeset(attrs)
           |> Repo.update()
           |> unwrap_or_rollback()
+
+        :ok = DriverHotState.put(updated_driver)
 
         %DriverActivityEvent{}
         |> DriverActivityEvent.create_changeset(%{

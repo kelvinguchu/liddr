@@ -39,5 +39,6 @@ defmodule LiddrWeb.DriverLocationControllerTest do
     persisted = Repo.get!(DriverLocation, user_id)
     assert is_binary(persisted.s2_cell_token)
     assert persisted.s2_cell_token != ""
+    assert persisted.s2_cell_token =~ ~r/\A[0-9a-f]{1,16}\z/
   end
 end

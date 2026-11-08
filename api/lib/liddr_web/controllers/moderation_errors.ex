@@ -36,6 +36,15 @@ defmodule LiddrWeb.ModerationErrors do
         "Report cannot be triaged in its current state"
       )
 
+  def render(conn, :report_triage_rate_limited),
+    do:
+      error_response(
+        conn,
+        :too_many_requests,
+        "REPORT_TRIAGE_RATE_LIMITED",
+        "Too many moderation triage actions in the current window"
+      )
+
   def render(conn, :report_not_reviewable),
     do:
       error_response(
@@ -43,6 +52,15 @@ defmodule LiddrWeb.ModerationErrors do
         :unprocessable_entity,
         "REPORT_NOT_REVIEWABLE",
         "Report cannot be reviewed in its current state"
+      )
+
+  def render(conn, :report_review_rate_limited),
+    do:
+      error_response(
+        conn,
+        :too_many_requests,
+        "REPORT_REVIEW_RATE_LIMITED",
+        "Too many moderation review actions in the current window"
       )
 
   def render(conn, :missing_enforcement_ends_at),

@@ -2,6 +2,7 @@ defmodule Liddr.Subscriptions.TxStatusCallback do
   import Ecto.Query
 
   alias Liddr.Payments.Mpesa.Parser
+  alias Liddr.Payments.Mpesa.Sanitizer
   alias Liddr.Repo
   alias Liddr.Subscriptions.Activation
   alias Liddr.Subscriptions.SubscriptionPayment
@@ -85,7 +86,7 @@ defmodule Liddr.Subscriptions.TxStatusCallback do
       "originator_conversation_id" =>
         parsed.originator_conversation_id || payment.originator_conversation_id,
       "callback_received_at" => now,
-      "callback_payload" => payload,
+      "callback_payload" => Sanitizer.payload(payload),
       "paid_at" =>
         if(payment_status == "success", do: payment.paid_at || now, else: payment.paid_at)
     })

@@ -3,6 +3,7 @@ defmodule Liddr.Subscriptions.StkCallback do
 
   alias Decimal, as: D
   alias Liddr.Payments.Mpesa.Parser
+  alias Liddr.Payments.Mpesa.Sanitizer
   alias Liddr.Repo
   alias Liddr.Subscriptions.Activation
   alias Liddr.Subscriptions.SubscriptionPayment
@@ -109,7 +110,7 @@ defmodule Liddr.Subscriptions.StkCallback do
         "result_code" => parsed.result_code,
         "result_desc" => parsed.result_desc,
         "callback_received_at" => now,
-        "callback_payload" => payload,
+        "callback_payload" => Sanitizer.payload(payload),
         "phone_e164" => parsed.phone_e164 || payment.phone_e164,
         "merchant_request_id" => parsed.merchant_request_id || payment.merchant_request_id,
         "checkout_request_id" => parsed.checkout_request_id || payment.checkout_request_id,

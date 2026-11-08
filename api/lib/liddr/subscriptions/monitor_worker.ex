@@ -5,6 +5,7 @@ defmodule Liddr.Subscriptions.MonitorWorker do
 
   import Ecto.Query
 
+  alias Liddr.Location.DriverHotState
   alias Liddr.Repo
 
   @impl Oban.Worker
@@ -43,10 +44,14 @@ defmodule Liddr.Subscriptions.MonitorWorker do
           )
       )
 
+    driver_ids_to_invalidate = Repo.all(from(d in inactive_drivers_query, select: d.user_id))
+
     {_driver_count, _updated_driver_rows} =
       Repo.update_all(inactive_drivers_query,
         set: [subscription_status: "inactive", is_available: false, updated_at: now]
       )
+
+    :ok = DriverHotState.invalidate_many(driver_ids_to_invalidate)
 
     :ok
   end

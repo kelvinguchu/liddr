@@ -24,6 +24,12 @@ defmodule LiddrWeb.RideControllerErrors do
       {:unprocessable_entity, "INVALID_QUOTE_ID", "quote_id must be a positive integer"},
     ride_quote_not_found: {:not_found, "RIDE_QUOTE_NOT_FOUND", "Ride quote was not found"},
     ride_quote_expired: {:unprocessable_entity, "RIDE_QUOTE_EXPIRED", "Ride quote has expired"},
+    ride_request_rate_limited:
+      {:too_many_requests, "RIDE_REQUEST_RATE_LIMITED",
+       "Too many ride requests in the current window"},
+    ride_action_secondary_rate_limited:
+      {:too_many_requests, "RIDE_ACTION_SECURITY_RATE_LIMITED",
+       "Request pattern is temporarily restricted for security review"},
     ride_quote_vehicle_category_mismatch:
       {:unprocessable_entity, "RIDE_QUOTE_VEHICLE_CATEGORY_MISMATCH",
        "Ride quote vehicle category does not match request"},
@@ -115,6 +121,15 @@ defmodule LiddrWeb.RideControllerErrors do
     ride_not_no_show_eligible:
       {:unprocessable_entity, "RIDE_NOT_NO_SHOW_ELIGIBLE",
        "Ride cannot be marked as no-show from current status"},
+    rider_cancel_rate_limited:
+      {:too_many_requests, "RIDER_CANCEL_RATE_LIMITED",
+       "Too many rider cancellation attempts in the current window"},
+    driver_cancel_rate_limited:
+      {:too_many_requests, "DRIVER_CANCEL_RATE_LIMITED",
+       "Too many driver cancellation attempts in the current window"},
+    driver_no_show_rate_limited:
+      {:too_many_requests, "DRIVER_NO_SHOW_RATE_LIMITED",
+       "Too many no-show actions in the current window"},
     ride_no_show_wait_not_elapsed:
       {:unprocessable_entity, "RIDE_NO_SHOW_WAIT_NOT_ELAPSED",
        "Driver must wait the configured no-show window after arrival"},

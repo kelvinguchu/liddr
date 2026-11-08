@@ -108,6 +108,33 @@ defmodule LiddrWeb.ReportControllerTest do
     assert %{"error" => %{"code" => "REPORTED_DRIVER_REQUIRED"}} = json_response(conn, 422)
   end
 
+  test "POST /api/reports enforces per-user creation rate limit", %{conn: conn} do
+    %{auth_conn: auth_conn} = AuthFixtures.authenticate_rider!(conn, "0710000099")
+    reported = Repo.insert!(%User{phone: "254700020999"})
+    insert_category!("unsafe_driving_rate_limited", "both", true, 11, 4)
+
+    for seq <- 1..12 do
+      response =
+        post(auth_conn, "/api/reports", %{
+          "reported_user_id" => reported.id,
+          "category_slug" => "unsafe_driving_rate_limited",
+          "description" => "Rate limit report #{seq}"
+        })
+
+      assert %{"data" => _report} = json_response(response, 201)
+    end
+
+    blocked_response =
+      post(auth_conn, "/api/reports", %{
+        "reported_user_id" => reported.id,
+        "category_slug" => "unsafe_driving_rate_limited",
+        "description" => "Should be blocked by report rate limit"
+      })
+
+    assert %{"error" => %{"code" => "REPORT_CREATE_RATE_LIMITED"}} =
+             json_response(blocked_response, 429)
+  end
+
   defp insert_category!(slug, applies_to, is_active, display_order, severity \\ 3) do
     Repo.insert!(%ReportCategory{
       slug: slug,

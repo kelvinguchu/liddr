@@ -136,6 +136,15 @@ defmodule LiddrWeb.SubscriptionController do
         "Missing required M-Pesa field: #{key}"
       )
 
+  defp render_error(conn, {:invalid_mpesa_field, key}),
+    do:
+      error_response(
+        conn,
+        :unprocessable_entity,
+        "INVALID_MPESA_FIELD",
+        "Invalid M-Pesa field: #{key}"
+      )
+
   defp render_error(conn, :invalid_mpesa_amount),
     do:
       error_response(
@@ -182,6 +191,33 @@ defmodule LiddrWeb.SubscriptionController do
       )
 
   defp render_error(conn, :mpesa_stk_request_failed),
+    do:
+      error_response(
+        conn,
+        :service_unavailable,
+        "MPESA_STK_REQUEST_FAILED",
+        "Unable to initiate M-Pesa STK push"
+      )
+
+  defp render_error(conn, {:mpesa_http_error, :stk_push, _status, _body}),
+    do:
+      error_response(
+        conn,
+        :service_unavailable,
+        "MPESA_STK_REQUEST_FAILED",
+        "Unable to initiate M-Pesa STK push"
+      )
+
+  defp render_error(conn, {:mpesa_invalid_response, :stk_push, _status, _body}),
+    do:
+      error_response(
+        conn,
+        :service_unavailable,
+        "MPESA_STK_REQUEST_FAILED",
+        "Unable to initiate M-Pesa STK push"
+      )
+
+  defp render_error(conn, {:mpesa_transport_error, :stk_push, _reason}),
     do:
       error_response(
         conn,

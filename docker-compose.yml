@@ -12,7 +12,6 @@ services:
       PHX_SERVER: "true"
       PORT: "4000"
       PHX_HOST: localhost
-      POOL_SIZE: "10"
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/liddr-488911-11e0721e169d.json
       MALWARE_SCAN_ENABLED: "true"
       CLAMAV_HOST: clamav

@@ -54,7 +54,6 @@ defmodule Liddr.MixProject do
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
       {:oban, "~> 2.19"},
-      {:resend, "~> 0.4.0"},
       {:redix, "~> 1.5"}
     ]
   end

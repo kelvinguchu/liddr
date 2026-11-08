@@ -27,10 +27,10 @@ defmodule Liddr.Subscriptions.StkCallback do
           ensure_callback_integrity!(payment, parsed)
 
           updated_payment =
-            if payment.status in @final_payment_statuses do
-              payment
-            else
+            if apply_callback?(payment, parsed) do
               apply_callback_to_payment!(payment, parsed, payload, now)
+            else
+              payment
             end
 
           if updated_payment.status == "success" do
@@ -44,6 +44,13 @@ defmodule Liddr.Subscriptions.StkCallback do
       |> unwrap_transaction_result()
     end
   end
+
+  defp apply_callback?(%{status: status}, _parsed) when status not in @final_payment_statuses,
+    do: true
+
+  defp apply_callback?(%{status: "success"}, _parsed), do: false
+  defp apply_callback?(_payment, %{result_code: 0}), do: true
+  defp apply_callback?(_payment, _parsed), do: false
 
   defp find_payment_for_callback!(parsed) do
     checkout_request_id = parsed.checkout_request_id

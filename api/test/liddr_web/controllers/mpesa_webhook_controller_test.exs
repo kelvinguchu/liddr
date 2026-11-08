@@ -85,6 +85,57 @@ defmodule LiddrWeb.MpesaWebhookControllerTest do
              Redaction.mask_reference(payment.merchant_request_id)
   end
 
+  for previous_status <- ~w(timeout failed cancelled) do
+    test "POST /api/payments/mpesa/stk-callback applies a late success after #{previous_status}",
+         %{conn: conn} do
+      %{driver: driver, subscription: subscription, payment: payment} =
+        create_pending_subscription_payment!()
+
+      payment =
+        payment
+        |> Ecto.Changeset.change(status: unquote(previous_status))
+        |> Repo.update!()
+
+      payload = stk_callback_payload(payment.checkout_request_id, payment.merchant_request_id, 0)
+
+      assert %{"ResultCode" => 0} =
+               conn
+               |> post("/api/payments/mpesa/stk-callback?token=#{@callback_token}", payload)
+               |> json_response(200)
+
+      updated_payment = Repo.get!(SubscriptionPayment, payment.id)
+
+      assert updated_payment.status == "success"
+      assert updated_payment.mpesa_receipt_number == "QWERTY1234"
+      assert not is_nil(updated_payment.paid_at)
+      assert Repo.get!(Subscription, subscription.id).status == "active"
+      assert Repo.get!(Liddr.Accounts.Driver, driver.user_id).subscription_status == "active"
+    end
+  end
+
+  for previous_status <- ~w(timeout success) do
+    test "POST /api/payments/mpesa/stk-callback keeps #{previous_status} on a late failure", %{
+      conn: conn
+    } do
+      %{payment: payment} = create_pending_subscription_payment!()
+
+      payment =
+        payment
+        |> Ecto.Changeset.change(status: unquote(previous_status))
+        |> Repo.update!()
+
+      payload =
+        stk_callback_payload(payment.checkout_request_id, payment.merchant_request_id, 1032)
+
+      assert %{"ResultCode" => 0} =
+               conn
+               |> post("/api/payments/mpesa/stk-callback?token=#{@callback_token}", payload)
+               |> json_response(200)
+
+      assert Repo.get!(SubscriptionPayment, payment.id).status == unquote(previous_status)
+    end
+  end
+
   test "POST /api/payments/mpesa/stk-callback is idempotent for duplicate callbacks", %{
     conn: conn
   } do

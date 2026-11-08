@@ -2,7 +2,6 @@ package rides
 
 import (
 	"context"
-	"fmt"
 	"slices"
 	"time"
 
@@ -102,9 +101,8 @@ func (s *Service) MarkNoShow(ctx context.Context, rideID, driverID uuid.UUID) (R
 }
 
 func cancelLocked(ctx context.Context, q *store.Queries, ride store.Ride, actorID uuid.UUID, side, reason string, now time.Time) error {
-	err := q.WithdrawOpenOffersForRide(ctx, store.WithdrawOpenOffersForRideParams{Now: new(now), RideID: ride.ID})
-	if err != nil {
-		return fmt.Errorf("withdraw offers: %w", err)
+	if err := WithdrawOffers(ctx, q, ride.ID, now); err != nil {
+		return err
 	}
 	return Transition(ctx, q, Change{
 		RideID: ride.ID,

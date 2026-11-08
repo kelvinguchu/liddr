@@ -53,10 +53,11 @@ ORDER BY r.next_dispatch_at
 LIMIT 1
 FOR UPDATE OF r SKIP LOCKED;
 
--- name: ExpireOffersForRide :exec
+-- name: ExpireOffersForRide :many
 UPDATE ride_offers
 SET status = 'expired', responded_at = sqlc.arg(now)
-WHERE ride_id = sqlc.arg(ride_id) AND status = 'offered' AND expires_at <= sqlc.arg(now);
+WHERE ride_id = sqlc.arg(ride_id) AND status = 'offered' AND expires_at <= sqlc.arg(now)
+RETURNING id, driver_id;
 
 -- name: EarliestOpenOfferExpiry :one
 SELECT expires_at FROM ride_offers

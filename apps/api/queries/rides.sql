@@ -93,7 +93,7 @@ SELECT * FROM rides WHERE id = sqlc.arg(id);
 -- name: GetRideForUpdate :one
 SELECT * FROM rides WHERE id = sqlc.arg(id) FOR UPDATE;
 
--- name: SetRideStatus :exec
+-- name: SetRideStatus :one
 UPDATE rides
 SET status = sqlc.arg(status),
     driver_id = COALESCE(sqlc.narg(driver_id), driver_id),
@@ -109,12 +109,14 @@ SET status = sqlc.arg(status),
     payment_mode = COALESCE(sqlc.narg(payment_mode), payment_mode),
     arrival_distance_m = COALESCE(sqlc.narg(arrival_distance_m), arrival_distance_m),
     completion_distance_m = COALESCE(sqlc.narg(completion_distance_m), completion_distance_m)
-WHERE id = sqlc.arg(id);
+WHERE id = sqlc.arg(id)
+RETURNING rider_id, driver_id;
 
--- name: WithdrawOpenOffersForRide :exec
+-- name: WithdrawOpenOffersForRide :many
 UPDATE ride_offers
 SET status = 'withdrawn', responded_at = sqlc.arg(now)
-WHERE ride_id = sqlc.arg(ride_id) AND status = 'offered';
+WHERE ride_id = sqlc.arg(ride_id) AND status = 'offered'
+RETURNING id, driver_id;
 
 -- name: GetDriverLocation :one
 SELECT lat, lng, captured_at FROM driver_locations WHERE driver_id = sqlc.arg(driver_id);

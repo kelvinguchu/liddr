@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/kelvinguchu/liddr/apps/api/internal/events"
 	"github.com/kelvinguchu/liddr/apps/api/internal/geo"
 	"github.com/kelvinguchu/liddr/apps/api/internal/rides"
 	"github.com/kelvinguchu/liddr/apps/api/internal/store"
@@ -68,8 +69,14 @@ func (s *Service) dispatchOne(ctx context.Context) (bool, error) {
 		}
 		worked = true
 
-		if err := q.ExpireOffersForRide(ctx, store.ExpireOffersForRideParams{Now: new(now), RideID: ride.ID}); err != nil {
+		expired, err := q.ExpireOffersForRide(ctx, store.ExpireOffersForRideParams{Now: new(now), RideID: ride.ID})
+		if err != nil {
 			return fmt.Errorf("expire offers: %w", err)
+		}
+		for _, offer := range expired {
+			if err := events.Publish(ctx, q, events.Event{Type: events.TypeOfferClosed, OfferID: new(offer.ID)}, offer.DriverID); err != nil {
+				return err
+			}
 		}
 		earliest, err := q.EarliestOpenOfferExpiry(ctx, ride.ID)
 		if err == nil {
@@ -131,13 +138,20 @@ func sendWave(ctx context.Context, q *store.Queries, ride store.ClaimDueRideRow,
 			break
 		}
 		// A driver who took another offer a moment ago conflicts and is skipped.
+		offerID := uuid.New()
 		inserted, err := q.InsertOffer(ctx, store.InsertOfferParams{
-			ID: uuid.New(), RideID: ride.ID, DriverID: c.driverID, DistanceM: c.distanceM, OfferedAt: now, ExpiresAt: expiresAt,
+			ID: offerID, RideID: ride.ID, DriverID: c.driverID, DistanceM: c.distanceM, OfferedAt: now, ExpiresAt: expiresAt,
 		})
 		if err != nil {
 			return fmt.Errorf("insert offer: %w", err)
 		}
-		sent += int(inserted)
+		if inserted == 0 {
+			continue
+		}
+		if err := events.Publish(ctx, q, events.Event{Type: events.TypeOfferCreated, OfferID: new(offerID), RideID: new(ride.ID)}, c.driverID); err != nil {
+			return err
+		}
+		sent++
 	}
 
 	if sent == 0 {

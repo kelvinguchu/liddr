@@ -23,6 +23,7 @@ import (
 	"github.com/kelvinguchu/liddr/apps/api/internal/httpapi"
 	"github.com/kelvinguchu/liddr/apps/api/internal/maps"
 	"github.com/kelvinguchu/liddr/apps/api/internal/payments"
+	"github.com/kelvinguchu/liddr/apps/api/internal/realtime"
 	"github.com/kelvinguchu/liddr/apps/api/internal/rides"
 	"github.com/kelvinguchu/liddr/apps/api/internal/sms"
 	"github.com/kelvinguchu/liddr/apps/api/internal/store"
@@ -114,6 +115,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 
 	dispatcher := dispatch.NewService(dispatch.Config{Pool: pool, Now: time.Now})
 	billing := newSubscriptions(cfg, pool, logger)
+	hub := realtime.NewHub(logger)
 	api := httpapi.New(httpapi.Deps{
 		Logger:     logger,
 		Database:   pool,
@@ -137,6 +139,10 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		}),
 		Dispatch:         dispatcher,
 		Subscriptions:    billing,
+		Realtime:         hub,
+		RealtimeBase:     ctx,
+		RealtimeOrigins:  cfg.RealtimeOrigins,
+		RealtimeJitter:   cfg.DrainDelay,
 		MpesaAllowedIPs:  cfg.Mpesa.AllowedIPs,
 		TrustedProxyHops: cfg.TrustedProxyHops,
 	})
@@ -162,6 +168,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	var workers sync.WaitGroup
 	workers.Go(func() { dispatcher.Run(workerCtx, logger) })
 	workers.Go(func() { billing.Run(workerCtx, logger) })
+	workers.Go(func() { hub.Listen(workerCtx, pool) })
 	defer workers.Wait()
 	defer stopWorkers()
 
@@ -175,7 +182,9 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		return fmt.Errorf("serve http: %w", err)
 	case <-ctx.Done():
 	}
-	return shutdown(ctx, cfg, logger, api, server, served)
+	err = shutdown(ctx, cfg, logger, api, server, served)
+	hub.Wait()
+	return err
 }
 
 func shutdown(ctx context.Context, cfg config.Config, logger *slog.Logger, api *httpapi.API, server *http.Server, served <-chan error) error {

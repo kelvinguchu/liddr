@@ -444,7 +444,7 @@ func (q *Queries) RiderHasActiveRide(ctx context.Context, riderID uuid.UUID) (bo
 	return exists, err
 }
 
-const setRideStatus = `-- name: SetRideStatus :exec
+const setRideStatus = `-- name: SetRideStatus :one
 UPDATE rides
 SET status = $1,
     driver_id = COALESCE($2, driver_id),
@@ -461,6 +461,7 @@ SET status = $1,
     arrival_distance_m = COALESCE($12, arrival_distance_m),
     completion_distance_m = COALESCE($13, completion_distance_m)
 WHERE id = $14
+RETURNING rider_id, driver_id
 `
 
 type SetRideStatusParams struct {
@@ -480,8 +481,13 @@ type SetRideStatusParams struct {
 	ID                  uuid.UUID
 }
 
-func (q *Queries) SetRideStatus(ctx context.Context, arg SetRideStatusParams) error {
-	_, err := q.db.Exec(ctx, setRideStatus,
+type SetRideStatusRow struct {
+	RiderID  uuid.UUID
+	DriverID *uuid.UUID
+}
+
+func (q *Queries) SetRideStatus(ctx context.Context, arg SetRideStatusParams) (SetRideStatusRow, error) {
+	row := q.db.QueryRow(ctx, setRideStatus,
 		arg.Status,
 		arg.DriverID,
 		arg.AcceptedAt,
@@ -497,13 +503,16 @@ func (q *Queries) SetRideStatus(ctx context.Context, arg SetRideStatusParams) er
 		arg.CompletionDistanceM,
 		arg.ID,
 	)
-	return err
+	var i SetRideStatusRow
+	err := row.Scan(&i.RiderID, &i.DriverID)
+	return i, err
 }
 
-const withdrawOpenOffersForRide = `-- name: WithdrawOpenOffersForRide :exec
+const withdrawOpenOffersForRide = `-- name: WithdrawOpenOffersForRide :many
 UPDATE ride_offers
 SET status = 'withdrawn', responded_at = $1
 WHERE ride_id = $2 AND status = 'offered'
+RETURNING id, driver_id
 `
 
 type WithdrawOpenOffersForRideParams struct {
@@ -511,7 +520,27 @@ type WithdrawOpenOffersForRideParams struct {
 	RideID uuid.UUID
 }
 
-func (q *Queries) WithdrawOpenOffersForRide(ctx context.Context, arg WithdrawOpenOffersForRideParams) error {
-	_, err := q.db.Exec(ctx, withdrawOpenOffersForRide, arg.Now, arg.RideID)
-	return err
+type WithdrawOpenOffersForRideRow struct {
+	ID       uuid.UUID
+	DriverID uuid.UUID
+}
+
+func (q *Queries) WithdrawOpenOffersForRide(ctx context.Context, arg WithdrawOpenOffersForRideParams) ([]WithdrawOpenOffersForRideRow, error) {
+	rows, err := q.db.Query(ctx, withdrawOpenOffersForRide, arg.Now, arg.RideID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []WithdrawOpenOffersForRideRow{}
+	for rows.Next() {
+		var i WithdrawOpenOffersForRideRow
+		if err := rows.Scan(&i.ID, &i.DriverID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

@@ -624,6 +624,22 @@ paths:
         default:
           $ref: "#/components/responses/Problem"
 
+  /v1/realtime:
+    get:
+      operationId: openRealtime
+      summary: Open a WebSocket of live updates for the signed-in account
+      description: |
+        The server sends JSON text frames and accepts none. Each has a `type`:
+        `ride.status` (`ride_id`, `status`), `offer.created` (`offer_id`, `ride_id`),
+        `offer.closed` (`offer_id`), `driver.location` (`ride_id`, `lat`, `lng`) and
+        `resync`, which means updates may have been missed and state should be fetched.
+        The socket closes when the access token expires, so reconnect after refreshing.
+      responses:
+        "101":
+          description: Switching to the WebSocket protocol.
+        default:
+          $ref: "#/components/responses/Problem"
+
 components:
   parameters:
     CallbackToken:

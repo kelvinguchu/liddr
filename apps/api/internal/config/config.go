@@ -65,6 +65,7 @@ type Config struct {
 	GoogleMapsKey    Secret
 	GoogleRoutesURL  string
 	Mpesa            Mpesa
+	RealtimeOrigins  []string
 }
 
 // LoadDatabaseURL returns the only setting that migrations need.
@@ -101,6 +102,15 @@ func Load(getenv func(string) string) (Config, error) {
 			Password: Secret(required("HOSTPINNACLE_PASSWORD")),
 			SenderID: required("HOSTPINNACLE_SENDER_ID"),
 		},
+	}
+	for origin := range strings.SplitSeq(getenv("REALTIME_ALLOWED_ORIGINS"), ",") {
+		if origin = strings.TrimSpace(origin); origin != "" {
+			if origin == "*" {
+				errs = append(errs, errors.New("REALTIME_ALLOWED_ORIGINS must list exact origins"))
+				continue
+			}
+			cfg.RealtimeOrigins = append(cfg.RealtimeOrigins, origin)
+		}
 	}
 	cfg.Mpesa = Mpesa{
 		BaseURL:         withDefault(getenv("MPESA_BASE_URL"), mpesaBaseURL(getenv("MPESA_ENV"))),

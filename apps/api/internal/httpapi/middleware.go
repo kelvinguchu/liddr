@@ -1,11 +1,13 @@
 package httpapi
 
 import (
+	"bufio"
 	"context"
 	"crypto/rand"
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/netip"
 	"runtime/debug"
@@ -118,6 +120,15 @@ func (s *statusRecorder) WriteHeader(status int) {
 func (s *statusRecorder) Write(p []byte) (int, error) {
 	s.wroteHeader = true
 	return s.ResponseWriter.Write(p)
+}
+
+// Hijack lets a WebSocket take over the connection.
+func (s *statusRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	conn, rw, err := http.NewResponseController(s.ResponseWriter).Hijack()
+	if err != nil {
+		return nil, nil, fmt.Errorf("hijack connection: %w", err)
+	}
+	return conn, rw, nil
 }
 
 // Unwrap lets http.ResponseController reach the underlying writer.

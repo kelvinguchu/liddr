@@ -79,10 +79,11 @@ func (q *Queries) EarliestOpenOfferExpiry(ctx context.Context, rideID uuid.UUID)
 	return expires_at, err
 }
 
-const expireOffersForRide = `-- name: ExpireOffersForRide :exec
+const expireOffersForRide = `-- name: ExpireOffersForRide :many
 UPDATE ride_offers
 SET status = 'expired', responded_at = $1
 WHERE ride_id = $2 AND status = 'offered' AND expires_at <= $1
+RETURNING id, driver_id
 `
 
 type ExpireOffersForRideParams struct {
@@ -90,9 +91,29 @@ type ExpireOffersForRideParams struct {
 	RideID uuid.UUID
 }
 
-func (q *Queries) ExpireOffersForRide(ctx context.Context, arg ExpireOffersForRideParams) error {
-	_, err := q.db.Exec(ctx, expireOffersForRide, arg.Now, arg.RideID)
-	return err
+type ExpireOffersForRideRow struct {
+	ID       uuid.UUID
+	DriverID uuid.UUID
+}
+
+func (q *Queries) ExpireOffersForRide(ctx context.Context, arg ExpireOffersForRideParams) ([]ExpireOffersForRideRow, error) {
+	rows, err := q.db.Query(ctx, expireOffersForRide, arg.Now, arg.RideID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ExpireOffersForRideRow{}
+	for rows.Next() {
+		var i ExpireOffersForRideRow
+		if err := rows.Scan(&i.ID, &i.DriverID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getDriver = `-- name: GetDriver :one

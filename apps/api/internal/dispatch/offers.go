@@ -101,8 +101,8 @@ func (s *Service) Accept(ctx context.Context, driverID, offerID uuid.UUID) (uuid
 		if err := q.SetOfferStatus(ctx, store.SetOfferStatusParams{Status: "accepted", Now: new(now), ID: offerID}); err != nil {
 			return fmt.Errorf("accept offer: %w", err)
 		}
-		if err := q.WithdrawOpenOffersForRide(ctx, store.WithdrawOpenOffersForRideParams{Now: new(now), RideID: rideID}); err != nil {
-			return fmt.Errorf("withdraw offers: %w", err)
+		if err := rides.WithdrawOffers(ctx, q, rideID, now); err != nil {
+			return err
 		}
 		return rides.Transition(ctx, q, rides.Change{
 			RideID: rideID,

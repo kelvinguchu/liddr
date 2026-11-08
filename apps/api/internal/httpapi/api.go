@@ -15,6 +15,7 @@ import (
 
 	"github.com/kelvinguchu/liddr/apps/api/internal/auth"
 	"github.com/kelvinguchu/liddr/apps/api/internal/dispatch"
+	"github.com/kelvinguchu/liddr/apps/api/internal/realtime"
 	"github.com/kelvinguchu/liddr/apps/api/internal/rides"
 	"github.com/kelvinguchu/liddr/apps/api/internal/subscriptions"
 )
@@ -36,6 +37,13 @@ type Deps struct {
 	Dispatch   *dispatch.Service
 
 	Subscriptions *subscriptions.Service
+
+	// Realtime and RealtimeOrigins serve live updates. RealtimeBase bounds each
+	// socket's life, because a socket outlives the HTTP request that opened it.
+	Realtime        *realtime.Hub
+	RealtimeBase    context.Context //nolint:containedctx // Server lifetime, not a request.
+	RealtimeOrigins []string
+	RealtimeJitter  time.Duration
 
 	// MpesaAllowedIPs restricts callbacks when it is not empty.
 	MpesaAllowedIPs []netip.Addr
@@ -65,6 +73,7 @@ func New(deps Deps) *API {
 		Middlewares:      []MiddlewareFunc{a.authenticate},
 		ErrorHandlerFunc: a.requestError,
 	})
+	mux.Handle("GET /v1/realtime", a.protect(http.HandlerFunc(a.openRealtime)))
 	a.handler = a.withMiddleware(mux)
 	return a
 }

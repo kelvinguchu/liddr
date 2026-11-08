@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/kelvinguchu/liddr/apps/api/internal/events"
 	"github.com/kelvinguchu/liddr/apps/api/internal/geo"
 	"github.com/kelvinguchu/liddr/apps/api/internal/rides"
 	"github.com/kelvinguchu/liddr/apps/api/internal/store"
@@ -153,6 +154,19 @@ func checkEligible(driver store.GetDriverForUpdateRow) error {
 	return nil
 }
 
+// shareLocation sends the position only to the rider of the driver's active
+// ride, so the feed stops the moment the rider is dropped off or cancels.
+func (s *Service) shareLocation(ctx context.Context, driverID uuid.UUID, point geo.Point) error {
+	ride, err := s.queries.GetActiveRideForDriver(ctx, new(driverID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("find active ride: %w", err)
+	}
+	return events.Publish(ctx, s.queries, events.Event{Type: events.TypeDriverLocation, RideID: new(ride.ID), Lat: new(point.Lat), Lng: new(point.Lng)}, ride.RiderID)
+}
+
 // UpdateLocation stores the driver's position using a server timestamp. Location
 // is collected only while online or on a ride. Excess pings are dropped silently.
 func (s *Service) UpdateLocation(ctx context.Context, driverID uuid.UUID, point geo.Point) error {
@@ -167,7 +181,7 @@ func (s *Service) UpdateLocation(ctx context.Context, driverID uuid.UUID, point 
 		return fmt.Errorf("save driver location: %w", err)
 	}
 	if written > 0 {
-		return nil
+		return s.shareLocation(ctx, driverID, point)
 	}
 
 	// Nothing written is either an excess ping or a driver who should not be

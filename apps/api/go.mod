@@ -3,6 +3,7 @@ module github.com/kelvinguchu/liddr/apps/api
 go 1.27.3
 
 require (
+	github.com/coder/websocket v1.8.15
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.12.0

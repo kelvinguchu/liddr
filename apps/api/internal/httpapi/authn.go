@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/kelvinguchu/liddr/apps/api/internal/auth"
+	"github.com/kelvinguchu/liddr/apps/api/internal/realtime"
 )
 
 type principalKey struct{}
@@ -61,6 +62,32 @@ func (a *API) authenticate(next http.Handler) http.Handler {
 			return
 		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), principalKey{}, p)))
+	})
+}
+
+// protect applies the same rules as generated routes to a hand-registered one.
+func (a *API) protect(next http.Handler) http.Handler {
+	guarded := a.authenticate(next)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		guarded.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), BearerAuthScopes, []string{})))
+	})
+}
+
+func (a *API) openRealtime(w http.ResponseWriter, r *http.Request) {
+	p, ok := principal(r.Context())
+	if !ok {
+		a.responseError(w, r, errNoPrincipal)
+		return
+	}
+	token := bearerToken(r)
+	a.deps.Realtime.Serve(a.deps.RealtimeBase, w, r, realtime.Options{
+		UserID:         p.UserID,
+		OriginPatterns: a.deps.RealtimeOrigins,
+		ShutdownJitter: a.deps.RealtimeJitter,
+		StillValid: func(ctx context.Context) bool {
+			_, err := a.deps.Auth.Authenticate(ctx, token)
+			return err == nil
+		},
 	})
 }
 

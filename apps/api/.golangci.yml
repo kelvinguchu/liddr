@@ -24,6 +24,7 @@ linters:
           files:
             - "**/internal/auth/**"
             - "**/internal/dispatch/**"
+            - "**/internal/events/**"
             - "**/internal/geo/**"
             - "**/internal/maps/**"
             - "**/internal/payments/**"

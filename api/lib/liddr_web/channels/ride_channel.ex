@@ -2,7 +2,12 @@ defmodule LiddrWeb.RideChannel do
   use LiddrWeb, :channel
 
   alias Liddr.Rides
+  alias Liddr.Rides.DriverTracking
   alias LiddrWeb.RideSerializer
+
+  @driver_location_event DriverTracking.event()
+
+  intercept [@driver_location_event]
 
   @impl true
   def join("ride:" <> ride_id, payload, socket) do
@@ -16,7 +21,8 @@ defmodule LiddrWeb.RideChannel do
          ride_id: ride.id,
          ride: RideSerializer.ride_payload(ride),
          events: Enum.map(events, &RideSerializer.event_payload/1),
-         next_since: next_since
+         next_since: next_since,
+         driver_location: DriverTracking.latest_for_user(ride, user_id)
        }, assign(socket, :ride_id, ride.id)}
     else
       _ -> {:error, %{reason: "forbidden"}}
@@ -49,6 +55,15 @@ defmodule LiddrWeb.RideChannel do
   @impl true
   def handle_in(_event, _payload, socket),
     do: {:reply, {:error, %{reason: "unsupported"}}, socket}
+
+  @impl true
+  def handle_out(@driver_location_event, %{visible_user_ids: user_ids} = payload, socket) do
+    if socket.assigns.current_user.id in user_ids do
+      push(socket, @driver_location_event, Map.delete(payload, :visible_user_ids))
+    end
+
+    {:noreply, socket}
+  end
 
   defp normalize_join_params(%{} = payload) do
     %{

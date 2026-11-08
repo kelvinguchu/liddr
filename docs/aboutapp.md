@@ -1073,9 +1073,9 @@ WebSocket connection is established at:
 ws://localhost:4000/socket/websocket?token=<jwt_token>
 
 Channel	Who Joins	Events Sent	Events Received
-ride:{ride_id}	Rider + Driver	ride lifecycle + timeline events	timeline.sync
+ride:{ride_id}	Rider + Driver	ride lifecycle + timeline events + driver_location_updated	timeline.sync
 driver:{driver_id}	Driver only	offer + assignment + lifecycle events	none (unsupported)
-Driver location updates are sent via HTTP endpoint POST /drivers/me/location, not via a dedicated location socket topic.
+Drivers send location updates through HTTP POST /drivers/me/location. While a ride is active, the server pushes each update to the ride topic as driver_location_updated. Shared-ride members stop receiving updates once they are dropped off, cancelled, or marked no-show. These updates are not added to the ride timeline; on join or reconnect, read driver_location from the join reply or GET /rides/:ride_id/current-status.
 
 27.11 WebSocket Message Shapes
 // Client requests missing timeline events after reconnect
@@ -1316,7 +1316,7 @@ Use this as the authoritative view for backend behavior until the main body is f
 ### A) Geographic Indexing And Live Location
 - Live supply indexing is implemented directly with the S2 location engine and canonical hex cell tokens in Redis (`Liddr.Location.S2`, `Liddr.Location.SupplyIndex`).
 - Radius covering is produced by the official `golang/geo/s2` `RegionCoverer` helper, while Elixir stores and queries the canonical S2 tokens it returns.
-- Driver location ingest is HTTP (`POST /api/drivers/me/location`), not WebSocket write ingestion.
+- Driver location ingest is HTTP (`POST /api/drivers/me/location`), not WebSocket write ingestion; active rides receive `driver_location_updated` on the ride channel.
 - Passenger/driver live ride updates are delivered through Phoenix Channels for ride/driver topics.
 
 Primary evidence:

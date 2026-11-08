@@ -4,6 +4,7 @@ defmodule Liddr.Rides.CurrentTripStatus do
   import Ecto.Query
 
   alias Liddr.Repo
+  alias Liddr.Rides.DriverTracking
   alias Liddr.Rides.Ride
   alias Liddr.Rides.RideEvent
   alias Liddr.Rides.SharedRides.Access
@@ -43,7 +44,8 @@ defmodule Liddr.Rides.CurrentTripStatus do
            latest_status_event:
              if(latest_status_event, do: RideSerializer.event_payload(latest_status_event)),
            status_updated_at: status_updated_at(ride.updated_at, latest_status_at),
-           reassign_context: reassign_context(ride.metadata)
+           reassign_context: reassign_context(ride.metadata),
+           driver_location: DriverTracking.latest_for_user(ride, user_id)
          }
        }}
     else

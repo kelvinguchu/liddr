@@ -12,6 +12,7 @@ defmodule Liddr.Location do
   alias Liddr.Location.S2
   alias Liddr.Location.SupplyIndex
   alias Liddr.Repo
+  alias Liddr.Rides.DriverTracking
   alias Liddr.Rides.SharedRides.LocationEtaRefresh
   alias Liddr.Subscriptions.PaymentUtils
 
@@ -115,6 +116,11 @@ defmodule Liddr.Location do
           {_, timings} =
             measure(:shared_eta_refresh, timings, fn ->
               maybe_refresh_shared_eta(updated_driver, lat, lng, now)
+            end)
+
+          {_, timings} =
+            measure(:ride_tracking, timings, fn ->
+              DriverTracking.publish(updated_driver, lat, lng, now, attrs)
             end)
 
           maybe_log_slow_location(started_at, timings, driver_user_id)

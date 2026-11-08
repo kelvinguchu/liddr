@@ -138,6 +138,53 @@ defmodule LiddrWeb.RideChannelReplayTest do
     assert_reply ref, :error, %{reason: "forbidden"}, 1_000
   end
 
+  test "driver location is pushed to allowed viewers without exposing the audience" do
+    %{access_token: token, user_id: rider_id, ride_id: ride_id} = joined_ride_fixture()
+    {:ok, socket} = connect(UserSocket, %{"token" => token})
+
+    assert {:ok, %{driver_location: nil}, _socket} =
+             subscribe_and_join(socket, RideChannel, "ride:#{ride_id}", %{})
+
+    LiddrWeb.Endpoint.broadcast("ride:#{ride_id}", "driver_location_updated", %{
+      ride_id: ride_id,
+      lat: -1.29,
+      lng: 36.82,
+      visible_user_ids: [rider_id]
+    })
+
+    assert_push "driver_location_updated", payload, 2_000
+    assert payload.lat == -1.29
+    refute Map.has_key?(payload, :visible_user_ids)
+  end
+
+  test "driver location is not pushed to subscribers outside the audience" do
+    %{access_token: token, ride_id: ride_id} = joined_ride_fixture()
+    {:ok, socket} = connect(UserSocket, %{"token" => token})
+
+    assert {:ok, _reply, joined_socket} =
+             subscribe_and_join(socket, RideChannel, "ride:#{ride_id}", %{})
+
+    LiddrWeb.Endpoint.broadcast("ride:#{ride_id}", "driver_location_updated", %{
+      ride_id: ride_id,
+      lat: -1.29,
+      lng: 36.82,
+      visible_user_ids: []
+    })
+
+    assert_receive %Phoenix.Socket.Broadcast{event: "driver_location_updated"}
+    _ = :sys.get_state(joined_socket.channel_pid)
+    refute_push "driver_location_updated", _payload, 0
+  end
+
+  defp joined_ride_fixture do
+    %{access_token: token, user_id: rider_id} = AuthFixtures.authenticate_with_role!("rider")
+    %{user_id: driver_id} = AuthFixtures.authenticate_with_role!("driver")
+    category_id = VerificationFixtures.insert_vehicle_category!()
+    _driver = create_driver_profile!(driver_id, category_id)
+    ride = create_accepted_ride!(rider_id, driver_id, category_id)
+    %{access_token: token, user_id: rider_id, ride_id: ride.id}
+  end
+
   defp normalize_cursor(%DateTime{} = cursor), do: DateTime.to_iso8601(cursor)
   defp normalize_cursor(cursor) when is_binary(cursor), do: cursor
   defp normalize_cursor(_cursor), do: nil

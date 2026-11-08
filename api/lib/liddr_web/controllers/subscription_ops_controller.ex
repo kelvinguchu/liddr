@@ -1,6 +1,7 @@
 defmodule LiddrWeb.SubscriptionOpsController do
   use LiddrWeb, :controller
 
+  alias Liddr.Payments.Mpesa.Sanitizer
   alias Liddr.Subscriptions
   alias LiddrWeb.SubscriptionOpsErrors
   alias LiddrWeb.Idempotency
@@ -38,7 +39,7 @@ defmodule LiddrWeb.SubscriptionOpsController do
                data: %{
                  validation_url: payload.validation_url,
                  confirmation_url: payload.confirmation_url,
-                 response_payload: payload.result.response_payload
+                 response_payload: Sanitizer.payload(payload.result.response_payload)
                }
              }}
 
@@ -62,7 +63,7 @@ defmodule LiddrWeb.SubscriptionOpsController do
              %{
                data: %{
                  payment: SubscriptionSerializer.ops_payment_payload(payload.payment),
-                 response_payload: payload.query_result.response_payload,
+                 response_payload: Sanitizer.payload(payload.query_result.response_payload),
                  result_url: payload.result_url,
                  timeout_url: payload.timeout_url
                }

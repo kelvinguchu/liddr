@@ -51,6 +51,43 @@ defmodule Liddr.Location.SupplyIndexTest do
     assert {:ok, [42]} = SupplyIndex.candidate_driver_ids(3, -1.2921, 36.8219, 2.0, 10)
   end
 
+  test "upsert_driver leaves the previous zone when the driver changes cell" do
+    previous_redis_module = Application.get_env(:liddr, :location_redis_module)
+    on_exit(fn -> restore_env(:location_redis_module, previous_redis_module) end)
+
+    Application.put_env(:liddr, :location_redis_module, FakeRedis)
+    FakeRedis.reset!()
+    now = DateTime.utc_now()
+
+    assert :ok = SupplyIndex.upsert_driver(42, 3, -1.2921, 36.8219, now, "cell_a")
+    assert :ok = SupplyIndex.upsert_driver(42, 3, -1.3000, 36.8500, now, "cell_b")
+
+    assert zone_members("cell_a", 3) == []
+    assert zone_members("cell_b", 3) == ["42"]
+
+    assert :ok = SupplyIndex.remove_driver(42)
+    assert zone_members("cell_b", 3) == []
+  end
+
+  test "upsert_driver keeps the driver in the zone when the cell is unchanged" do
+    previous_redis_module = Application.get_env(:liddr, :location_redis_module)
+    on_exit(fn -> restore_env(:location_redis_module, previous_redis_module) end)
+
+    Application.put_env(:liddr, :location_redis_module, FakeRedis)
+    FakeRedis.reset!()
+    now = DateTime.utc_now()
+
+    assert :ok = SupplyIndex.upsert_driver(42, 3, -1.2921, 36.8219, now, "cell_a")
+    assert :ok = SupplyIndex.upsert_driver(42, 3, -1.2922, 36.8220, now, "cell_a")
+
+    assert zone_members("cell_a", 3) == ["42"]
+  end
+
+  defp zone_members(cell_token, category_id) do
+    {:ok, members} = FakeRedis.command(["SMEMBERS", "zone:#{cell_token}:supply:#{category_id}"])
+    members
+  end
+
   defp restore_env(key, nil), do: Application.delete_env(:liddr, key)
   defp restore_env(key, value), do: Application.put_env(:liddr, key, value)
 end

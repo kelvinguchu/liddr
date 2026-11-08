@@ -27,6 +27,7 @@ defmodule Liddr.Location.SupplyIndex do
     now_iso = datetime_to_iso8601(captured_at)
 
     with true <- is_binary(cell_token),
+         {:ok, previous} <- fetch_driver_snapshot(driver_user_id),
          commands <-
            upsert_commands(
              driver_user_id,
@@ -34,7 +35,8 @@ defmodule Liddr.Location.SupplyIndex do
              cell_token,
              lat,
              lng,
-             now_iso
+             now_iso,
+             previous
            ),
          {:ok, _} <- redis_module().pipeline(commands) do
       :ok
@@ -85,12 +87,20 @@ defmodule Liddr.Location.SupplyIndex do
     end
   end
 
-  defp upsert_commands(driver_user_id, vehicle_category_id, cell_token, lat, lng, captured_at_iso) do
+  defp upsert_commands(
+         driver_user_id,
+         vehicle_category_id,
+         cell_token,
+         lat,
+         lng,
+         captured_at_iso,
+         previous
+       ) do
     zone_ttl_seconds = zone_ttl_seconds()
     driver_ttl_seconds = driver_ttl_seconds()
     new_zone = zone_key(cell_token, vehicle_category_id)
 
-    [
+    commands = [
       ["SADD", new_zone, driver_user_id],
       ["EXPIRE", new_zone, zone_ttl_seconds],
       [
@@ -109,20 +119,29 @@ defmodule Liddr.Location.SupplyIndex do
       ],
       ["EXPIRE", driver_key(driver_user_id), driver_ttl_seconds]
     ]
+
+    old_zone_removal(previous, new_zone, driver_user_id) ++ commands
   end
 
   defp remove_commands(driver_user_id, previous) do
+    old_zone_removal(previous, nil, driver_user_id) ++ [["DEL", driver_key(driver_user_id)]]
+  end
+
+  defp old_zone_removal(previous, new_zone, driver_user_id) do
+    case previous_zone(previous) do
+      nil -> []
+      ^new_zone -> []
+      old_zone -> [["SREM", old_zone, driver_user_id]]
+    end
+  end
+
+  defp previous_zone(previous) do
     old_cell = previous["cell"]
     old_category_id = parse_positive_integer(previous["vehicle_category_id"])
 
-    commands =
-      if is_binary(old_cell) and is_integer(old_category_id) do
-        [["SREM", zone_key(old_cell, old_category_id), driver_user_id]]
-      else
-        []
-      end
-
-    commands ++ [["DEL", driver_key(driver_user_id)]]
+    if is_binary(old_cell) and is_integer(old_category_id) do
+      zone_key(old_cell, old_category_id)
+    end
   end
 
   defp map_from_hgetall(fields) do

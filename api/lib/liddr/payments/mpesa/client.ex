@@ -11,6 +11,9 @@ defmodule Liddr.Payments.Mpesa.Client do
   @stk_query_path "/mpesa/stkpushquery/v1/query"
   @tx_status_query_path "/mpesa/transactionstatus/v1/query"
 
+  # `response_payload` stays raw because callers persist its IDs to match Daraja
+  # callbacks. Run it through `Sanitizer` before storing or returning the payload.
+
   @impl true
   def initiate_stk_push(input) when is_map(input) do
     with {:ok, config} <- Config.fetch(),
@@ -43,7 +46,7 @@ defmodule Liddr.Payments.Mpesa.Client do
         {:ok,
          %{
            request_payload: Sanitizer.payload(payload),
-           response_payload: Sanitizer.payload(body)
+           response_payload: body
          }}
       else
         {:error, _reason} = error -> error
@@ -81,7 +84,7 @@ defmodule Liddr.Payments.Mpesa.Client do
         {:ok,
          %{
            request_payload: Sanitizer.payload(payload),
-           response_payload: Sanitizer.payload(body)
+           response_payload: body
          }}
       else
         {:error, _reason} = error -> error
@@ -118,7 +121,7 @@ defmodule Liddr.Payments.Mpesa.Client do
             {:ok,
              %{
                request_payload: Sanitizer.payload(payload),
-               response_payload: Sanitizer.payload(body)
+               response_payload: body
              }}
           end
 
@@ -176,7 +179,7 @@ defmodule Liddr.Payments.Mpesa.Client do
         {:ok,
          %{
            request_payload: Sanitizer.payload(payload),
-           response_payload: Sanitizer.payload(body)
+           response_payload: body
          }}
       else
         {:error, _reason} = error -> error

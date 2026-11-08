@@ -5,7 +5,9 @@ import (
 	"net/http"
 
 	"github.com/kelvinguchu/liddr/apps/api/internal/dispatch"
+	"github.com/kelvinguchu/liddr/apps/api/internal/payments"
 	"github.com/kelvinguchu/liddr/apps/api/internal/rides"
+	"github.com/kelvinguchu/liddr/apps/api/internal/subscriptions"
 )
 
 // problem is how a domain error appears to a client.
@@ -43,6 +45,14 @@ var problems = []problem{
 	{dispatch.ErrInvalidLocation, http.StatusBadRequest, "INVALID_LOCATION", "That location is not valid."},
 	{dispatch.ErrOfferNotFound, http.StatusNotFound, "OFFER_NOT_FOUND", "That offer could not be found."},
 	{dispatch.ErrOfferClosed, http.StatusConflict, "OFFER_CLOSED", "That offer is no longer available."},
+	{subscriptions.ErrProfileMissing, http.StatusNotFound, "DRIVER_PROFILE_MISSING", "Finish setting up your driver profile first."},
+	{subscriptions.ErrNotVerified, http.StatusForbidden, "DRIVER_NOT_VERIFIED", "Your documents have not been approved yet."},
+	{subscriptions.ErrAlreadyActive, http.StatusConflict, "ALREADY_ACTIVE", "This week is already paid."},
+	{subscriptions.ErrPaymentPending, http.StatusConflict, "PAYMENT_PENDING", "Check your phone. A payment is already waiting for your PIN."},
+	{subscriptions.ErrRateLimited, http.StatusTooManyRequests, "RATE_LIMITED", "Too many attempts. Please wait and try again."},
+	{subscriptions.ErrPaymentRefused, http.StatusBadGateway, "PAYMENT_REFUSED", "M-Pesa could not start this payment. Please try again."},
+	{subscriptions.ErrCallbackRefused, http.StatusUnauthorized, "UNAUTHORIZED", "Not authorized."},
+	{payments.ErrInvalidCallback, http.StatusBadRequest, "INVALID_CALLBACK", "The callback could not be read."},
 }
 
 func findProblem(err error) (problem, bool) {

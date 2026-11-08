@@ -65,6 +65,16 @@ type DriverLocation struct {
 	CapturedAt time.Time
 }
 
+type MpesaUnmatchedCallback struct {
+	ID               int64
+	Kind             string
+	ExternalRef      string
+	AmountKes        *int32
+	AccountReference *string
+	Reason           string
+	ReceivedAt       time.Time
+}
+
 type Ride struct {
 	ID                  uuid.UUID
 	RiderID             uuid.UUID
@@ -133,6 +143,38 @@ type RideQuote struct {
 	FinalFareKes      int32
 	ExpiresAt         time.Time
 	CreatedAt         time.Time
+}
+
+type Subscription struct {
+	ID                uuid.UUID
+	DriverID          uuid.UUID
+	VehicleCategoryID int64
+	WeekStart         time.Time
+	WeekEnd           time.Time
+	AmountKes         int32
+	Status            string
+	Reference         string
+	ActivatedAt       *time.Time
+	ExpiredAt         *time.Time
+	CreatedAt         time.Time
+}
+
+type SubscriptionPayment struct {
+	ID                uuid.UUID
+	SubscriptionID    uuid.UUID
+	DriverID          uuid.UUID
+	Channel           string
+	Status            string
+	AmountKes         int32
+	Phone             *string
+	MerchantRequestID *string
+	CheckoutRequestID *string
+	Receipt           *string
+	ResultCode        *int32
+	ResultDesc        *string
+	RequestedAt       time.Time
+	PaidAt            *time.Time
+	LastCheckedAt     *time.Time
 }
 
 type User struct {

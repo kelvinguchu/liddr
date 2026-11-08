@@ -26,9 +26,11 @@ linters:
             - "**/internal/dispatch/**"
             - "**/internal/geo/**"
             - "**/internal/maps/**"
+            - "**/internal/payments/**"
             - "**/internal/rides/**"
             - "**/internal/sms/**"
             - "**/internal/store/**"
+            - "**/internal/subscriptions/**"
           deny:
             - pkg: github.com/kelvinguchu/liddr/apps/api/internal/httpapi
               desc: dependencies point inward; domain packages must not import transport

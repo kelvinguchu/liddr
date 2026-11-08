@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/netip"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -37,6 +39,19 @@ type SMS struct {
 	SenderID string
 }
 
+// Mpesa holds Daraja settings.
+type Mpesa struct {
+	BaseURL         string
+	ConsumerKey     Secret
+	ConsumerSecret  Secret
+	Shortcode       string
+	Passkey         Secret
+	TransactionType string
+	CallbackBaseURL string
+	CallbackToken   Secret
+	AllowedIPs      []netip.Addr
+}
+
 // Config is the validated configuration of the API server.
 type Config struct {
 	Addr             string
@@ -49,6 +64,7 @@ type Config struct {
 	SMS              SMS
 	GoogleMapsKey    Secret
 	GoogleRoutesURL  string
+	Mpesa            Mpesa
 }
 
 // LoadDatabaseURL returns the only setting that migrations need.
@@ -86,6 +102,33 @@ func Load(getenv func(string) string) (Config, error) {
 			SenderID: required("HOSTPINNACLE_SENDER_ID"),
 		},
 	}
+	cfg.Mpesa = Mpesa{
+		BaseURL:         withDefault(getenv("MPESA_BASE_URL"), mpesaBaseURL(getenv("MPESA_ENV"))),
+		ConsumerKey:     Secret(required("MPESA_CONSUMER_KEY")),
+		ConsumerSecret:  Secret(required("MPESA_CONSUMER_SECRET")),
+		Shortcode:       required("MPESA_SHORTCODE"),
+		Passkey:         Secret(required("MPESA_PASSKEY")),
+		TransactionType: withDefault(getenv("MPESA_STK_TRANSACTION_TYPE"), "CustomerPayBillOnline"),
+		CallbackBaseURL: required("MPESA_CALLBACK_BASE_URL"),
+		CallbackToken:   Secret(required("MPESA_CALLBACK_TOKEN")),
+	}
+	if cfg.Mpesa.CallbackToken != "" && len(cfg.Mpesa.CallbackToken) < minHMACKeyBytes {
+		errs = append(errs, fmt.Errorf("MPESA_CALLBACK_TOKEN must be at least %d bytes", minHMACKeyBytes))
+	}
+	if strings.ContainsAny(string(cfg.Mpesa.CallbackToken), "/?#% ") {
+		errs = append(errs, errors.New("MPESA_CALLBACK_TOKEN must be safe to place in a URL path"))
+	}
+	for field := range strings.SplitSeq(getenv("MPESA_CALLBACK_ALLOWED_IPS"), ",") {
+		if field = strings.TrimSpace(field); field == "" {
+			continue
+		}
+		addr, err := netip.ParseAddr(field)
+		if err != nil {
+			errs = append(errs, errors.New("MPESA_CALLBACK_ALLOWED_IPS must be comma-separated IP addresses"))
+			continue
+		}
+		cfg.Mpesa.AllowedIPs = append(cfg.Mpesa.AllowedIPs, addr.Unmap())
+	}
 	if cfg.AuthHMACKey != "" && len(cfg.AuthHMACKey) < minHMACKeyBytes {
 		errs = append(errs, fmt.Errorf("AUTH_HMAC_KEY must be at least %d bytes", minHMACKeyBytes))
 	}
@@ -111,6 +154,13 @@ func Load(getenv func(string) string) (Config, error) {
 		return Config{}, err
 	}
 	return cfg, nil
+}
+
+func mpesaBaseURL(environment string) string {
+	if environment == "production" {
+		return "https://api.safaricom.co.ke"
+	}
+	return "https://sandbox.safaricom.co.ke"
 }
 
 func parseDuration(getenv func(string) string, name, fallback string) (time.Duration, error) {

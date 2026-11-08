@@ -15,17 +15,21 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/kelvinguchu/liddr/apps/api/internal/auth"
 	"github.com/kelvinguchu/liddr/apps/api/internal/config"
 	"github.com/kelvinguchu/liddr/apps/api/internal/dispatch"
 	"github.com/kelvinguchu/liddr/apps/api/internal/httpapi"
 	"github.com/kelvinguchu/liddr/apps/api/internal/maps"
+	"github.com/kelvinguchu/liddr/apps/api/internal/payments"
 	"github.com/kelvinguchu/liddr/apps/api/internal/rides"
 	"github.com/kelvinguchu/liddr/apps/api/internal/sms"
 	"github.com/kelvinguchu/liddr/apps/api/internal/store"
+	"github.com/kelvinguchu/liddr/apps/api/internal/subscriptions"
 )
 
-const usage = "usage: api <serve|migrate>"
+const usage = "usage: api <serve|migrate|register-c2b-urls>"
 
 func main() {
 	if err := run(context.Background(), os.Args, os.Getenv, os.Stdout, os.Stderr); err != nil {
@@ -38,7 +42,7 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout,
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	if len(args) != 2 || (args[1] != "serve" && args[1] != "migrate") {
+	if len(args) != 2 || (args[1] != "serve" && args[1] != "migrate" && args[1] != "register-c2b-urls") {
 		// The returned error reports the failure even if stderr is closed.
 		_, _ = fmt.Fprintln(stderr, usage)
 		return errors.New("invalid command")
@@ -62,7 +66,43 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout,
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
+	if args[1] == "register-c2b-urls" {
+		return registerC2BURLs(ctx, cfg, logger)
+	}
 	return serve(ctx, cfg, logger)
+}
+
+func newGateway(cfg config.Config) *payments.Client {
+	return payments.NewClient(payments.Config{
+		BaseURL:         cfg.Mpesa.BaseURL,
+		ConsumerKey:     cfg.Mpesa.ConsumerKey.Reveal(),
+		ConsumerSecret:  cfg.Mpesa.ConsumerSecret.Reveal(),
+		Shortcode:       cfg.Mpesa.Shortcode,
+		Passkey:         cfg.Mpesa.Passkey.Reveal(),
+		TransactionType: cfg.Mpesa.TransactionType,
+	}, time.Now)
+}
+
+func newSubscriptions(cfg config.Config, pool *pgxpool.Pool, logger *slog.Logger) *subscriptions.Service {
+	return subscriptions.NewService(subscriptions.Config{
+		Pool:            pool,
+		Gateway:         newGateway(cfg),
+		Now:             time.Now,
+		Logger:          logger,
+		CallbackBaseURL: cfg.Mpesa.CallbackBaseURL,
+		CallbackToken:   cfg.Mpesa.CallbackToken.Reveal(),
+		Shortcode:       cfg.Mpesa.Shortcode,
+	})
+}
+
+// registerC2BURLs is a one-off setup step, so it has no HTTP surface to protect.
+func registerC2BURLs(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
+	validation, confirmation := newSubscriptions(cfg, nil, logger).C2BURLs()
+	if err := newGateway(cfg).RegisterC2BURLs(ctx, validation, confirmation); err != nil {
+		return err
+	}
+	logger.LogAttrs(ctx, slog.LevelInfo, "c2b urls registered")
+	return nil
 }
 
 func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
@@ -73,6 +113,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	defer pool.Close()
 
 	dispatcher := dispatch.NewService(dispatch.Config{Pool: pool, Now: time.Now})
+	billing := newSubscriptions(cfg, pool, logger)
 	api := httpapi.New(httpapi.Deps{
 		Logger:     logger,
 		Database:   pool,
@@ -95,6 +136,8 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 			Now:    time.Now,
 		}),
 		Dispatch:         dispatcher,
+		Subscriptions:    billing,
+		MpesaAllowedIPs:  cfg.Mpesa.AllowedIPs,
 		TrustedProxyHops: cfg.TrustedProxyHops,
 	})
 	server := &http.Server{
@@ -118,6 +161,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	workerCtx, stopWorkers := context.WithCancel(context.WithoutCancel(ctx))
 	var workers sync.WaitGroup
 	workers.Go(func() { dispatcher.Run(workerCtx, logger) })
+	workers.Go(func() { billing.Run(workerCtx, logger) })
 	defer workers.Wait()
 	defer stopWorkers()
 

@@ -16,7 +16,10 @@ import (
 	"github.com/kelvinguchu/liddr/apps/api/internal/testdb"
 )
 
-const testTimeout = 30 * time.Second
+const (
+	testTimeout       = 30 * time.Second
+	testCallbackToken = "test-callback-token-of-sufficient-length"
+)
 
 func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m)
@@ -62,6 +65,13 @@ func envWithRoutes(databaseURL, smsURL, routesURL string) func(string) string {
 		"AUTH_HMAC_KEY":              "integration-test-key-of-sufficient-length",
 		"GOOGLE_MAPS_API_KEY_SERVER": "test-maps-key",
 		"GOOGLE_ROUTES_BASE_URL":     routesURL,
+		"MPESA_CONSUMER_KEY":         "test-consumer-key",
+		"MPESA_CONSUMER_SECRET":      "test-consumer-secret",
+		"MPESA_SHORTCODE":            "174379",
+		"MPESA_PASSKEY":              "test-passkey",
+		"MPESA_BASE_URL":             "http://127.0.0.1:1",
+		"MPESA_CALLBACK_BASE_URL":    "https://api.example",
+		"MPESA_CALLBACK_TOKEN":       testCallbackToken,
 		"HOSTPINNACLE_API_URL":       withDefaultURL(smsURL),
 		"HOSTPINNACLE_API_KEY":       "test-key",
 		"HOSTPINNACLE_USER_ID":       "test-user",

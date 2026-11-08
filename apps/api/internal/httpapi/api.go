@@ -9,12 +9,14 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"sync/atomic"
 	"time"
 
 	"github.com/kelvinguchu/liddr/apps/api/internal/auth"
 	"github.com/kelvinguchu/liddr/apps/api/internal/dispatch"
 	"github.com/kelvinguchu/liddr/apps/api/internal/rides"
+	"github.com/kelvinguchu/liddr/apps/api/internal/subscriptions"
 )
 
 const readinessTimeout = 2 * time.Second
@@ -32,6 +34,11 @@ type Deps struct {
 	Auth       *auth.Service
 	Rides      *rides.Service
 	Dispatch   *dispatch.Service
+
+	Subscriptions *subscriptions.Service
+
+	// MpesaAllowedIPs restricts callbacks when it is not empty.
+	MpesaAllowedIPs []netip.Addr
 
 	// TrustedProxyHops is how many proxies in front of this server append to
 	// X-Forwarded-For. Zero means clients connect directly.

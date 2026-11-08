@@ -23,22 +23,22 @@ const (
 
 // Defines values for DriverProfileSubscriptionStatus.
 const (
-	Active    DriverProfileSubscriptionStatus = "active"
-	Grace     DriverProfileSubscriptionStatus = "grace"
-	Inactive  DriverProfileSubscriptionStatus = "inactive"
-	Suspended DriverProfileSubscriptionStatus = "suspended"
+	DriverProfileSubscriptionStatusActive    DriverProfileSubscriptionStatus = "active"
+	DriverProfileSubscriptionStatusGrace     DriverProfileSubscriptionStatus = "grace"
+	DriverProfileSubscriptionStatusInactive  DriverProfileSubscriptionStatus = "inactive"
+	DriverProfileSubscriptionStatusSuspended DriverProfileSubscriptionStatus = "suspended"
 )
 
 // Valid indicates whether the value is a known member of the DriverProfileSubscriptionStatus enum.
 func (e DriverProfileSubscriptionStatus) Valid() bool {
 	switch e {
-	case Active:
+	case DriverProfileSubscriptionStatusActive:
 		return true
-	case Grace:
+	case DriverProfileSubscriptionStatusGrace:
 		return true
-	case Inactive:
+	case DriverProfileSubscriptionStatusInactive:
 		return true
-	case Suspended:
+	case DriverProfileSubscriptionStatusSuspended:
 		return true
 	default:
 		return false
@@ -47,19 +47,19 @@ func (e DriverProfileSubscriptionStatus) Valid() bool {
 
 // Defines values for DriverProfileVerificationStatus.
 const (
-	Approved DriverProfileVerificationStatus = "approved"
-	Pending  DriverProfileVerificationStatus = "pending"
-	Rejected DriverProfileVerificationStatus = "rejected"
+	DriverProfileVerificationStatusApproved DriverProfileVerificationStatus = "approved"
+	DriverProfileVerificationStatusPending  DriverProfileVerificationStatus = "pending"
+	DriverProfileVerificationStatusRejected DriverProfileVerificationStatus = "rejected"
 )
 
 // Valid indicates whether the value is a known member of the DriverProfileVerificationStatus enum.
 func (e DriverProfileVerificationStatus) Valid() bool {
 	switch e {
-	case Approved:
+	case DriverProfileVerificationStatusApproved:
 		return true
-	case Pending:
+	case DriverProfileVerificationStatusPending:
 		return true
-	case Rejected:
+	case DriverProfileVerificationStatusRejected:
 		return true
 	default:
 		return false
@@ -104,34 +104,34 @@ func (e PaymentMode) Valid() bool {
 
 // Defines values for RideStatus.
 const (
-	Accepted       RideStatus = "accepted"
-	Arrived        RideStatus = "arrived"
-	Cancelled      RideStatus = "cancelled"
-	Completed      RideStatus = "completed"
-	DriverArriving RideStatus = "driver_arriving"
-	InProgress     RideStatus = "in_progress"
-	NoDrivers      RideStatus = "no_drivers"
-	Searching      RideStatus = "searching"
+	RideStatusAccepted       RideStatus = "accepted"
+	RideStatusArrived        RideStatus = "arrived"
+	RideStatusCancelled      RideStatus = "cancelled"
+	RideStatusCompleted      RideStatus = "completed"
+	RideStatusDriverArriving RideStatus = "driver_arriving"
+	RideStatusInProgress     RideStatus = "in_progress"
+	RideStatusNoDrivers      RideStatus = "no_drivers"
+	RideStatusSearching      RideStatus = "searching"
 )
 
 // Valid indicates whether the value is a known member of the RideStatus enum.
 func (e RideStatus) Valid() bool {
 	switch e {
-	case Accepted:
+	case RideStatusAccepted:
 		return true
-	case Arrived:
+	case RideStatusArrived:
 		return true
-	case Cancelled:
+	case RideStatusCancelled:
 		return true
-	case Completed:
+	case RideStatusCompleted:
 		return true
-	case DriverArriving:
+	case RideStatusDriverArriving:
 		return true
-	case InProgress:
+	case RideStatusInProgress:
 		return true
-	case NoDrivers:
+	case RideStatusNoDrivers:
 		return true
-	case Searching:
+	case RideStatusSearching:
 		return true
 	default:
 		return false
@@ -174,6 +174,78 @@ func (e SignupRole) Valid() bool {
 	case SignupRoleDriver:
 		return true
 	case SignupRoleRider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SubscriptionStatus.
+const (
+	SubscriptionStatusActive  SubscriptionStatus = "active"
+	SubscriptionStatusExpired SubscriptionStatus = "expired"
+	SubscriptionStatusPending SubscriptionStatus = "pending"
+)
+
+// Valid indicates whether the value is a known member of the SubscriptionStatus enum.
+func (e SubscriptionStatus) Valid() bool {
+	switch e {
+	case SubscriptionStatusActive:
+		return true
+	case SubscriptionStatusExpired:
+		return true
+	case SubscriptionStatusPending:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SubscriptionPaymentChannel.
+const (
+	C2b SubscriptionPaymentChannel = "c2b"
+	Stk SubscriptionPaymentChannel = "stk"
+)
+
+// Valid indicates whether the value is a known member of the SubscriptionPaymentChannel enum.
+func (e SubscriptionPaymentChannel) Valid() bool {
+	switch e {
+	case C2b:
+		return true
+	case Stk:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SubscriptionPaymentStatus.
+const (
+	SubscriptionPaymentStatusCancelled       SubscriptionPaymentStatus = "cancelled"
+	SubscriptionPaymentStatusFailed          SubscriptionPaymentStatus = "failed"
+	SubscriptionPaymentStatusInitiated       SubscriptionPaymentStatus = "initiated"
+	SubscriptionPaymentStatusNeedsReview     SubscriptionPaymentStatus = "needs_review"
+	SubscriptionPaymentStatusPendingCallback SubscriptionPaymentStatus = "pending_callback"
+	SubscriptionPaymentStatusSuccess         SubscriptionPaymentStatus = "success"
+	SubscriptionPaymentStatusTimeout         SubscriptionPaymentStatus = "timeout"
+)
+
+// Valid indicates whether the value is a known member of the SubscriptionPaymentStatus enum.
+func (e SubscriptionPaymentStatus) Valid() bool {
+	switch e {
+	case SubscriptionPaymentStatusCancelled:
+		return true
+	case SubscriptionPaymentStatusFailed:
+		return true
+	case SubscriptionPaymentStatusInitiated:
+		return true
+	case SubscriptionPaymentStatusNeedsReview:
+		return true
+	case SubscriptionPaymentStatusPendingCallback:
+		return true
+	case SubscriptionPaymentStatusSuccess:
+		return true
+	case SubscriptionPaymentStatusTimeout:
 		return true
 	default:
 		return false
@@ -246,6 +318,15 @@ type Me struct {
 	Phone string             `json:"phone"`
 	Roles []Role             `json:"roles"`
 }
+
+// MpesaAck defines model for MpesaAck.
+type MpesaAck struct {
+	ResultCode int32  `json:"ResultCode"`
+	ResultDesc string `json:"ResultDesc"`
+}
+
+// MpesaCallback A Daraja callback body. Its shape is owned by Safaricom.
+type MpesaCallback map[string]interface{}
 
 // Offer defines model for Offer.
 type Offer struct {
@@ -363,6 +444,43 @@ type SetDriverCategoryRequest struct {
 // SignupRole defines model for SignupRole.
 type SignupRole string
 
+// Subscription defines model for Subscription.
+type Subscription struct {
+	AmountKes        int32  `json:"amount_kes"`
+	PaybillShortcode string `json:"paybill_shortcode"`
+
+	// Reference The account number to use when paying by paybill.
+	Reference string             `json:"reference"`
+	Status    SubscriptionStatus `json:"status"`
+	WeekEnd   openapi_types.Date `json:"week_end"`
+	WeekStart openapi_types.Date `json:"week_start"`
+}
+
+// SubscriptionStatus defines model for Subscription.Status.
+type SubscriptionStatus string
+
+// SubscriptionPayment defines model for SubscriptionPayment.
+type SubscriptionPayment struct {
+	AmountKes   int32                      `json:"amount_kes"`
+	Channel     SubscriptionPaymentChannel `json:"channel"`
+	Id          openapi_types.UUID         `json:"id"`
+	PaidAt      *time.Time                 `json:"paid_at,omitempty"`
+	Receipt     *string                    `json:"receipt,omitempty"`
+	RequestedAt time.Time                  `json:"requested_at"`
+	Status      SubscriptionPaymentStatus  `json:"status"`
+}
+
+// SubscriptionPaymentChannel defines model for SubscriptionPayment.Channel.
+type SubscriptionPaymentChannel string
+
+// SubscriptionPaymentStatus defines model for SubscriptionPayment.Status.
+type SubscriptionPaymentStatus string
+
+// SubscriptionPaymentList defines model for SubscriptionPaymentList.
+type SubscriptionPaymentList struct {
+	Data []SubscriptionPayment `json:"data"`
+}
+
 // VehicleCategory defines model for VehicleCategory.
 type VehicleCategory struct {
 	// Capacity Passenger seats. Zero for package delivery.
@@ -382,6 +500,9 @@ type VehicleCategory struct {
 type VehicleCategoryList struct {
 	Data []VehicleCategory `json:"data"`
 }
+
+// CallbackToken defines model for CallbackToken.
+type CallbackToken = string
 
 // OfferId defines model for OfferId.
 type OfferId = openapi_types.UUID
@@ -424,6 +545,15 @@ type CancelRideJSONRequestBody = CancelRideRequest
 
 // CompleteTripJSONRequestBody defines body for CompleteTrip for application/json ContentType.
 type CompleteTripJSONRequestBody = CompleteTripRequest
+
+// MpesaC2bConfirmationJSONRequestBody defines body for MpesaC2bConfirmation for application/json ContentType.
+type MpesaC2bConfirmationJSONRequestBody = MpesaCallback
+
+// MpesaC2bValidationJSONRequestBody defines body for MpesaC2bValidation for application/json ContentType.
+type MpesaC2bValidationJSONRequestBody = MpesaCallback
+
+// MpesaStkCallbackJSONRequestBody defines body for MpesaStkCallback for application/json ContentType.
+type MpesaStkCallbackJSONRequestBody = MpesaCallback
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -499,9 +629,27 @@ type ServerInterface interface {
 	// StartTrip Start the trip
 	// (POST /v1/rides/{ride_id}/start)
 	StartTrip(w http.ResponseWriter, r *http.Request, rideId RideId)
+	// GetSubscription Return this week's subscription and how to pay it
+	// (GET /v1/subscriptions/me)
+	GetSubscription(w http.ResponseWriter, r *http.Request)
+	// ListSubscriptionPayments List recent subscription payments
+	// (GET /v1/subscriptions/me/payments)
+	ListSubscriptionPayments(w http.ResponseWriter, r *http.Request)
+	// PaySubscription Send an M-Pesa prompt for this week to the driver's phone
+	// (POST /v1/subscriptions/pay)
+	PaySubscription(w http.ResponseWriter, r *http.Request)
 	// ListVehicleCategories List the vehicle categories open for booking and driver sign-up
 	// (GET /v1/vehicle-categories)
 	ListVehicleCategories(w http.ResponseWriter, r *http.Request)
+	// MpesaC2bConfirmation Receive a paybill payment from Safaricom
+	// (POST /v1/webhooks/mpesa/{token}/c2b/confirmation)
+	MpesaC2bConfirmation(w http.ResponseWriter, r *http.Request, token CallbackToken)
+	// MpesaC2bValidation Answer Safaricom's paybill validation
+	// (POST /v1/webhooks/mpesa/{token}/c2b/validation)
+	MpesaC2bValidation(w http.ResponseWriter, r *http.Request, token CallbackToken)
+	// MpesaStkCallback Receive an STK push result from Safaricom
+	// (POST /v1/webhooks/mpesa/{token}/stk)
+	MpesaStkCallback(w http.ResponseWriter, r *http.Request, token CallbackToken)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -1065,11 +1213,149 @@ func (siw *ServerInterfaceWrapper) StartTrip(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
+// GetSubscription operation middleware
+func (siw *ServerInterfaceWrapper) GetSubscription(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSubscription(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListSubscriptionPayments operation middleware
+func (siw *ServerInterfaceWrapper) ListSubscriptionPayments(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSubscriptionPayments(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PaySubscription operation middleware
+func (siw *ServerInterfaceWrapper) PaySubscription(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PaySubscription(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListVehicleCategories operation middleware
 func (siw *ServerInterfaceWrapper) ListVehicleCategories(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListVehicleCategories(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MpesaC2bConfirmation operation middleware
+func (siw *ServerInterfaceWrapper) MpesaC2bConfirmation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "token" -------------
+	var token CallbackToken
+
+	err = runtime.BindStyledParameterWithOptions("simple", "token", r.PathValue("token"), &token, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MpesaC2bConfirmation(w, r, token)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MpesaC2bValidation operation middleware
+func (siw *ServerInterfaceWrapper) MpesaC2bValidation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "token" -------------
+	var token CallbackToken
+
+	err = runtime.BindStyledParameterWithOptions("simple", "token", r.PathValue("token"), &token, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MpesaC2bValidation(w, r, token)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MpesaStkCallback operation middleware
+func (siw *ServerInterfaceWrapper) MpesaStkCallback(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "token" -------------
+	var token CallbackToken
+
+	err = runtime.BindStyledParameterWithOptions("simple", "token", r.PathValue("token"), &token, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MpesaStkCallback(w, r, token)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1224,6 +1510,12 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/drivers/me/offers", wrapper.ListDriverOffers)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/offers/{offer_id}/accept", wrapper.AcceptOffer)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/offers/{offer_id}/reject", wrapper.RejectOffer)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/subscriptions/me", wrapper.GetSubscription)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/subscriptions/me/payments", wrapper.ListSubscriptionPayments)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/subscriptions/pay", wrapper.PaySubscription)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/webhooks/mpesa/{token}/stk", wrapper.MpesaStkCallback)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/webhooks/mpesa/{token}/c2b/validation", wrapper.MpesaC2bValidation)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/webhooks/mpesa/{token}/c2b/confirmation", wrapper.MpesaC2bConfirmation)
 
 	return m
 }
@@ -2146,6 +2438,120 @@ func (response StartTripdefaultJSONResponse) VisitStartTripResponse(w http.Respo
 	return err
 }
 
+type GetSubscriptionRequestObject struct {
+}
+
+type GetSubscriptionResponseObject interface {
+	VisitGetSubscriptionResponse(w http.ResponseWriter) error
+}
+
+type GetSubscription200JSONResponse Subscription
+
+func (response GetSubscription200JSONResponse) VisitGetSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSubscriptiondefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetSubscriptiondefaultJSONResponse) VisitGetSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSubscriptionPaymentsRequestObject struct {
+}
+
+type ListSubscriptionPaymentsResponseObject interface {
+	VisitListSubscriptionPaymentsResponse(w http.ResponseWriter) error
+}
+
+type ListSubscriptionPayments200JSONResponse SubscriptionPaymentList
+
+func (response ListSubscriptionPayments200JSONResponse) VisitListSubscriptionPaymentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSubscriptionPaymentsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListSubscriptionPaymentsdefaultJSONResponse) VisitListSubscriptionPaymentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PaySubscriptionRequestObject struct {
+}
+
+type PaySubscriptionResponseObject interface {
+	VisitPaySubscriptionResponse(w http.ResponseWriter) error
+}
+
+type PaySubscription202JSONResponse SubscriptionPayment
+
+func (response PaySubscription202JSONResponse) VisitPaySubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PaySubscriptiondefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response PaySubscriptiondefaultJSONResponse) VisitPaySubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListVehicleCategoriesRequestObject struct {
 }
 
@@ -2177,6 +2583,126 @@ func (response ListVehicleCategories500JSONResponse) VisitListVehicleCategoriesR
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MpesaC2bConfirmationRequestObject struct {
+	Token CallbackToken `json:"token"`
+	Body  *MpesaC2bConfirmationJSONRequestBody
+}
+
+type MpesaC2bConfirmationResponseObject interface {
+	VisitMpesaC2bConfirmationResponse(w http.ResponseWriter) error
+}
+
+type MpesaC2bConfirmation200JSONResponse MpesaAck
+
+func (response MpesaC2bConfirmation200JSONResponse) VisitMpesaC2bConfirmationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MpesaC2bConfirmationdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response MpesaC2bConfirmationdefaultJSONResponse) VisitMpesaC2bConfirmationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MpesaC2bValidationRequestObject struct {
+	Token CallbackToken `json:"token"`
+	Body  *MpesaC2bValidationJSONRequestBody
+}
+
+type MpesaC2bValidationResponseObject interface {
+	VisitMpesaC2bValidationResponse(w http.ResponseWriter) error
+}
+
+type MpesaC2bValidation200JSONResponse MpesaAck
+
+func (response MpesaC2bValidation200JSONResponse) VisitMpesaC2bValidationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MpesaC2bValidationdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response MpesaC2bValidationdefaultJSONResponse) VisitMpesaC2bValidationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MpesaStkCallbackRequestObject struct {
+	Token CallbackToken `json:"token"`
+	Body  *MpesaStkCallbackJSONRequestBody
+}
+
+type MpesaStkCallbackResponseObject interface {
+	VisitMpesaStkCallbackResponse(w http.ResponseWriter) error
+}
+
+type MpesaStkCallback200JSONResponse MpesaAck
+
+func (response MpesaStkCallback200JSONResponse) VisitMpesaStkCallbackResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MpesaStkCallbackdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response MpesaStkCallbackdefaultJSONResponse) VisitMpesaStkCallbackResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -2255,9 +2781,27 @@ type StrictServerInterface interface {
 	// StartTrip Start the trip
 	// (POST /v1/rides/{ride_id}/start)
 	StartTrip(ctx context.Context, request StartTripRequestObject) (StartTripResponseObject, error)
+	// GetSubscription Return this week's subscription and how to pay it
+	// (GET /v1/subscriptions/me)
+	GetSubscription(ctx context.Context, request GetSubscriptionRequestObject) (GetSubscriptionResponseObject, error)
+	// ListSubscriptionPayments List recent subscription payments
+	// (GET /v1/subscriptions/me/payments)
+	ListSubscriptionPayments(ctx context.Context, request ListSubscriptionPaymentsRequestObject) (ListSubscriptionPaymentsResponseObject, error)
+	// PaySubscription Send an M-Pesa prompt for this week to the driver's phone
+	// (POST /v1/subscriptions/pay)
+	PaySubscription(ctx context.Context, request PaySubscriptionRequestObject) (PaySubscriptionResponseObject, error)
 	// ListVehicleCategories List the vehicle categories open for booking and driver sign-up
 	// (GET /v1/vehicle-categories)
 	ListVehicleCategories(ctx context.Context, request ListVehicleCategoriesRequestObject) (ListVehicleCategoriesResponseObject, error)
+	// MpesaC2bConfirmation Receive a paybill payment from Safaricom
+	// (POST /v1/webhooks/mpesa/{token}/c2b/confirmation)
+	MpesaC2bConfirmation(ctx context.Context, request MpesaC2bConfirmationRequestObject) (MpesaC2bConfirmationResponseObject, error)
+	// MpesaC2bValidation Answer Safaricom's paybill validation
+	// (POST /v1/webhooks/mpesa/{token}/c2b/validation)
+	MpesaC2bValidation(ctx context.Context, request MpesaC2bValidationRequestObject) (MpesaC2bValidationResponseObject, error)
+	// MpesaStkCallback Receive an STK push result from Safaricom
+	// (POST /v1/webhooks/mpesa/{token}/stk)
+	MpesaStkCallback(ctx context.Context, request MpesaStkCallbackRequestObject) (MpesaStkCallbackResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -2963,6 +3507,78 @@ func (sh *strictHandler) StartTrip(w http.ResponseWriter, r *http.Request, rideI
 	}
 }
 
+// GetSubscription operation middleware
+func (sh *strictHandler) GetSubscription(w http.ResponseWriter, r *http.Request) {
+	var request GetSubscriptionRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSubscription(ctx, request.(GetSubscriptionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSubscription")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSubscriptionResponseObject); ok {
+		if err := validResponse.VisitGetSubscriptionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListSubscriptionPayments operation middleware
+func (sh *strictHandler) ListSubscriptionPayments(w http.ResponseWriter, r *http.Request) {
+	var request ListSubscriptionPaymentsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListSubscriptionPayments(ctx, request.(ListSubscriptionPaymentsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListSubscriptionPayments")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListSubscriptionPaymentsResponseObject); ok {
+		if err := validResponse.VisitListSubscriptionPaymentsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PaySubscription operation middleware
+func (sh *strictHandler) PaySubscription(w http.ResponseWriter, r *http.Request) {
+	var request PaySubscriptionRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PaySubscription(ctx, request.(PaySubscriptionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PaySubscription")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PaySubscriptionResponseObject); ok {
+		if err := validResponse.VisitPaySubscriptionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListVehicleCategories operation middleware
 func (sh *strictHandler) ListVehicleCategories(w http.ResponseWriter, r *http.Request) {
 	var request ListVehicleCategoriesRequestObject
@@ -2980,6 +3596,105 @@ func (sh *strictHandler) ListVehicleCategories(w http.ResponseWriter, r *http.Re
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListVehicleCategoriesResponseObject); ok {
 		if err := validResponse.VisitListVehicleCategoriesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// MpesaC2bConfirmation operation middleware
+func (sh *strictHandler) MpesaC2bConfirmation(w http.ResponseWriter, r *http.Request, token CallbackToken) {
+	var request MpesaC2bConfirmationRequestObject
+
+	request.Token = token
+
+	var body MpesaC2bConfirmationJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.MpesaC2bConfirmation(ctx, request.(MpesaC2bConfirmationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "MpesaC2bConfirmation")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(MpesaC2bConfirmationResponseObject); ok {
+		if err := validResponse.VisitMpesaC2bConfirmationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// MpesaC2bValidation operation middleware
+func (sh *strictHandler) MpesaC2bValidation(w http.ResponseWriter, r *http.Request, token CallbackToken) {
+	var request MpesaC2bValidationRequestObject
+
+	request.Token = token
+
+	var body MpesaC2bValidationJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.MpesaC2bValidation(ctx, request.(MpesaC2bValidationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "MpesaC2bValidation")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(MpesaC2bValidationResponseObject); ok {
+		if err := validResponse.VisitMpesaC2bValidationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// MpesaStkCallback operation middleware
+func (sh *strictHandler) MpesaStkCallback(w http.ResponseWriter, r *http.Request, token CallbackToken) {
+	var request MpesaStkCallbackRequestObject
+
+	request.Token = token
+
+	var body MpesaStkCallbackJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.MpesaStkCallback(ctx, request.(MpesaStkCallbackRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "MpesaStkCallback")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(MpesaStkCallbackResponseObject); ok {
+		if err := validResponse.VisitMpesaStkCallbackResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

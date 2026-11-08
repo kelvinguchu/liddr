@@ -507,8 +507,132 @@ paths:
         default:
           $ref: "#/components/responses/Problem"
 
+  /v1/subscriptions/me:
+    get:
+      operationId: getSubscription
+      summary: Return this week's subscription and how to pay it
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "200":
+          description: The subscription.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subscription"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/subscriptions/me/payments:
+    get:
+      operationId: listSubscriptionPayments
+      summary: List recent subscription payments
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "200":
+          description: Newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionPaymentList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/subscriptions/pay:
+    post:
+      operationId: paySubscription
+      summary: Send an M-Pesa prompt for this week to the driver's phone
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "202":
+          description: The prompt was sent or is being confirmed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionPayment"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/webhooks/mpesa/{token}/stk:
+    parameters:
+      - $ref: "#/components/parameters/CallbackToken"
+    post:
+      operationId: mpesaStkCallback
+      summary: Receive an STK push result from Safaricom
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MpesaCallback"
+      responses:
+        "200":
+          description: Accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MpesaAck"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/webhooks/mpesa/{token}/c2b/validation:
+    parameters:
+      - $ref: "#/components/parameters/CallbackToken"
+    post:
+      operationId: mpesaC2bValidation
+      summary: Answer Safaricom's paybill validation
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MpesaCallback"
+      responses:
+        "200":
+          description: Accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MpesaAck"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/webhooks/mpesa/{token}/c2b/confirmation:
+    parameters:
+      - $ref: "#/components/parameters/CallbackToken"
+    post:
+      operationId: mpesaC2bConfirmation
+      summary: Receive a paybill payment from Safaricom
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MpesaCallback"
+      responses:
+        "200":
+          description: Accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MpesaAck"
+        default:
+          $ref: "#/components/responses/Problem"
+
 components:
   parameters:
+    CallbackToken:
+      name: token
+      in: path
+      required: true
+      description: Shared secret. Safaricom cannot send custom headers.
+      schema:
+        type: string
     RideId:
       name: ride_id
       in: path
@@ -539,6 +663,81 @@ components:
       scheme: bearer
 
   schemas:
+    Subscription:
+      type: object
+      additionalProperties: false
+      required: [status, amount_kes, week_start, week_end, reference, paybill_shortcode]
+      properties:
+        status:
+          type: string
+          enum: [pending, active, expired]
+        amount_kes:
+          type: integer
+          format: int32
+        week_start:
+          type: string
+          format: date
+        week_end:
+          type: string
+          format: date
+        reference:
+          type: string
+          description: The account number to use when paying by paybill.
+        paybill_shortcode:
+          type: string
+
+    SubscriptionPayment:
+      type: object
+      additionalProperties: false
+      required: [id, channel, status, amount_kes, requested_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        channel:
+          type: string
+          enum: [stk, c2b]
+        status:
+          type: string
+          enum: [initiated, pending_callback, success, failed, cancelled, timeout, needs_review]
+        amount_kes:
+          type: integer
+          format: int32
+        receipt:
+          type: string
+        requested_at:
+          type: string
+          format: date-time
+        paid_at:
+          type: string
+          format: date-time
+
+    SubscriptionPaymentList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubscriptionPayment"
+
+    MpesaCallback:
+      type: object
+      additionalProperties: true
+      description: A Daraja callback body. Its shape is owned by Safaricom.
+
+    MpesaAck:
+      type: object
+      additionalProperties: false
+      required: [ResultCode, ResultDesc]
+      properties:
+        ResultCode:
+          type: integer
+          format: int32
+        ResultDesc:
+          type: string
+
     Coordinates:
       type: object
       additionalProperties: false

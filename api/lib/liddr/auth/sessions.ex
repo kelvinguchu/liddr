@@ -38,31 +38,25 @@ defmodule Liddr.Auth.Sessions do
 
           case Policy.ensure_user_can_authenticate(user) do
             :ok ->
-              :ok
+              updated_session =
+                Repo.update!(
+                  Ecto.Changeset.change(session, %{
+                    last_seen_at: now
+                  })
+                )
+
+              %{
+                user: user,
+                session_id: updated_session.id,
+                auth_method: updated_session.auth_method
+              }
 
             {:error, reason} ->
-              revoke_family!(session.session_family_id, now, "account_restricted")
-              Repo.rollback(reason)
+              revoke_and_fail(session, now, "account_restricted", reason)
           end
-
-          updated_session =
-            Repo.update!(
-              Ecto.Changeset.change(session, %{
-                last_seen_at: now
-              })
-            )
-
-          %{
-            user: user,
-            session_id: updated_session.id,
-            auth_method: updated_session.auth_method
-          }
       end
     end)
-    |> case do
-      {:ok, payload} -> {:ok, payload}
-      {:error, reason} -> {:error, reason}
-    end
+    |> unwrap_session_result()
   end
 
   def refresh_session(attrs, meta \\ %{}) do
@@ -80,8 +74,7 @@ defmodule Liddr.Auth.Sessions do
 
         cond do
           not is_nil(session.revoked_at) and session.revoked_reason == "rotated" ->
-            revoke_family!(session.session_family_id, now, "reuse_detected")
-            Repo.rollback(:refresh_token_reuse_detected)
+            revoke_and_fail(session, now, "reuse_detected", :refresh_token_reuse_detected)
 
           not is_nil(session.revoked_at) ->
             Repo.rollback(:refresh_token_revoked)
@@ -91,53 +84,18 @@ defmodule Liddr.Auth.Sessions do
               Ecto.Changeset.change(session, %{revoked_at: now, revoked_reason: "expired"})
             )
 
-            Repo.rollback(:refresh_token_expired)
+            {:commit_error, :refresh_token_expired}
 
           true ->
             user = Repo.get(User, session.user_id) || Repo.rollback(:user_not_found)
 
             case Policy.ensure_user_can_authenticate(user) do
-              :ok ->
-                :ok
-
-              {:error, reason} ->
-                revoke_family!(session.session_family_id, now, "account_restricted")
-                Repo.rollback(reason)
+              :ok -> rotate_session!(session, now, meta)
+              {:error, reason} -> revoke_and_fail(session, now, "account_restricted", reason)
             end
-
-            new_session_payload =
-              issue_session!(
-                session.user_id,
-                session.auth_method,
-                now,
-                %{
-                  ip: Input.get_value(meta, :ip),
-                  device: Input.get_value(meta, :device),
-                  user_agent: Input.get_value(meta, :user_agent)
-                },
-                session.session_family_id
-              )
-
-            replacement =
-              Repo.get_by!(AuthSession,
-                refresh_token_hash: Crypto.token_hash(new_session_payload.refresh_token)
-              )
-
-            Repo.update!(
-              Ecto.Changeset.change(session, %{
-                revoked_at: now,
-                revoked_reason: "rotated",
-                replaced_by_session_id: replacement.id
-              })
-            )
-
-            new_session_payload
         end
       end)
-      |> case do
-        {:ok, session_payload} -> {:ok, session_payload}
-        {:error, reason} -> {:error, reason}
-      end
+      |> unwrap_session_result()
     end
   end
 
@@ -218,6 +176,46 @@ defmodule Liddr.Auth.Sessions do
       session_id: session.id
     }
   end
+
+  defp rotate_session!(session, now, meta) do
+    new_session_payload =
+      issue_session!(
+        session.user_id,
+        session.auth_method,
+        now,
+        %{
+          ip: Input.get_value(meta, :ip),
+          device: Input.get_value(meta, :device),
+          user_agent: Input.get_value(meta, :user_agent)
+        },
+        session.session_family_id
+      )
+
+    replacement =
+      Repo.get_by!(AuthSession,
+        refresh_token_hash: Crypto.token_hash(new_session_payload.refresh_token)
+      )
+
+    Repo.update!(
+      Ecto.Changeset.change(session, %{
+        revoked_at: now,
+        revoked_reason: "rotated",
+        replaced_by_session_id: replacement.id
+      })
+    )
+
+    new_session_payload
+  end
+
+  # Returning a value commits the transaction; Repo.rollback/1 would undo the revocation.
+  defp revoke_and_fail(session, now, revoked_reason, error_reason) do
+    revoke_family!(session.session_family_id, now, revoked_reason)
+    {:commit_error, error_reason}
+  end
+
+  defp unwrap_session_result({:ok, {:commit_error, reason}}), do: {:error, reason}
+  defp unwrap_session_result({:ok, payload}), do: {:ok, payload}
+  defp unwrap_session_result({:error, reason}), do: {:error, reason}
 
   def revoke_family!(session_family_id, now, reason) do
     Repo.update_all(

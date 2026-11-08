@@ -3,7 +3,7 @@
 Ride-hailing and delivery platform for Kenya: Go API, Postgres, Redis, WebSockets, background jobs, M-Pesa, and an Android app.
 
 Layout: `go.work` at the root, the Go API in `apps/api`, the Android app in `apps/android`, and the old Elixir backend in `legacy/api`.
-Product rules: `docs/aboutapp.md` and the policy docs in `docs/`. Status: the Go API is being designed. Treat `legacy/api` as a business-rule reference, not as design or proof of correctness.
+Product rules: `docs/aboutapp.md` and the policy docs in `docs/`. Status: the Go API foundation is in place and features are being built. Treat `legacy/api` as a business-rule reference, not as design or proof of correctness.
 
 ## Priorities
 
@@ -29,15 +29,14 @@ In order: intentional product experience, low latency, security and privacy by d
 Run from `apps/api`. Toolchain: Go 1.27.3 or newer, pinned in `go.mod` with `go get go@1.27.3`.
 
 ```sh
-gofmt -l .                                # must print nothing
-golangci-lint run ./...
-go vet ./...
-go test ./...
+make db-up                                # local Postgres on 127.0.0.1:55432
+make check                                # formatting, lint, vet, tests with -race
+make generate                             # after editing the contract, queries or migrations
+make install-lint                         # pinned golangci-lint
+make seed-test-prices                     # KES 10-30 subscriptions for real-money tests; test databases only
 go test ./internal/rides -run 'TestComplete/final_fare'
-go test -race ./...                       # needs cgo; run before finishing concurrency work
 go test -fuzz=FuzzParseSTKCallback -fuzztime=30s ./internal/payments
 govulncheck ./...                         # gate CI on text mode; -json always exits 0
-sqlc vet && sqlc generate                 # after editing queries or migrations
 go fix -diff ./...                        # from a clean tree, after each toolchain bump
 ```
 
@@ -52,6 +51,7 @@ Use `golangci-lint` config `version: "2"`, installed by binary, with `default: n
 
 ```text
 cmd/api/main.go    calls run(ctx, args, getenv, stdout, stderr) error and exits
+internal/config    environment parsing and redacting secret type
 internal/httpapi   OpenAPI-generated types, handlers, middleware on net/http
 internal/realtime  WebSocket hub and per-connection writers
 internal/auth      sessions, OTP, TOTP, step-up
@@ -82,7 +82,8 @@ migrations/  queries/  testdata/
 - Pick value or pointer semantics when declaring a type, and keep to it.
 - Prefer synchronous functions and let callers add concurrency.
 - Before adding a dependency, check source, tests, maintenance, vulnerability history, licence and transitive dependencies.
-- Approved so far: `pgx/v5`, `sqlc`, River, `coder/websocket`, `go-cmp`, `goleak`, `x/sync/errgroup`. Choose and record a Redis client before first use.
+- Approved so far: `pgx/v5`, `sqlc`, `oapi-codegen`, `goose`, River, `coder/websocket`, `go-cmp`, `goleak`, `x/sync/errgroup`. Choose and record a Redis client before first use.
+- Migrations are forward-only goose files, applied by `api migrate` as a deploy step and never at server start.
 - Copy a few lines instead of adding a tiny dependency.
 - Do not optimize a path without a benchmark or profile. API p95 budget: under 300ms.
 

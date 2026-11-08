@@ -1,0 +1,125 @@
+openapi: 3.0.3
+info:
+  title: Liddr API
+  version: 0.1.0
+  description: Ride-hailing and delivery API for Kenya.
+
+# Every operation requires a session unless it opts out with `security: []`.
+security:
+  - bearerAuth: []
+
+paths:
+  /healthz:
+    get:
+      operationId: getLiveness
+      summary: Report that the process is running
+      security: []
+      responses:
+        "200":
+          description: The process is running.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+
+  /readyz:
+    get:
+      operationId: getReadiness
+      summary: Report whether the instance can serve traffic
+      security: []
+      responses:
+        "200":
+          description: The instance can serve traffic.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+        "503":
+          description: The instance is draining or cannot reach Postgres.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+
+  /v1/vehicle-categories:
+    get:
+      operationId: listVehicleCategories
+      summary: List the vehicle categories open for booking and driver sign-up
+      security: []
+      responses:
+        "200":
+          description: Active categories in display order.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VehicleCategoryList"
+        "500":
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+
+  schemas:
+    Health:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, unavailable]
+
+    VehicleCategory:
+      type: object
+      additionalProperties: false
+      required: [slug, label, capacity, weekly_subscription_kes]
+      properties:
+        slug:
+          type: string
+          example: motorbike
+        label:
+          type: string
+          example: Motorbike
+        capacity:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Passenger seats. Zero for package delivery.
+        weekly_subscription_kes:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Weekly driver subscription in whole Kenyan shillings.
+
+    VehicleCategoryList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/VehicleCategory"
+
+    Error:
+      type: object
+      additionalProperties: false
+      required: [code, message, request_id]
+      properties:
+        code:
+          type: string
+          description: Stable machine-readable error code.
+          example: INTERNAL_ERROR
+        message:
+          type: string
+          description: Safe message for display.
+        request_id:
+          type: string
+          description: Quote this when contacting support.

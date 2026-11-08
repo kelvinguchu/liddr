@@ -1,0 +1,66 @@
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - bodyclose
+    - depguard
+    - errcheck
+    - errorlint
+    - exhaustive
+    - forbidigo
+    - gosec
+    - govet
+    - ineffassign
+    - modernize
+    - sloglint
+    - sqlclosecheck
+    - staticcheck
+    - unused
+  settings:
+    depguard:
+      rules:
+        domain-stays-inward:
+          files:
+            - "**/internal/rides/**"
+            - "**/internal/store/**"
+          deny:
+            - pkg: github.com/kelvinguchu/liddr/apps/api/internal/httpapi
+              desc: dependencies point inward; domain packages must not import transport
+            - pkg: github.com/kelvinguchu/liddr/apps/api/internal/realtime
+              desc: domain packages push to sockets through an interface they define
+        store-stays-below-domain:
+          files:
+            - "**/internal/store/**"
+          deny:
+            - pkg: github.com/kelvinguchu/liddr/apps/api/internal/rides
+              desc: store must not depend on domain packages
+    forbidigo:
+      forbid:
+        - pattern: ^log\.Fatal.*$
+        - pattern: ^panic$
+        - pattern: ^fmt\.Print(f|ln)?$
+        - pattern: ^http\.DefaultServeMux$
+        - pattern: ^time\.Sleep$
+        - pattern: ^context\.Background$
+    sloglint:
+      no-global: all
+      context: all
+      static-msg: true
+  exclusions:
+    generated: lax
+    rules:
+      # These two are banned only in tests.
+      - path-except: _test\.go
+        linters:
+          - forbidigo
+        text: time\.Sleep|context\.Background
+      # Tests panic on purpose to exercise recovery.
+      - path: _test\.go
+        linters:
+          - forbidigo
+        text: panic
+
+formatters:
+  enable:
+    - gofmt

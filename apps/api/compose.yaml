@@ -1,0 +1,20 @@
+# Local Postgres for development and integration tests. Data is discarded on
+# `docker compose down`. These credentials exist only on this loopback port.
+name: liddr-api-dev
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: liddr
+      POSTGRES_PASSWORD: liddr
+      POSTGRES_DB: liddr
+    ports:
+      - "127.0.0.1:55432:5432"
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U liddr -d liddr"]
+      interval: 2s
+      timeout: 3s
+      retries: 30

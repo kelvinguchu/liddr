@@ -1021,7 +1021,7 @@ POST	/auth/logout	Invalidate current session	No (requires refresh token payload)
 27.5 Ride Endpoints
 Method	Endpoint	Description	Auth Required
 POST	/rides/quote	Quote fare before booking	Yes — Rider
-POST	/rides/requests	Create a new ride request	Yes — Rider
+POST	/rides/requests	Create a new ride request (quote_id required; final fare is set by the server)	Yes — Rider
 POST	/rides/:ride_id/cancel	Rider cancel before trip start	Yes — Rider
 GET	/rides/history/rider	Rider ride history	Yes — Rider
 GET	/rides/history/driver	Driver ride history	Yes — Driver
@@ -1047,7 +1047,7 @@ GET	/subscriptions/me/history	Past subscription payments	Yes — Driver
 27.8 Send (Delivery) Endpoints
 Method	Endpoint	Description	Auth Required
 POST	/send/quote	Quote a Send delivery fare	Yes — Rider
-POST	/send/requests	Create a Send delivery request	Yes — Rider
+POST	/send/requests	Create a Send delivery request (quote_id required)	Yes — Rider
 GET	/send/history/sender	Sender delivery history	Yes — Rider
 GET	/send/history/courier	Courier delivery history	Yes — Driver
 POST	/send/rides/:ride_id/pickup-proof	Capture package pickup proof photo reference	Yes — Driver

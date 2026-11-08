@@ -48,7 +48,7 @@ defmodule LiddrWeb.RideRateLimitControllerTest do
       requested_at: now
     })
 
-    response = post(rider_conn, "/api/rides/requests", %{}) |> json_response(429)
+    response = post_ride_request(rider_conn, %{}) |> json_response(429)
     assert get_in(response, ["error", "code"]) == "RIDE_REQUEST_RATE_LIMITED"
   end
 

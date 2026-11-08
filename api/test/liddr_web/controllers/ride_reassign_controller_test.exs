@@ -38,7 +38,7 @@ defmodule LiddrWeb.RideReassignControllerTest do
 
     %{"data" => %{"ride" => %{"id" => ride_id}, "offers" => [%{"id" => offer_id}]}} =
       rider_conn
-      |> post("/api/rides/requests", %{
+      |> post_ride_request(%{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
@@ -127,7 +127,7 @@ defmodule LiddrWeb.RideReassignControllerTest do
 
     %{"data" => %{"ride" => %{"id" => ride_id}, "offers" => [%{"id" => offer_id}]}} =
       rider_conn
-      |> post("/api/rides/requests", %{
+      |> post_ride_request(%{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",

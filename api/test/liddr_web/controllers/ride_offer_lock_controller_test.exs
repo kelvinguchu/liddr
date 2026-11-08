@@ -63,7 +63,7 @@ defmodule LiddrWeb.RideOfferLockControllerTest do
     )
 
     conn =
-      post(rider_conn, "/api/rides/requests", %{
+      post_ride_request(rider_conn, %{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
@@ -99,7 +99,7 @@ defmodule LiddrWeb.RideOfferLockControllerTest do
     Application.put_env(:liddr, TestOfferLock, test_pid: self(), locked_driver_ids: [])
 
     request_conn =
-      post(rider_conn, "/api/rides/requests", %{
+      post_ride_request(rider_conn, %{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
@@ -154,7 +154,7 @@ defmodule LiddrWeb.RideOfferLockControllerTest do
     )
 
     conn =
-      post(rider_conn, "/api/rides/requests", %{
+      post_ride_request(rider_conn, %{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
@@ -203,7 +203,7 @@ defmodule LiddrWeb.RideOfferLockControllerTest do
     )
 
     conn =
-      post(rider_conn, "/api/send/requests", %{
+      post_send_request(rider_conn, %{
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
         "dropoff_lat" => "-1.3000",

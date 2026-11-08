@@ -22,7 +22,7 @@ defmodule LiddrWeb.SendDeliveryControllerTest do
 
     %{"data" => %{"ride" => %{"id" => ride_id}, "offers" => [%{"id" => offer_id}]}} =
       rider_conn
-      |> post("/api/send/requests", %{
+      |> post_send_request(%{
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
         "dropoff_lat" => "-1.3000",
@@ -105,7 +105,7 @@ defmodule LiddrWeb.SendDeliveryControllerTest do
 
     %{"data" => %{"ride" => %{"id" => ride_id}, "offers" => [%{"id" => offer_id}]}} =
       rider_conn
-      |> post("/api/send/requests", %{
+      |> post_send_request(%{
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
         "dropoff_lat" => "-1.3000",
@@ -175,7 +175,7 @@ defmodule LiddrWeb.SendDeliveryControllerTest do
 
     %{"data" => %{"ride" => %{"id" => ride_id}, "offers" => [%{"id" => offer_id}]}} =
       rider_conn
-      |> post("/api/send/requests", %{
+      |> post_send_request(%{
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
         "dropoff_lat" => "-1.3000",

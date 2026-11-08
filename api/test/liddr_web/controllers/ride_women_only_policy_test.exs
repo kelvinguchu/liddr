@@ -15,7 +15,7 @@ defmodule LiddrWeb.RideWomenOnlyPolicyTest do
       VerificationFixtures.insert_vehicle_category!(%{slug: "women_only", label: "Women Only"})
 
     request_conn =
-      post(rider_conn, "/api/rides/requests", %{
+      post_ride_request(rider_conn, %{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
@@ -40,7 +40,7 @@ defmodule LiddrWeb.RideWomenOnlyPolicyTest do
       )
 
     request_conn =
-      post(rider_conn, "/api/rides/requests", %{
+      post_ride_request(rider_conn, %{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",

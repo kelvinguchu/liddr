@@ -51,6 +51,8 @@ defmodule LiddrWeb.SendController do
        "item_value_kes must be a non-negative decimal"},
     invalid_quote_id:
       {:unprocessable_entity, "INVALID_QUOTE_ID", "quote_id must be a positive integer"},
+    ride_quote_required:
+      {:unprocessable_entity, "RIDE_QUOTE_REQUIRED", "quote_id is required to book a ride"},
     ride_quote_not_found: {:not_found, "RIDE_QUOTE_NOT_FOUND", "Ride quote was not found"},
     ride_quote_expired: {:unprocessable_entity, "RIDE_QUOTE_EXPIRED", "Ride quote has expired"},
     ride_quote_vehicle_category_mismatch:

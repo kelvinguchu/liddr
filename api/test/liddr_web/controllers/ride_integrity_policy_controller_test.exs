@@ -19,7 +19,7 @@ defmodule LiddrWeb.RideIntegrityPolicyControllerTest do
     enable_prepay_only!(rider_user_id, 7)
 
     assert %{"error" => %{"code" => "RIDER_PREPAY_REQUIRED"}} =
-             post(rider_conn, "/api/rides/requests", %{
+             post_ride_request(rider_conn, %{
                "vehicle_category_id" => category_id,
                "pickup_lat" => "-1.2921",
                "pickup_lng" => "36.8219",
@@ -30,7 +30,7 @@ defmodule LiddrWeb.RideIntegrityPolicyControllerTest do
              |> json_response(422)
 
     assert %{"data" => %{"ride" => %{"id" => ride_id}}} =
-             post(rider_conn, "/api/rides/requests", %{
+             post_ride_request(rider_conn, %{
                "vehicle_category_id" => category_id,
                "pickup_lat" => "-1.2921",
                "pickup_lng" => "36.8219",
@@ -59,7 +59,7 @@ defmodule LiddrWeb.RideIntegrityPolicyControllerTest do
 
     %{"data" => %{"ride" => %{"id" => ride_id}, "offers" => [%{"id" => offer_id}]}} =
       request_conn =
-      post(rider_conn, "/api/rides/requests", %{
+      post_ride_request(rider_conn, %{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
@@ -104,7 +104,7 @@ defmodule LiddrWeb.RideIntegrityPolicyControllerTest do
 
     %{"data" => %{"ride" => %{"id" => ride_id}, "offers" => [%{"id" => offer_id}]}} =
       request_conn =
-      post(rider_conn, "/api/rides/requests", %{
+      post_ride_request(rider_conn, %{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",

@@ -16,6 +16,8 @@ defmodule Liddr.Auth do
   def refresh_session(attrs, meta \\ %{}), do: Sessions.refresh_session(attrs, meta)
   def logout(attrs), do: Sessions.logout(attrs)
 
+  defdelegate session_active?(session_id), to: Sessions
+
   def authenticate_access_token(access_token, meta \\ %{}),
     do: Sessions.authenticate_access_token(access_token, meta)
 

@@ -138,12 +138,10 @@ defmodule LiddrWeb.RideControllerErrors do
     payment_mode_mismatch_for_policy:
       {:unprocessable_entity, "PAYMENT_MODE_POLICY_MISMATCH",
        "payment_mode does not match the required mode for this ride"},
-    invalid_final_fare:
-      {:unprocessable_entity, "INVALID_FINAL_FARE",
-       "final_fare_kes must be greater than or equal to zero"},
+    ride_quote_required:
+      {:unprocessable_entity, "RIDE_QUOTE_REQUIRED", "quote_id is required to book a ride"},
     missing_final_fare:
-      {:unprocessable_entity, "MISSING_FINAL_FARE",
-       "final_fare_kes is required when no quote fare is available"},
+      {:unprocessable_entity, "MISSING_FINAL_FARE", "This ride has no agreed fare"},
     driver_not_locked_to_ride:
       {:unprocessable_entity, "DRIVER_NOT_LOCKED_TO_RIDE", "Driver is not locked to this ride"},
     offer_lock_backend_unavailable:

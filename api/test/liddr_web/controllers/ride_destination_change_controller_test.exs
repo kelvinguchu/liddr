@@ -217,7 +217,7 @@ defmodule LiddrWeb.RideDestinationChangeControllerTest do
       end
 
     %{"data" => %{"ride" => %{"id" => ride_id}, "offers" => [%{"id" => offer_id}]}} =
-      post(rider_conn, "/api/rides/requests", request_body) |> json_response(201)
+      post_ride_request(rider_conn, request_body) |> json_response(201)
 
     _ = post(driver_conn, "/api/rides/offers/#{offer_id}/accept", %{}) |> json_response(200)
     _ = post(driver_conn, "/api/rides/#{ride_id}/arrived", %{}) |> json_response(200)

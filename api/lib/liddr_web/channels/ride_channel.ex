@@ -3,6 +3,7 @@ defmodule LiddrWeb.RideChannel do
 
   alias Liddr.Rides
   alias Liddr.Rides.DriverTracking
+  alias LiddrWeb.ChannelSessionGuard
   alias LiddrWeb.RideSerializer
 
   @driver_location_event DriverTracking.event()
@@ -14,7 +15,8 @@ defmodule LiddrWeb.RideChannel do
     user_id = socket.assigns.current_user.id
     join_params = normalize_join_params(payload)
 
-    with {:ok, %{ride: ride, events: events, next_since: next_since}} <-
+    with true <- ChannelSessionGuard.active?(socket),
+         {:ok, %{ride: ride, events: events, next_since: next_since}} <-
            Rides.list_events_for_user(user_id, ride_id, join_params) do
       {:ok,
        %{
@@ -23,7 +25,7 @@ defmodule LiddrWeb.RideChannel do
          events: Enum.map(events, &RideSerializer.event_payload/1),
          next_since: next_since,
          driver_location: DriverTracking.latest_for_user(ride, user_id)
-       }, assign(socket, :ride_id, ride.id)}
+       }, socket |> assign(:ride_id, ride.id) |> ChannelSessionGuard.start()}
     else
       _ -> {:error, %{reason: "forbidden"}}
     end
@@ -55,6 +57,9 @@ defmodule LiddrWeb.RideChannel do
   @impl true
   def handle_in(_event, _payload, socket),
     do: {:reply, {:error, %{reason: "unsupported"}}, socket}
+
+  @impl true
+  def handle_info(:revalidate_session, socket), do: ChannelSessionGuard.revalidate(socket)
 
   @impl true
   def handle_out(@driver_location_event, %{visible_user_ids: user_ids} = payload, socket) do

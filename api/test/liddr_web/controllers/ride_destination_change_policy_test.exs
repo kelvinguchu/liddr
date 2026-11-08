@@ -202,7 +202,7 @@ defmodule LiddrWeb.RideDestinationChangePolicyTest do
     _ = create_eligible_driver_profile!(driver_user_id, category_id)
 
     %{"data" => %{"ride" => %{"id" => ride_id}, "offers" => [%{"id" => offer_id}]}} =
-      post(rider_conn, "/api/rides/requests", %{
+      post_ride_request(rider_conn, %{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",

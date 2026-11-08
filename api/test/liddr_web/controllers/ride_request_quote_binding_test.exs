@@ -8,6 +8,23 @@ defmodule LiddrWeb.RideRequestQuoteBindingTest do
   alias Liddr.VerificationFixtures
   alias LiddrWeb.AuthFixtures
 
+  test "POST /api/rides/requests rejects a booking without a quote", %{conn: conn} do
+    %{auth_conn: rider_conn, user_id: rider_user_id} = AuthFixtures.authenticate_rider!(conn)
+    category_id = VerificationFixtures.insert_vehicle_category!()
+
+    response =
+      post(rider_conn, "/api/rides/requests", %{
+        "vehicle_category_id" => category_id,
+        "pickup_lat" => "-1.2921",
+        "pickup_lng" => "36.8219",
+        "dropoff_lat" => "-1.3000",
+        "dropoff_lng" => "36.8000"
+      })
+
+    assert %{"error" => %{"code" => "RIDE_QUOTE_REQUIRED"}} = json_response(response, 422)
+    assert is_nil(Repo.get_by(Ride, rider_id: rider_user_id))
+  end
+
   test "POST /api/rides/requests links valid quote_id to ride", %{conn: conn} do
     now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
     %{auth_conn: rider_conn, user_id: rider_user_id} = AuthFixtures.authenticate_rider!(conn)
@@ -41,7 +58,7 @@ defmodule LiddrWeb.RideRequestQuoteBindingTest do
       |> Repo.insert!()
 
     request_conn =
-      post(rider_conn, "/api/rides/requests", %{
+      post_ride_request(rider_conn, %{
         "vehicle_category_id" => category_id,
         "quote_id" => quote.id
       })
@@ -86,7 +103,7 @@ defmodule LiddrWeb.RideRequestQuoteBindingTest do
       |> Repo.insert!()
 
     mismatch_conn =
-      post(rider_conn, "/api/rides/requests", %{
+      post_ride_request(rider_conn, %{
         "vehicle_category_id" => category_id,
         "quote_id" => shared_quote.id
       })
@@ -95,7 +112,7 @@ defmodule LiddrWeb.RideRequestQuoteBindingTest do
              json_response(mismatch_conn, 422)
 
     valid_conn =
-      post(rider_conn, "/api/rides/requests", %{
+      post_ride_request(rider_conn, %{
         "vehicle_category_id" => category_id,
         "product_type" => "shared",
         "quote_id" => shared_quote.id
@@ -120,7 +137,7 @@ defmodule LiddrWeb.RideRequestQuoteBindingTest do
     category_id = VerificationFixtures.insert_vehicle_category!(%{slug: "basic"})
 
     request_conn =
-      post(rider_conn, "/api/rides/requests", %{
+      post_ride_request(rider_conn, %{
         "vehicle_category_id" => category_id,
         "product_type" => "shared",
         "pickup_lat" => "-1.2922",

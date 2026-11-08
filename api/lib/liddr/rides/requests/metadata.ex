@@ -13,12 +13,6 @@ defmodule Liddr.Rides.Requests.Metadata do
 
   defp base_metadata(nil, nil), do: %{}
 
-  defp base_metadata(nil, requested_payment_mode) do
-    if is_binary(requested_payment_mode),
-      do: %{"requested_payment_mode" => requested_payment_mode},
-      else: %{}
-  end
-
   defp base_metadata(%RideQuote{} = quote, requested_payment_mode) do
     quote_product_type = ProductType.from_quote_payload(quote.provider_payload)
 

@@ -28,7 +28,7 @@ defmodule Liddr.Rides.Requests.Lookup do
     quote_id = PaymentUtils.get_value(attrs, :quote_id)
 
     if is_nil(quote_id) do
-      nil
+      Repo.rollback(:ride_quote_required)
     else
       parsed_quote_id =
         RequestParams.parse_positive_integer(quote_id) || Repo.rollback(:invalid_quote_id)
@@ -58,24 +58,10 @@ defmodule Liddr.Rides.Requests.Lookup do
     end
   end
 
-  def fetch_pickup_point(nil, attrs) do
-    %{
-      lat: PaymentUtils.get_value(attrs, :pickup_lat) |> RequestParams.to_float_or_nil(),
-      lng: PaymentUtils.get_value(attrs, :pickup_lng) |> RequestParams.to_float_or_nil()
-    }
-  end
-
   def fetch_pickup_point(%RideQuote{} = quote, _attrs) do
     %{
       lat: RequestParams.to_float_or_nil(quote.pickup_lat),
       lng: RequestParams.to_float_or_nil(quote.pickup_lng)
-    }
-  end
-
-  def fetch_dropoff_coordinates(nil, attrs) do
-    %{
-      lat: PaymentUtils.get_value(attrs, :dropoff_lat),
-      lng: PaymentUtils.get_value(attrs, :dropoff_lng)
     }
   end
 

@@ -18,7 +18,7 @@ defmodule LiddrWeb.RideExecutionControllerTest do
 
     %{"data" => %{"ride" => %{"id" => ride_id}, "offers" => [%{"id" => offer_id}]}} =
       rider_conn
-      |> post("/api/rides/requests", %{
+      |> post_ride_request(%{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
@@ -71,7 +71,7 @@ defmodule LiddrWeb.RideExecutionControllerTest do
 
     %{"data" => %{"ride" => %{"id" => ride_id}, "offers" => [%{"id" => offer_id}]}} =
       rider_conn
-      |> post("/api/rides/requests", %{
+      |> post_ride_request(%{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
@@ -95,7 +95,7 @@ defmodule LiddrWeb.RideExecutionControllerTest do
 
     %{"data" => %{"ride" => %{"id" => ride_id}, "offers" => [%{"id" => offer_id}]}} =
       rider_conn
-      |> post("/api/rides/requests", %{
+      |> post_ride_request(%{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
@@ -128,7 +128,7 @@ defmodule LiddrWeb.RideExecutionControllerTest do
     assert driver.is_available == true
 
     assert %{"data" => %{"offers_count" => 1}} =
-             post(rider_conn, "/api/rides/requests", %{
+             post_ride_request(rider_conn, %{
                "vehicle_category_id" => category_id,
                "pickup_lat" => "-1.2921",
                "pickup_lng" => "36.8219",
@@ -147,7 +147,7 @@ defmodule LiddrWeb.RideExecutionControllerTest do
 
     %{"data" => %{"ride" => %{"id" => ride_id}, "offers" => [%{"id" => offer_id}]}} =
       rider_conn
-      |> post("/api/rides/requests", %{
+      |> post_ride_request(%{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
@@ -198,7 +198,7 @@ defmodule LiddrWeb.RideExecutionControllerTest do
 
     %{"data" => %{"ride" => %{"id" => ride_id}, "offers" => [%{"id" => offer_id}]}} =
       rider_conn
-      |> post("/api/rides/requests", %{
+      |> post_ride_request(%{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
@@ -227,7 +227,7 @@ defmodule LiddrWeb.RideExecutionControllerTest do
 
     %{"data" => %{"ride" => %{"id" => ride_id}, "offers" => [%{"id" => offer_id}]}} =
       rider_conn
-      |> post("/api/rides/requests", %{
+      |> post_ride_request(%{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",

@@ -165,6 +165,26 @@ defmodule Liddr.Auth.Sessions do
     end
   end
 
+  def session_active?(nil), do: false
+
+  def session_active?(session_id) do
+    now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
+
+    user =
+      Repo.one(
+        from s in AuthSession,
+          join: live in AuthSession,
+          on: live.session_family_id == s.session_family_id,
+          join: u in User,
+          on: u.id == s.user_id,
+          where: s.id == ^session_id and is_nil(live.revoked_at) and live.expires_at > ^now,
+          limit: 1,
+          select: u
+      )
+
+    not is_nil(user) and Policy.ensure_user_can_authenticate(user) == :ok
+  end
+
   def issue_session!(user_id, auth_method, now, meta, session_family_id \\ nil) do
     access_token = Crypto.token_value()
     refresh_token = Crypto.token_value()

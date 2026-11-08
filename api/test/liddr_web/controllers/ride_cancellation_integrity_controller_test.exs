@@ -174,7 +174,7 @@ defmodule LiddrWeb.RideCancellationIntegrityControllerTest do
   defp request_and_accept_ride!(rider_conn, driver_conn, category_id) do
     %{"data" => %{"offers" => [%{"id" => offer_id}]}} =
       request_conn =
-      post(rider_conn, "/api/rides/requests", %{
+      post_ride_request(rider_conn, %{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",

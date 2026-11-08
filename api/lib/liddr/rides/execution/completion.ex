@@ -1,4 +1,6 @@
 defmodule Liddr.Rides.Execution.Completion do
+  import Ecto.Query
+
   alias Decimal, as: D
   alias Liddr.Location
   alias Liddr.Repo
@@ -10,9 +12,11 @@ defmodule Liddr.Rides.Execution.Completion do
   alias Liddr.Rides.Realtime
   alias Liddr.Rides.RideQuote
   alias Liddr.Rides.SendDeliveries
+  alias Liddr.Rides.SharedRideMember
   alias Liddr.Subscriptions.PaymentUtils
 
   @payment_modes ~w(cash_direct mpesa_direct in_app_mpesa)
+  @unbilled_member_statuses ~w(cancelled no_show)
 
   def complete_ride(driver_user_id, ride_id, attrs \\ %{}) do
     now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
@@ -35,7 +39,7 @@ defmodule Liddr.Rides.Execution.Completion do
             SendDeliveries.ensure_completion_allowed!(ride, now)
             payment_mode = resolve_payment_mode!(attrs)
             ensure_request_payment_mode_policy!(ride, payment_mode)
-            {final_fare, pricing_payload} = resolve_completion_pricing!(ride, attrs, payment_mode)
+            {final_fare, pricing_payload} = resolve_completion_pricing!(ride, payment_mode)
             geofence = Geofence.ensure_completion!(ride, driver.user_id, now)
 
             completed_ride =
@@ -106,33 +110,19 @@ defmodule Liddr.Rides.Execution.Completion do
       else: Repo.rollback(:invalid_payment_mode)
   end
 
-  defp resolve_completion_pricing!(ride, attrs, payment_mode) do
+  defp resolve_completion_pricing!(ride, payment_mode) do
     quote = fetch_quote(ride.quote_id)
-    provided_final_fare = attrs |> PaymentUtils.get_value(:final_fare_kes) |> parse_decimal()
-    quoted_final_fare = quote && quote.final_fare_kes
     metadata_final_fare = ride.metadata |> quoted_final_from_metadata() |> parse_decimal()
+    quoted_final_fare = metadata_final_fare || (quote && quote.final_fare_kes)
+    member_total_fare = shared_member_total(ride)
 
     final_fare =
-      provided_final_fare || quoted_final_fare || metadata_final_fare ||
-        Repo.rollback(:missing_final_fare)
-
-    if D.compare(final_fare, D.new("0")) == :lt do
-      Repo.rollback(:invalid_final_fare)
-    end
-
-    currency =
-      attrs
-      |> PaymentUtils.get_value(:currency)
-      |> PaymentUtils.normalize_text()
-      |> case do
-        nil -> "KES"
-        value -> String.upcase(value)
-      end
+      member_total_fare || quoted_final_fare || Repo.rollback(:missing_final_fare)
 
     pricing_payload = %{
       "quote_id" => ride.quote_id,
-      "source" => if(provided_final_fare, do: "provided", else: "quoted"),
-      "currency" => currency,
+      "source" => if(member_total_fare, do: "shared_members", else: "quoted"),
+      "currency" => "KES",
       "payment_mode" => payment_mode,
       "quoted_final_fare_kes" => decimal_to_string(quoted_final_fare),
       "final_fare_kes" => decimal_to_string(final_fare),
@@ -141,6 +131,16 @@ defmodule Liddr.Rides.Execution.Completion do
 
     {final_fare, pricing_payload}
   end
+
+  defp shared_member_total(%{product_type: "shared", id: ride_id}) do
+    Repo.one(
+      from m in SharedRideMember,
+        where: m.ride_id == ^ride_id and m.status not in ^@unbilled_member_statuses,
+        select: sum(m.fare_kes)
+    )
+  end
+
+  defp shared_member_total(_ride), do: nil
 
   defp quote_pricing_payload(nil), do: %{}
 
@@ -190,12 +190,14 @@ defmodule Liddr.Rides.Execution.Completion do
 
   defp parse_decimal(value) when is_binary(value) do
     case D.parse(String.trim(value)) do
-      {decimal, ""} -> decimal
+      {decimal, ""} -> if finite_decimal?(decimal), do: decimal
       _ -> nil
     end
   end
 
   defp parse_decimal(_value), do: nil
+
+  defp finite_decimal?(decimal), do: not (D.nan?(decimal) or D.inf?(decimal))
 
   defp decimal_to_string(nil), do: nil
   defp decimal_to_string(%D{} = value), do: D.to_string(value, :normal)

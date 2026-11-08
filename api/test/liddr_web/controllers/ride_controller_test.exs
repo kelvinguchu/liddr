@@ -36,7 +36,7 @@ defmodule LiddrWeb.RideControllerTest do
       )
 
     conn =
-      post(rider_conn, "/api/rides/requests", %{
+      post_ride_request(rider_conn, %{
         "vehicle_category_id" => 1,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
@@ -54,7 +54,7 @@ defmodule LiddrWeb.RideControllerTest do
     motorbike_id = VerificationFixtures.insert_vehicle_category!(%{slug: "motorbike"})
 
     conn =
-      post(rider_conn, "/api/rides/requests", %{
+      post_ride_request(rider_conn, %{
         "vehicle_category_id" => motorbike_id,
         "product_type" => "shared",
         "pickup_lat" => "-1.2921",
@@ -94,7 +94,7 @@ defmodule LiddrWeb.RideControllerTest do
       )
 
     request_conn =
-      post(rider_conn, "/api/rides/requests", %{
+      post_ride_request(rider_conn, %{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
@@ -132,7 +132,7 @@ defmodule LiddrWeb.RideControllerTest do
     _ = create_eligible_driver_profile!(driver_user_id, category_id)
 
     request_conn =
-      post(rider_conn, "/api/rides/requests", %{
+      post_ride_request(rider_conn, %{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
@@ -167,7 +167,7 @@ defmodule LiddrWeb.RideControllerTest do
     _ = create_eligible_driver_profile!(driver_user_id, category_id)
 
     request_conn =
-      post(rider_conn, "/api/rides/requests", %{
+      post_ride_request(rider_conn, %{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
@@ -220,7 +220,7 @@ defmodule LiddrWeb.RideControllerTest do
       )
 
     request_conn =
-      post(rider_conn, "/api/rides/requests", %{
+      post_ride_request(rider_conn, %{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
@@ -285,7 +285,7 @@ defmodule LiddrWeb.RideControllerTest do
     _ = create_eligible_driver_profile!(second_driver_user_id, category_id)
 
     request_conn =
-      post(rider_conn, "/api/rides/requests", %{
+      post_ride_request(rider_conn, %{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
@@ -327,7 +327,7 @@ defmodule LiddrWeb.RideControllerTest do
     _ = create_eligible_driver_profile!(driver_user_id, category_id)
 
     first_request_conn =
-      post(first_rider_conn, "/api/rides/requests", %{
+      post_ride_request(first_rider_conn, %{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
@@ -391,7 +391,7 @@ defmodule LiddrWeb.RideControllerTest do
     _ = create_eligible_driver_profile!(driver_user_id, category_id)
 
     request_conn =
-      post(rider_conn, "/api/rides/requests", %{
+      post_ride_request(rider_conn, %{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
@@ -430,7 +430,7 @@ defmodule LiddrWeb.RideControllerTest do
     _ = create_eligible_driver_profile!(second_driver_id, category_id)
 
     request_conn =
-      post(rider_conn, "/api/rides/requests", %{
+      post_ride_request(rider_conn, %{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",

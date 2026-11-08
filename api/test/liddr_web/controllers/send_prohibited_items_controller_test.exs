@@ -61,7 +61,7 @@ defmodule LiddrWeb.SendProhibitedItemsControllerTest do
     insert_prohibited_item!("firearm", "block", "Firearms are not allowed")
 
     conn =
-      post(auth_conn, "/api/send/requests", %{
+      post_send_request(auth_conn, %{
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
         "dropoff_lat" => "-1.3000",
@@ -91,7 +91,7 @@ defmodule LiddrWeb.SendProhibitedItemsControllerTest do
     insert_prohibited_item!("jewellery", "warn", "High-value item is sender liability")
 
     conn =
-      post(auth_conn, "/api/send/requests", %{
+      post_send_request(auth_conn, %{
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
         "dropoff_lat" => "-1.3000",
@@ -116,7 +116,7 @@ defmodule LiddrWeb.SendProhibitedItemsControllerTest do
     insert_prohibited_item!("jewellery", "warn", "High-value item is sender liability")
 
     conn =
-      post(auth_conn, "/api/send/requests", %{
+      post_send_request(auth_conn, %{
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
         "dropoff_lat" => "-1.3000",

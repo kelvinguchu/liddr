@@ -34,7 +34,7 @@ defmodule LiddrWeb.SharedPoolingDetourGuardTest do
       )
 
     response =
-      post(joining_conn, "/api/rides/requests", %{
+      post_ride_request(joining_conn, %{
         "vehicle_category_id" => category_id,
         "product_type" => "shared",
         "quote_id" => quote.id,

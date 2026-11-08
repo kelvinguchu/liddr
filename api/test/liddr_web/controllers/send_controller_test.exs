@@ -92,6 +92,30 @@ defmodule LiddrWeb.SendControllerTest do
     assert_received {:send_routes_input, _input}
   end
 
+  test "POST /api/send/requests rejects a delivery without a quote", %{conn: conn} do
+    %{auth_conn: auth_conn} = AuthFixtures.authenticate_rider!(conn)
+    %{user_id: recipient_user_id} = AuthFixtures.authenticate_rider!(conn)
+    recipient_phone = Repo.get!(User, recipient_user_id).phone
+    _send_category_id = VerificationFixtures.insert_vehicle_category!(%{slug: "send"})
+
+    response =
+      post(auth_conn, "/api/send/requests", %{
+        "pickup_lat" => "-1.2921",
+        "pickup_lng" => "36.8219",
+        "dropoff_lat" => "-1.3000",
+        "dropoff_lng" => "36.8000",
+        "sender_name" => "Alice",
+        "recipient_name" => "Bob",
+        "recipient_phone" => recipient_phone,
+        "item_description" => "Small package",
+        "item_size" => "small",
+        "payer" => "sender",
+        "payment_timing" => "after"
+      })
+
+    assert %{"error" => %{"code" => "RIDE_QUOTE_REQUIRED"}} = json_response(response, 422)
+  end
+
   test "POST /api/send/requests creates a send ride with delivery details", %{conn: conn} do
     %{auth_conn: auth_conn, user_id: rider_user_id} = AuthFixtures.authenticate_rider!(conn)
     %{user_id: recipient_user_id} = AuthFixtures.authenticate_rider!(conn)
@@ -99,7 +123,7 @@ defmodule LiddrWeb.SendControllerTest do
     send_category_id = VerificationFixtures.insert_vehicle_category!(%{slug: "send"})
 
     conn =
-      post(auth_conn, "/api/send/requests", %{
+      post_send_request(auth_conn, %{
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
         "dropoff_lat" => "-1.3000",
@@ -149,7 +173,7 @@ defmodule LiddrWeb.SendControllerTest do
     first_conn =
       auth_conn
       |> put_req_header("idempotency-key", key)
-      |> post("/api/send/requests", %{
+      |> post_send_request(%{
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
         "dropoff_lat" => "-1.3000",
@@ -166,7 +190,7 @@ defmodule LiddrWeb.SendControllerTest do
     second_conn =
       auth_conn
       |> put_req_header("idempotency-key", key)
-      |> post("/api/send/requests", %{
+      |> post_send_request(%{
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
         "dropoff_lat" => "-1.3000",
@@ -199,7 +223,7 @@ defmodule LiddrWeb.SendControllerTest do
     _send_category_id = VerificationFixtures.insert_vehicle_category!(%{slug: "send"})
 
     conn =
-      post(auth_conn, "/api/send/requests", %{
+      post_send_request(auth_conn, %{
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
         "dropoff_lat" => "-1.3000",
@@ -221,7 +245,7 @@ defmodule LiddrWeb.SendControllerTest do
     _send_category_id = VerificationFixtures.insert_vehicle_category!(%{slug: "send"})
 
     conn =
-      post(auth_conn, "/api/send/requests", %{
+      post_send_request(auth_conn, %{
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
         "dropoff_lat" => "-1.3000",

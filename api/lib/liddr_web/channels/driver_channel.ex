@@ -1,12 +1,15 @@
 defmodule LiddrWeb.DriverChannel do
   use LiddrWeb, :channel
 
+  alias LiddrWeb.ChannelSessionGuard
+
   @impl true
   def join("driver:" <> driver_id, _payload, socket) do
-    with {:ok, parsed_driver_id} <- parse_positive_integer(driver_id),
+    with true <- ChannelSessionGuard.active?(socket),
+         {:ok, parsed_driver_id} <- parse_positive_integer(driver_id),
          true <- driver_role?(socket),
          true <- socket.assigns.current_user.id == parsed_driver_id do
-      {:ok, %{driver_id: parsed_driver_id}, socket}
+      {:ok, %{driver_id: parsed_driver_id}, ChannelSessionGuard.start(socket)}
     else
       _ -> {:error, %{reason: "forbidden"}}
     end
@@ -17,6 +20,9 @@ defmodule LiddrWeb.DriverChannel do
   @impl true
   def handle_in(_event, _payload, socket),
     do: {:reply, {:error, %{reason: "unsupported"}}, socket}
+
+  @impl true
+  def handle_info(:revalidate_session, socket), do: ChannelSessionGuard.revalidate(socket)
 
   defp driver_role?(socket) do
     socket.assigns

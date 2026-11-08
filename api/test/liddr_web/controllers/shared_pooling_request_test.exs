@@ -28,7 +28,7 @@ defmodule LiddrWeb.SharedPoolingRequestTest do
     quote = create_shared_quote!(joining_rider_id, category_id, D.new("170.00"))
 
     response =
-      post(joining_conn, "/api/rides/requests", %{
+      post_ride_request(joining_conn, %{
         "vehicle_category_id" => category_id,
         "product_type" => "shared",
         "quote_id" => quote.id,
@@ -89,7 +89,7 @@ defmodule LiddrWeb.SharedPoolingRequestTest do
       )
 
     response =
-      post(joining_conn, "/api/rides/requests", %{
+      post_ride_request(joining_conn, %{
         "vehicle_category_id" => category_id,
         "product_type" => "shared",
         "pickup_lat" => "-1.2900000",
@@ -133,18 +133,9 @@ defmodule LiddrWeb.SharedPoolingRequestTest do
     assert joined_candidate_member_count == 1
   end
 
-  test "shared request without quote does not join existing shared group", %{conn: conn} do
-    %{user_id: primary_rider_id} = AuthFixtures.authenticate_rider!(conn)
+  test "shared request without quote is rejected", %{conn: conn} do
     %{auth_conn: joining_conn, user_id: joining_rider_id} = AuthFixtures.authenticate_rider!(conn)
     category_id = VerificationFixtures.insert_vehicle_category!(%{slug: "basic"})
-
-    %{ride: base_ride} =
-      create_shared_ride_group!(primary_rider_id, category_id,
-        pickup_lat: "-1.2921000",
-        pickup_lng: "36.8219000",
-        dropoff_lat: "-1.3000000",
-        dropoff_lng: "36.8000000"
-      )
 
     response =
       post(joining_conn, "/api/rides/requests", %{
@@ -157,22 +148,14 @@ defmodule LiddrWeb.SharedPoolingRequestTest do
         "offer_limit" => 1
       })
 
-    assert %{
-             "data" => %{
-               "ride" => %{"id" => new_ride_id, "rider_id" => ^joining_rider_id}
-             }
-           } = json_response(response, 201)
+    assert %{"error" => %{"code" => "RIDE_QUOTE_REQUIRED"}} = json_response(response, 422)
 
-    refute new_ride_id == base_ride.id
-
-    base_member_count =
-      Repo.aggregate(
-        from(m in SharedRideMember, where: m.ride_id == ^base_ride.id),
-        :count,
-        :id
-      )
-
-    assert base_member_count == 1
+    assert 0 ==
+             Repo.aggregate(
+               from(r in Liddr.Rides.Ride, where: r.rider_id == ^joining_rider_id),
+               :count,
+               :id
+             )
   end
 
   defp create_shared_ride_group!(rider_user_id, category_id, opts) do

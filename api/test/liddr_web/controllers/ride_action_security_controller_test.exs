@@ -44,13 +44,13 @@ defmodule LiddrWeb.RideActionSecurityControllerTest do
     assert %{"data" => %{"ride" => %{"id" => _ride_id}}} =
              rider_one_conn
              |> put_req_header("x-device-id", shared_device)
-             |> post("/api/rides/requests", payload)
+             |> post_ride_request(payload)
              |> json_response(201)
 
     assert %{"error" => %{"code" => "RIDE_ACTION_SECURITY_RATE_LIMITED"}} =
              rider_two_conn
              |> put_req_header("x-device-id", shared_device)
-             |> post("/api/rides/requests", payload)
+             |> post_ride_request(payload)
              |> json_response(429)
   end
 

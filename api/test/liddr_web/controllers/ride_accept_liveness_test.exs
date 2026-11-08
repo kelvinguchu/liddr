@@ -37,7 +37,7 @@ defmodule LiddrWeb.RideAcceptLivenessTest do
         "offers" => [%{"id" => offer_id, "driver_id" => ^driver_user_id}]
       }
     } =
-      post(rider_conn, "/api/rides/requests", %{
+      post_ride_request(rider_conn, %{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",

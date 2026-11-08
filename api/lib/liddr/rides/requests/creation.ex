@@ -105,7 +105,7 @@ defmodule Liddr.Rides.Requests.Creation do
       %Ride{}
       |> Ride.create_changeset(%{
         "rider_id" => rider_user_id,
-        "quote_id" => quote && quote.id,
+        "quote_id" => quote.id,
         "vehicle_category_id" => category.id,
         "status" => if(inline_dispatch?, do: "requested", else: "offering"),
         "product_type" => product_type,

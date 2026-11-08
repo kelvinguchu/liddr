@@ -53,7 +53,7 @@ defmodule LiddrWeb.RideDispatchFlowTest do
       )
 
     conn =
-      post(rider_conn, "/api/rides/requests", %{
+      post_ride_request(rider_conn, %{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
@@ -92,7 +92,7 @@ defmodule LiddrWeb.RideDispatchFlowTest do
       )
 
     first_request =
-      post(rider_conn, "/api/rides/requests", %{
+      post_ride_request(rider_conn, %{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
@@ -131,7 +131,7 @@ defmodule LiddrWeb.RideDispatchFlowTest do
       |> json_response(200)
 
     second_request =
-      post(rider_conn, "/api/rides/requests", %{
+      post_ride_request(rider_conn, %{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
@@ -152,7 +152,7 @@ defmodule LiddrWeb.RideDispatchFlowTest do
     assert %{"data" => %{"ride" => %{"status" => "completed"}}} = json_response(completed, 200)
 
     third_request =
-      post(rider_conn, "/api/rides/requests", %{
+      post_ride_request(rider_conn, %{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",
@@ -207,7 +207,7 @@ defmodule LiddrWeb.RideDispatchFlowTest do
       )
 
     request_conn =
-      post(rider_conn, "/api/rides/requests", %{
+      post_ride_request(rider_conn, %{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",

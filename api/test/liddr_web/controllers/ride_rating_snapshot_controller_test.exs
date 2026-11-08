@@ -22,7 +22,7 @@ defmodule LiddrWeb.RideRatingSnapshotControllerTest do
     update_user_rating!(driver_user_id, "4.58", 8)
 
     request_conn =
-      post(rider_conn, "/api/rides/requests", %{
+      post_ride_request(rider_conn, %{
         "vehicle_category_id" => category_id,
         "pickup_lat" => "-1.2921",
         "pickup_lng" => "36.8219",

@@ -28,6 +28,7 @@ defmodule LiddrWeb.ConnCase do
       import Plug.Conn
       import Phoenix.ConnTest
       import LiddrWeb.ConnCase
+      import LiddrWeb.RideQuoteFixtures
     end
   end
 

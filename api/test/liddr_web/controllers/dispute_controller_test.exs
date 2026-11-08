@@ -146,6 +146,60 @@ defmodule LiddrWeb.DisputeControllerTest do
     assert length(all) == 2
   end
 
+  test "GET /api/disputes/me hides reporter details from the reported user", %{conn: conn} do
+    %{auth_conn: driver_conn, user_id: driver_id} = AuthFixtures.authenticate_driver!(conn)
+    %{auth_conn: rider_conn, user_id: rider_id} = AuthFixtures.authenticate_rider!(conn)
+    ride = create_ride!(rider_id, driver_id, "completed")
+
+    _ =
+      post(rider_conn, "/api/disputes", %{
+        "ride_id" => ride.id,
+        "dispute_type" => "fare_dispute",
+        "description" => "Reporter statement that the driver should not read."
+      })
+      |> json_response(201)
+
+    assert %{"data" => %{"disputes" => [received]}} =
+             get(driver_conn, "/api/disputes/me?scope=received") |> json_response(200)
+
+    assert received["dispute_type"] == "fare_dispute"
+    assert received["reported_user_id"] == driver_id
+
+    for field <- ~w(reporter_user_id description severity_level resolution_summary) do
+      refute Map.has_key?(received, field)
+    end
+
+    assert %{"data" => %{"disputes" => [opened]}} =
+             get(rider_conn, "/api/disputes/me?scope=opened") |> json_response(200)
+
+    assert opened["description"] == "Reporter statement that the driver should not read."
+    assert opened["reporter_user_id"] == rider_id
+  end
+
+  test "GET /api/disputes/me keeps safety disputes from the reported user", %{conn: conn} do
+    ensure_dispute_category!("harassment_or_abuse")
+    %{auth_conn: driver_conn, user_id: driver_id} = AuthFixtures.authenticate_driver!(conn)
+    %{auth_conn: rider_conn, user_id: rider_id} = AuthFixtures.authenticate_rider!(conn)
+    ride = create_ride!(rider_id, driver_id, "completed")
+
+    _ =
+      post(rider_conn, "/api/disputes", %{
+        "ride_id" => ride.id,
+        "dispute_type" => "safety_incident",
+        "description" => "Driver harassed me during the trip."
+      })
+      |> json_response(201)
+
+    for path <- ["/api/disputes/me", "/api/disputes/me?scope=received"] do
+      assert %{"data" => %{"disputes" => []}} = get(driver_conn, path) |> json_response(200)
+    end
+
+    assert %{"data" => %{"disputes" => [opened]}} =
+             get(rider_conn, "/api/disputes/me") |> json_response(200)
+
+    assert opened["dispute_type"] == "safety_incident"
+  end
+
   test "POST /api/ops/disputes/:id/resolve supports partial refund outcome", %{conn: conn} do
     %{auth_conn: rider_conn, user_id: rider_id} = AuthFixtures.authenticate_rider!(conn)
     %{user_id: driver_id} = AuthFixtures.authenticate_driver!(conn)

@@ -38,18 +38,21 @@ defmodule Liddr.Auth.Totp do
   end
 
   def verify_code(secret, code, now \\ DateTime.utc_now(), opts \\ []) do
+    with {:ok, _counter} <- matching_counter(secret, code, now, opts), do: :ok
+  end
+
+  def matching_counter(secret, code, now \\ DateTime.utc_now(), opts \\ []) do
     with {:ok, normalized_secret} <- normalize_secret(secret),
          {:ok, normalized_code} <- normalize_code(code) do
       counter = now |> DateTime.to_unix(:second) |> div(@period_seconds)
       window = Keyword.get(opts, :window, 1)
 
-      if Enum.any?(
-           -window..window,
-           &code_matches?(normalized_secret, normalized_code, counter, &1)
-         ) do
-        :ok
-      else
-        {:error, :invalid_totp_code}
+      case Enum.find(
+             -window..window,
+             &code_matches?(normalized_secret, normalized_code, counter, &1)
+           ) do
+        nil -> {:error, :invalid_totp_code}
+        offset -> {:ok, max(counter + offset, 0)}
       end
     end
   end
@@ -78,7 +81,7 @@ defmodule Liddr.Auth.Totp do
   def decrypt_payload(token, salt) when is_binary(token) and is_binary(salt) do
     case MessageEncryptor.decrypt(token, aad(salt), encryption_key(salt), signing_key(salt)) do
       {:ok, json} -> Jason.decode(json)
-      {:error, reason} -> {:error, reason}
+      :error -> {:error, :invalid_totp_token}
     end
   end
 

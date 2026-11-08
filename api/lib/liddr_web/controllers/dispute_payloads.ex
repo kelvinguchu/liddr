@@ -1,4 +1,12 @@
 defmodule LiddrWeb.DisputePayloads do
+  @reporter_only_fields ~w(reporter_user_id description severity_level resolution_summary)a
+
+  def report_for_viewer(%{reporter_user_id: viewer_user_id} = report, viewer_user_id),
+    do: report(report)
+
+  def report_for_viewer(report, _viewer_user_id),
+    do: report |> report() |> Map.drop(@reporter_only_fields)
+
   def report(report) do
     %{
       id: report.id,

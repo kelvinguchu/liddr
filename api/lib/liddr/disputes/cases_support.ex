@@ -1,5 +1,21 @@
 defmodule Liddr.Disputes.CasesSupport do
+  import Ecto.Query
+
   alias Liddr.Moderation.Query
+
+  @reporter_only_dispute_types ~w(safety_incident wrong_driver)
+
+  def visible_to_reported_user(user_id) do
+    dynamic(
+      [r],
+      r.reported_user_id == ^user_id and
+        fragment(
+          "NOT (? ->> 'dispute_type' = ANY(?))",
+          r.metadata,
+          type(^@reporter_only_dispute_types, {:array, :string})
+        )
+    )
+  end
 
   def build_review_attrs(attrs, outcome, decision) do
     summary =

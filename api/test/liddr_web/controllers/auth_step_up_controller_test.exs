@@ -119,6 +119,60 @@ defmodule LiddrWeb.AuthStepUpControllerTest do
     assert is_binary(step_up_token)
   end
 
+  test "POST /api/auth/step-up/verify rejects a replayed totp code", %{conn: _conn} do
+    %{auth_conn: auth_conn} = AuthFixtures.authenticate_ops!("ops-totp-replay@example.com")
+    code = Liddr.Auth.Totp.current_code(auth_conn.assigns.test_totp_secret)
+
+    assert %{"data" => %{"step_up_token" => _token}} =
+             auth_conn |> verify_totp(code) |> json_response(200)
+
+    assert %{"error" => %{"code" => "INVALID_TOTP_CODE"}} =
+             auth_conn |> verify_totp(code) |> json_response(401)
+  end
+
+  test "POST /api/auth/step-up/verify locks totp after repeated failures", %{conn: _conn} do
+    %{auth_conn: auth_conn} = AuthFixtures.authenticate_ops!("ops-totp-lock@example.com")
+    code = Liddr.Auth.Totp.current_code(auth_conn.assigns.test_totp_secret)
+    wrong_code = wrong_totp_code(code)
+
+    for _attempt <- 1..4 do
+      assert %{"error" => %{"code" => "INVALID_TOTP_CODE"}} =
+               auth_conn |> verify_totp(wrong_code) |> json_response(401)
+    end
+
+    assert %{"error" => %{"code" => "CHALLENGE_LOCKED"}} =
+             auth_conn |> verify_totp(wrong_code) |> json_response(429)
+
+    assert %{"error" => %{"code" => "CHALLENGE_LOCKED"}} =
+             auth_conn |> verify_totp(code) |> json_response(429)
+  end
+
+  test "POST /api/auth/step-up/verify clears failures after a valid code", %{conn: _conn} do
+    %{auth_conn: auth_conn, user_id: user_id} =
+      AuthFixtures.authenticate_ops!("ops-totp-reset@example.com")
+
+    code = Liddr.Auth.Totp.current_code(auth_conn.assigns.test_totp_secret)
+
+    assert auth_conn |> verify_totp(wrong_totp_code(code)) |> json_response(401)
+    assert auth_conn |> verify_totp(code) |> json_response(200)
+
+    identity = Liddr.Auth.TotpEnrollment.active_identity(user_id)
+    refute Map.has_key?(identity.metadata, "totp_failed_attempts")
+    assert is_binary(identity.metadata["encrypted_secret"])
+  end
+
+  test "POST /api/auth/step-up/verify rejects a tampered totp challenge", %{conn: _conn} do
+    %{auth_conn: auth_conn} = AuthFixtures.authenticate_ops!("ops-totp-tamper@example.com")
+
+    conn =
+      post(auth_conn, "/api/auth/step-up/verify", %{
+        "challenge_id" => "totp:not-a-valid-token",
+        "code" => "123456"
+      })
+
+    assert %{"error" => %{"code" => "INVALID_TOTP_TOKEN"}} = json_response(conn, 422)
+  end
+
   test "ops/admin bootstrap endpoints remain reachable before totp enrollment", %{conn: _conn} do
     %{auth_conn: auth_conn} =
       AuthFixtures.authenticate_ops!("ops-bootstrap@example.com", enroll_totp: false)
@@ -138,5 +192,23 @@ defmodule LiddrWeb.AuthStepUpControllerTest do
       })
 
     assert %{"error" => %{"code" => "STEP_UP_REQUIRED"}} = json_response(conn, 403)
+  end
+
+  defp verify_totp(auth_conn, code) do
+    %{"data" => %{"challenge_id" => challenge_id}} =
+      auth_conn
+      |> post("/api/auth/step-up/challenges", %{})
+      |> json_response(201)
+
+    post(auth_conn, "/api/auth/step-up/verify", %{"challenge_id" => challenge_id, "code" => code})
+  end
+
+  defp wrong_totp_code(code) do
+    code
+    |> String.to_integer()
+    |> Kernel.+(1)
+    |> rem(1_000_000)
+    |> Integer.to_string()
+    |> String.pad_leading(6, "0")
   end
 end

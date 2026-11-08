@@ -6,6 +6,8 @@ defmodule LiddrWeb.AuthFixtures do
 
   alias Liddr.Accounts.User
   alias Liddr.Accounts.UserRole
+  alias Liddr.Auth.AuthIdentity
+  alias Liddr.Auth.Crypto
   alias Liddr.Auth.Sessions
   alias Liddr.Repo
 
@@ -59,6 +61,7 @@ defmodule LiddrWeb.AuthFixtures do
       case method do
         "totp" ->
           secret = auth_conn.assigns[:test_totp_secret] || raise "missing test totp secret"
+          allow_totp_code_reuse!(secret)
           Liddr.Auth.Totp.current_code(secret)
 
         _other ->
@@ -73,6 +76,16 @@ defmodule LiddrWeb.AuthFixtures do
 
     %{"data" => %{"step_up_token" => token}} = Phoenix.ConnTest.json_response(verify_conn, 200)
     token
+  end
+
+  # Fixtures can request several step-ups inside one 30-second TOTP period.
+  defp allow_totp_code_reuse!(secret) do
+    identity =
+      Repo.get_by!(AuthIdentity, provider: "totp", secret_hash: Crypto.token_hash(secret))
+
+    identity
+    |> Ecto.Changeset.change(metadata: Map.delete(identity.metadata, "totp_last_counter"))
+    |> Repo.update!()
   end
 
   def with_step_up!(auth_conn) do

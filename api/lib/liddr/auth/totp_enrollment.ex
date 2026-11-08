@@ -9,6 +9,7 @@ defmodule Liddr.Auth.TotpEnrollment do
   alias Liddr.Auth.Crypto
   alias Liddr.Auth.Input
   alias Liddr.Auth.Totp
+  alias Liddr.Auth.TotpAttempts
   alias Liddr.Repo
 
   @setup_salt "auth_totp_setup"
@@ -70,18 +71,8 @@ defmodule Liddr.Auth.TotpEnrollment do
     with {:ok, token} <- fetch_totp_challenge_token(attrs),
          {:ok, code} <- Input.fetch_code(attrs),
          {:ok, payload} <- Totp.decrypt_payload(token, @step_up_salt),
-         :ok <- validate_step_up_payload(payload, user.id, session_id),
-         %AuthIdentity{} = identity <- active_identity(user.id),
-         true <- identity.id == payload["identity_id"] || {:error, :totp_not_enrolled},
-         {:ok, secret} <- fetch_identity_secret(identity),
-         :ok <- Totp.verify_code(secret, code, now),
-         {:ok, _identity} <- touch_last_used(identity, now) do
-      {:ok, :verified}
-    else
-      {:error, :not_totp_challenge} -> {:error, :not_totp_challenge}
-      nil -> {:error, :totp_not_enrolled}
-      false -> {:error, :totp_not_enrolled}
-      {:error, reason} -> {:error, reason}
+         :ok <- validate_step_up_payload(payload, user.id, session_id) do
+      TotpAttempts.verify(user.id, payload["identity_id"], code, now, &fetch_identity_secret/1)
     end
   end
 
@@ -152,12 +143,6 @@ defmodule Liddr.Auth.TotpEnrollment do
         )
         |> Repo.insert()
     end
-  end
-
-  defp touch_last_used(identity, now) do
-    identity
-    |> AuthIdentity.touch_last_used_changeset(now)
-    |> Repo.update()
   end
 
   defp fetch_identity_secret(%AuthIdentity{metadata: metadata}) do

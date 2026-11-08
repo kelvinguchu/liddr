@@ -92,7 +92,8 @@ defmodule Liddr.Disputes.Cases do
          {:ok, decision} <- moderation_decision_for_outcome(outcome),
          {:ok, review_attrs} <- CasesSupport.build_review_attrs(attrs, outcome, decision) do
       Repo.transaction(fn ->
-        with {:ok, payload} <- Moderation.review_report(report.id, review_attrs, reviewer_user_id),
+        with {:ok, payload} <-
+               Moderation.review_report(report.id, review_attrs, reviewer_user_id),
              {:ok, compensation} <-
                Compensations.create_for_outcome(
                  payload.report,
@@ -130,10 +131,12 @@ defmodule Liddr.Disputes.Cases do
         from r in query, where: r.reporter_user_id == ^user_id
 
       "received" ->
-        from r in query, where: r.reported_user_id == ^user_id
+        from r in query, where: ^CasesSupport.visible_to_reported_user(user_id)
 
       _ ->
-        from r in query, where: r.reporter_user_id == ^user_id or r.reported_user_id == ^user_id
+        received = CasesSupport.visible_to_reported_user(user_id)
+        participant = dynamic([r], r.reporter_user_id == ^user_id or ^received)
+        from r in query, where: ^participant
     end
   end
 

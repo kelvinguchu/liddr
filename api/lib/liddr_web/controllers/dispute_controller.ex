@@ -34,7 +34,11 @@ defmodule LiddrWeb.DisputeController do
 
   def index(conn, params) do
     user_id = conn.assigns.current_user.id
-    reports = Disputes.list_for_user(user_id, params) |> Enum.map(&DisputePayloads.report/1)
+
+    reports =
+      Disputes.list_for_user(user_id, params)
+      |> Enum.map(&DisputePayloads.report_for_viewer(&1, user_id))
+
     json(conn, %{data: %{disputes: reports}})
   end
 

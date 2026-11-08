@@ -3,13 +3,13 @@ name: API Prod Security Guard
 on:
   pull_request:
     paths:
-      - "api/**"
+      - "legacy/api/**"
       - ".github/workflows/api-prod-security-guard.yml"
   push:
     branches:
       - main
     paths:
-      - "api/**"
+      - "legacy/api/**"
       - ".github/workflows/api-prod-security-guard.yml"
 
 jobs:
@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: api
+        working-directory: legacy/api
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,9 +32,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            api/deps
-            api/_build
-          key: ${{ runner.os }}-mix-prod-${{ hashFiles('api/mix.lock') }}
+            legacy/api/deps
+            legacy/api/_build
+          key: ${{ runner.os }}-mix-prod-${{ hashFiles('legacy/api/mix.lock') }}
           restore-keys: |
             ${{ runner.os }}-mix-prod-
 

@@ -3,10 +3,10 @@ name: liddr
 services:
   api:
     build:
-      context: ./api
+      context: ./legacy/api
       dockerfile: Dockerfile
     env_file:
-      - ./api/.env
+      - ./legacy/api/.env
     environment:
       MIX_ENV: prod
       PHX_SERVER: "true"
@@ -60,7 +60,7 @@ services:
   db:
     image: postgres:17.7-alpine3.23
     env_file:
-      - ./api/.env
+      - ./legacy/api/.env
     ports:
       - "5432:5432"
     restart: unless-stopped
@@ -83,7 +83,7 @@ services:
   redis:
     image: redis:7.2-alpine
     env_file:
-      - ./api/.env
+      - ./legacy/api/.env
     command: ["sh", "-c", "redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\""]
     restart: unless-stopped
     healthcheck:

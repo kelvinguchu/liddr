@@ -3,7 +3,7 @@
 Ride-hailing and delivery platform for Kenya: Go API, Postgres, Redis, WebSockets, background jobs, M-Pesa, and an Android app.
 
 Layout: `go.work` at the root, the Go API in `apps/api`, the Android app in `apps/android`, and the old Elixir backend in `legacy/api`.
-Product rules: `docs/aboutapp.md` and the policy docs in `docs/`. Status: the Go API foundation is in place and features are being built. Treat `legacy/api` as a business-rule reference, not as design or proof of correctness.
+Product rules: `docs/aboutapp.md` and the policy docs in `docs/`. Status: sign-in, solo rides, dispatch, M-Pesa subscriptions and live updates are ported. Other domains are still only in `legacy/api`. Treat `legacy/api` as a business-rule reference, not as design or proof of correctness.
 
 ## Priorities
 
@@ -58,9 +58,10 @@ internal/auth      sessions, OTP, TOTP, step-up
 internal/sms       HostPinnacle client
 internal/testdb    private migrated database per test
 internal/rides     quotes, booking, trip state machine, completion
-internal/dispatch  candidates, offers, reassignment
-internal/location  driver location and supply index
-internal/payments  M-Pesa client, callbacks, reconciliation
+internal/dispatch  driver availability and location, offers, the dispatch worker
+internal/events    realtime events, published through Postgres notifications
+internal/geo, maps coordinates and Google Routes
+internal/payments  M-Pesa client and callback parsers
 internal/subscriptions, send, disputes, verification, moderation, ratings
 internal/store     sqlc output and transaction helper
 migrations/  queries/  testdata/
@@ -146,6 +147,7 @@ Your training data may predate these. `go fix` applies many of them.
 - A write that must survive an error, such as a revocation, commits before the error returns. Rollback undoes it.
 - Do unique-violation recovery with `ON CONFLICT`. A failed statement aborts the surrounding transaction.
 - List columns explicitly, and do not use `SELECT *`.
+- Live location and dispatch run on Postgres. Publish realtime events inside the transaction they describe, with `events.Publish`.
 - Treat Redis as rebuildable. Postgres stays the source of truth, and every key has an owner and a TTL or a removal path.
 - Update caches only after commit, and never extend a cache entry's TTL from a stale read.
 - Enqueue River jobs with `InsertTx` in the same transaction as the business change.

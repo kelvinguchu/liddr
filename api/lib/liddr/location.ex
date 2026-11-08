@@ -156,9 +156,9 @@ defmodule Liddr.Location do
       |> Repo.update_all(set: [last_seen_at: now, updated_at: now])
     end
 
-    updated_driver = %{driver | user_id: user_id, last_seen_at: max_last_seen(last_seen_at, now)}
-    :ok = DriverHotState.put(updated_driver)
-    updated_driver
+    latest_seen_at = max_last_seen(last_seen_at, now)
+    :ok = DriverHotState.touch_last_seen(user_id, latest_seen_at)
+    %{driver | user_id: user_id, last_seen_at: latest_seen_at}
   end
 
   defp stale_last_seen?(nil, _now), do: true

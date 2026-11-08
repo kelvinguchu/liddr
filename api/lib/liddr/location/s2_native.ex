@@ -1,16 +1,23 @@
 defmodule Liddr.Location.S2Native do
   @moduledoc false
 
+  require Logger
+
   @source_glob Path.expand("../../../native/s2cover/*", __DIR__)
   @helper_basename "s2cover"
   @pool_name __MODULE__.Pool
   def start_link(_opts) do
-    with :ok <- ensure_compiled!() do
-      PartitionSupervisor.start_link(
-        child_spec: Liddr.Location.S2Native.Worker,
-        name: @pool_name,
-        partitions: pool_size()
-      )
+    case ensure_compiled!() do
+      :ok ->
+        PartitionSupervisor.start_link(
+          child_spec: Liddr.Location.S2Native.Worker,
+          name: @pool_name,
+          partitions: pool_size()
+        )
+
+      {:error, message} ->
+        Logger.error("[location.s2_native] helper unavailable, using fallback: #{message}")
+        :ignore
     end
   end
 
@@ -48,12 +55,21 @@ defmodule Liddr.Location.S2Native do
   end
 
   def helper_path do
-    Application.app_dir(:liddr, Path.join("priv/bin", helper_name()))
+    Application.get_env(:liddr, __MODULE__, [])
+    |> Keyword.get_lazy(:helper_path, fn ->
+      Application.app_dir(:liddr, Path.join("priv/bin", helper_name()))
+    end)
   end
 
   defp request(args) do
     GenServer.call(via_partition(self()), {:execute, args}, request_timeout_ms())
+  rescue
+    ArgumentError -> helper_unavailable(:pool_not_started)
+  catch
+    :exit, reason -> helper_unavailable(reason)
   end
+
+  defp helper_unavailable(reason), do: {:error, "s2 helper unavailable: #{inspect(reason)}"}
 
   defp via_partition(key), do: {:via, PartitionSupervisor, {@pool_name, key}}
 

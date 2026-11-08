@@ -29,13 +29,21 @@ defmodule Liddr.Location.DriverHotState do
   def put(snapshot) when is_map(snapshot) do
     case normalize_snapshot(snapshot) do
       %{user_id: user_id} = normalized ->
-        :ets.insert(@table, {user_id, expires_at_ms(), normalized})
-        :ok
+        cache_unless_in_transaction(user_id, normalized)
 
       _ ->
         :ok
     end
   end
+
+  # Updates only the last-seen slot so a location ping cannot extend the TTL of,
+  # or overwrite, a snapshot that changed while the ping was running.
+  def touch_last_seen(driver_user_id, last_seen_at) when is_integer(driver_user_id) do
+    :ets.update_element(@table, driver_user_id, {4, last_seen_at})
+    :ok
+  end
+
+  def touch_last_seen(_driver_user_id, _last_seen_at), do: :ok
 
   def invalidate(driver_user_id) when is_integer(driver_user_id) do
     :ets.delete(@table, driver_user_id)
@@ -78,15 +86,24 @@ defmodule Liddr.Location.DriverHotState do
     now_ms = System.monotonic_time(:millisecond)
 
     case :ets.lookup(@table, driver_user_id) do
-      [{^driver_user_id, expiry_ms, snapshot}] when expiry_ms > now_ms ->
-        {:ok, snapshot}
+      [{^driver_user_id, expiry_ms, snapshot, last_seen_at}] when expiry_ms > now_ms ->
+        {:ok, %{snapshot | last_seen_at: last_seen_at}}
 
-      [{^driver_user_id, _expiry_ms, _snapshot}] ->
+      [{^driver_user_id, _expiry_ms, _snapshot, _last_seen_at}] ->
         :ets.delete(@table, driver_user_id)
         :miss
 
       [] ->
         :miss
+    end
+  end
+
+  defp cache_unless_in_transaction(user_id, snapshot) do
+    if Repo.in_transaction?() do
+      invalidate(user_id)
+    else
+      :ets.insert(@table, {user_id, expires_at_ms(), snapshot, snapshot.last_seen_at})
+      :ok
     end
   end
 

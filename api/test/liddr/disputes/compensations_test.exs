@@ -46,6 +46,25 @@ defmodule Liddr.Disputes.CompensationsTest do
              )
   end
 
+  test "create_for_outcome returns the existing compensation inside a transaction" do
+    %{rider: rider, ops: ops_user, ride: ride} = create_dispute_fixture!()
+    report = submit_fare_dispute!(rider, ride)
+    attrs = %{"resolution_amount_kes" => "70.00"}
+
+    assert {:ok, {first, second}} =
+             Repo.transaction(fn ->
+               {:ok, first} =
+                 Compensations.create_for_outcome(report, "refund_partial", attrs, ops_user.id)
+
+               {:ok, second} =
+                 Compensations.create_for_outcome(report, "refund_partial", attrs, ops_user.id)
+
+               {first, second}
+             end)
+
+    assert first.id == second.id
+  end
+
   test "resolve_for_ops creates compensation once and blocks second resolve" do
     %{rider: rider, driver: _driver_user, ops: ops_user, ride: ride} = create_dispute_fixture!()
 

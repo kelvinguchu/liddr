@@ -127,19 +127,20 @@ defmodule Liddr.Disputes.Compensations do
   end
 
   defp insert_or_get_existing(attrs) do
-    case %Compensation{} |> Compensation.create_changeset(attrs) |> Repo.insert() do
-      {:ok, compensation} ->
-        {:ok, compensation}
+    insert_result =
+      %Compensation{}
+      |> Compensation.create_changeset(attrs)
+      |> Repo.insert(on_conflict: :nothing, conflict_target: :report_id)
 
-      {:error, %Ecto.Changeset{} = changeset} ->
-        if unique_report_constraint?(changeset) do
-          case Repo.get_by(Compensation, report_id: attrs["report_id"]) do
-            %Compensation{} = existing -> {:ok, existing}
-            nil -> {:error, :dispute_compensation_conflict}
-          end
-        else
-          {:error, changeset}
+    case insert_result do
+      {:ok, %Compensation{id: nil}} ->
+        case Repo.get_by(Compensation, report_id: attrs["report_id"]) do
+          %Compensation{} = existing -> {:ok, existing}
+          nil -> {:error, :dispute_compensation_conflict}
         end
+
+      result ->
+        result
     end
   end
 
@@ -222,13 +223,6 @@ defmodule Liddr.Disputes.Compensations do
 
   defp apply_transition(_compensation, _actor_user_id, _target_status, _attrs),
     do: Repo.rollback(:invalid_compensation_transition)
-
-  defp unique_report_constraint?(%Ecto.Changeset{} = changeset) do
-    Enum.any?(changeset.errors, fn
-      {:report_id, {_message, opts}} -> opts[:constraint] == :unique
-      _ -> false
-    end)
-  end
 
   defp unwrap_or_rollback({:ok, value}), do: value
   defp unwrap_or_rollback({:error, changeset}), do: Repo.rollback(changeset)

@@ -5,8 +5,63 @@
 package store
 
 import (
-	"github.com/jackc/pgx/v5/pgtype"
+	"net/netip"
+	"time"
+
+	"github.com/google/uuid"
 )
+
+type AuditEvent struct {
+	ID        int64
+	Action    string
+	UserID    *uuid.UUID
+	FamilyID  *uuid.UUID
+	RequestID string
+	Ip        netip.Addr
+	CreatedAt time.Time
+}
+
+type AuthChallenge struct {
+	ID               uuid.UUID
+	Phone            string
+	RequestedRole    string
+	CodeHash         []byte
+	IpHash           []byte
+	Attempts         int32
+	ExpiresAt        time.Time
+	ClosedAt         *time.Time
+	DeliveryFailedAt *time.Time
+	CreatedAt        time.Time
+}
+
+type AuthSession struct {
+	ID               uuid.UUID
+	FamilyID         uuid.UUID
+	UserID           uuid.UUID
+	AccessTokenHash  []byte
+	RefreshTokenHash []byte
+	AccessExpiresAt  time.Time
+	RefreshExpiresAt time.Time
+	RevokedAt        *time.Time
+	RevokedReason    *string
+	ReplacedByID     *uuid.UUID
+	CreatedAt        time.Time
+}
+
+type User struct {
+	ID            uuid.UUID
+	Phone         string
+	AccountStatus string
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+type UserRole struct {
+	UserID    uuid.UUID
+	Role      string
+	GrantedAt time.Time
+	RevokedAt *time.Time
+}
 
 type VehicleCategory struct {
 	ID                    int64
@@ -16,6 +71,6 @@ type VehicleCategory struct {
 	WeeklySubscriptionKes int32
 	IsActive              bool
 	DisplayOrder          int32
-	CreatedAt             pgtype.Timestamptz
-	UpdatedAt             pgtype.Timestamptz
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
 }

@@ -12,6 +12,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"go.uber.org/goleak"
+
+	"github.com/kelvinguchu/liddr/apps/api/internal/testdb"
 )
 
 const testTimeout = 30 * time.Second
@@ -46,25 +48,40 @@ func (c *capture) String() string {
 	return c.logs.String()
 }
 
-func envFor(databaseURL string) func(string) string {
+func envFor(databaseURL, smsURL string) func(string) string {
 	values := map[string]string{
-		"ADDR":                 "127.0.0.1:0",
-		"DATABASE_URL":         databaseURL,
-		"DB_MAX_CONNS":         "4",
-		"SHUTDOWN_DRAIN_DELAY": "0s",
-		"SHUTDOWN_TIMEOUT":     "5s",
+		"ADDR":                   "127.0.0.1:0",
+		"DATABASE_URL":           databaseURL,
+		"DB_MAX_CONNS":           "4",
+		"SHUTDOWN_DRAIN_DELAY":   "0s",
+		"SHUTDOWN_TIMEOUT":       "5s",
+		"AUTH_HMAC_KEY":          "integration-test-key-of-sufficient-length",
+		"HOSTPINNACLE_API_URL":   withDefaultURL(smsURL),
+		"HOSTPINNACLE_API_KEY":   "test-key",
+		"HOSTPINNACLE_USER_ID":   "test-user",
+		"HOSTPINNACLE_PASSWORD":  "test-password",
+		"HOSTPINNACLE_SENDER_ID": "LIDDR",
 	}
 	return func(key string) string { return values[key] }
 }
 
+// withDefaultURL gives tests that send no SMS an address that refuses connections.
+func withDefaultURL(smsURL string) string {
+	if smsURL == "" {
+		return "http://127.0.0.1:1/sms"
+	}
+	return smsURL
+}
+
 // startServer runs the real process entry point and stops it at test end,
 // failing the test unless shutdown is clean.
-func startServer(t *testing.T, databaseURL string) (string, *capture) {
+func startServer(t *testing.T, databaseURL, smsURL string) (string, *capture) {
 	t.Helper()
 	ctx, cancel := context.WithCancel(t.Context())
 	output := &capture{addr: make(chan string, 1)}
 	done := make(chan error, 1)
-	go func() { done <- run(ctx, []string{"api", "serve"}, envFor(databaseURL), output, io.Discard) }()
+	env := envFor(databaseURL, smsURL)
+	go func() { done <- run(ctx, []string{"api", "serve"}, env, output, io.Discard) }()
 
 	t.Cleanup(func() {
 		cancel()
@@ -114,14 +131,14 @@ func get(t *testing.T, target string) (int, http.Header, []byte) {
 }
 
 func TestVehicleCategoriesEndToEnd(t *testing.T) {
-	databaseURL := testDatabase(t)
-	if got := migrate(t, databaseURL); !strings.Contains(got, `"count":1`) {
-		t.Errorf("first migrate output = %s, want one applied", got)
+	databaseURL := testdb.URL(t)
+	if got := migrate(t, databaseURL); strings.Contains(got, `"count":0`) {
+		t.Errorf("first migrate output = %s, want migrations applied", got)
 	}
 	if got := migrate(t, databaseURL); !strings.Contains(got, `"count":0`) {
 		t.Errorf("second migrate output = %s, want none applied", got)
 	}
-	baseURL, _ := startServer(t, databaseURL)
+	baseURL, _ := startServer(t, databaseURL, "")
 
 	if status, _, body := get(t, baseURL+"/readyz"); status != http.StatusOK {
 		t.Errorf("GET /readyz = %d %s, want 200", status, body)
@@ -162,7 +179,7 @@ func TestVehicleCategoriesEndToEnd(t *testing.T) {
 
 func TestServeWithUnreachableDatabase(t *testing.T) {
 	const password = "hunter2"
-	baseURL, output := startServer(t, "postgres://liddr:"+password+"@127.0.0.1:1/liddr?connect_timeout=1")
+	baseURL, output := startServer(t, "postgres://liddr:"+password+"@127.0.0.1:1/liddr?connect_timeout=1", "")
 
 	if status, _, body := get(t, baseURL+"/healthz"); status != http.StatusOK {
 		t.Errorf("GET /healthz = %d %s, want 200", status, body)
@@ -185,9 +202,9 @@ func TestRunRejectsBadInvocations(t *testing.T) {
 		env  func(string) string
 		want string
 	}{
-		{"no command", []string{"api"}, envFor("postgres://db"), "invalid command"},
-		{"unknown command", []string{"api", "deploy"}, envFor("postgres://db"), "invalid command"},
-		{"extra argument", []string{"api", "serve", "now"}, envFor("postgres://db"), "invalid command"},
+		{"no command", []string{"api"}, envFor("postgres://db", ""), "invalid command"},
+		{"unknown command", []string{"api", "deploy"}, envFor("postgres://db", ""), "invalid command"},
+		{"extra argument", []string{"api", "serve", "now"}, envFor("postgres://db", ""), "invalid command"},
 		{"missing config", []string{"api", "serve"}, func(string) string { return "" }, "DATABASE_URL is required"},
 	}
 	for _, tt := range tests {

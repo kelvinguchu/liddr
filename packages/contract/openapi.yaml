@@ -60,13 +60,250 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /v1/auth/otp/request:
+    post:
+      operationId: requestOtp
+      summary: Send a sign-in code to a Kenyan mobile number
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OtpRequest"
+      responses:
+        "201":
+          description: The code was sent.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OtpChallenge"
+        "400":
+          description: The phone number or role is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Too many codes were requested.
+          headers:
+            Retry-After:
+              required: true
+              description: Seconds until another request can succeed.
+              schema:
+                type: integer
+                format: int32
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: The SMS provider could not take the message.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /v1/auth/otp/verify:
+    post:
+      operationId: verifyOtp
+      summary: Exchange a sign-in code for a session, creating the account if new
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OtpVerification"
+      responses:
+        "200":
+          description: The code was correct.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "400":
+          description: The code is wrong or no longer valid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: The account cannot sign in.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Too many wrong codes. Request a new one.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /v1/auth/refresh:
+    post:
+      operationId: refreshSession
+      summary: Rotate a refresh token for new tokens
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200":
+          description: New tokens. The presented refresh token is spent.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "401":
+          description: The refresh token is not valid. Sign in again.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: The account cannot sign in.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /v1/auth/logout:
+    post:
+      operationId: logout
+      summary: End the device's session. Succeeds even if already ended.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "204":
+          description: The session has ended.
+
+  /v1/me:
+    get:
+      operationId: getMe
+      summary: Return the signed-in account
+      responses:
+        "200":
+          description: The signed-in account.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+
 components:
   securitySchemes:
+    # Operation scopes name the roles allowed in. No scopes means any account.
     bearerAuth:
       type: http
       scheme: bearer
 
   schemas:
+    SignupRole:
+      type: string
+      enum: [rider, driver]
+
+    Role:
+      type: string
+      enum: [rider, driver, ops, admin]
+
+    OtpRequest:
+      type: object
+      additionalProperties: false
+      required: [phone, role]
+      properties:
+        phone:
+          type: string
+          example: "0712345678"
+        role:
+          $ref: "#/components/schemas/SignupRole"
+
+    OtpChallenge:
+      type: object
+      additionalProperties: false
+      required: [challenge_id, expires_at]
+      properties:
+        challenge_id:
+          type: string
+          format: uuid
+        expires_at:
+          type: string
+          format: date-time
+
+    OtpVerification:
+      type: object
+      additionalProperties: false
+      required: [challenge_id, code]
+      properties:
+        challenge_id:
+          type: string
+          format: uuid
+        code:
+          type: string
+          example: "123456"
+
+    RefreshRequest:
+      type: object
+      additionalProperties: false
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+
+    Session:
+      type: object
+      additionalProperties: false
+      required:
+        - access_token
+        - access_token_expires_in
+        - refresh_token
+        - refresh_token_expires_in
+        - user_id
+        - roles
+      properties:
+        access_token:
+          type: string
+        access_token_expires_in:
+          type: integer
+          format: int32
+          description: Lifetime in seconds.
+        refresh_token:
+          type: string
+        refresh_token_expires_in:
+          type: integer
+          format: int32
+          description: Lifetime in seconds.
+        user_id:
+          type: string
+          format: uuid
+        roles:
+          type: array
+          items:
+            $ref: "#/components/schemas/Role"
+
+    Me:
+      type: object
+      additionalProperties: false
+      required: [id, phone, roles]
+      properties:
+        id:
+          type: string
+          format: uuid
+        phone:
+          type: string
+        roles:
+          type: array
+          items:
+            $ref: "#/components/schemas/Role"
+
     Health:
       type: object
       additionalProperties: false

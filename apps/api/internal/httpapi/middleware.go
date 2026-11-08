@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"runtime/debug"
 	"time"
 )
@@ -19,11 +20,20 @@ const (
 	RequestTimeout = 20 * time.Second
 )
 
-type requestIDKey struct{}
+type requestInfoKey struct{}
+
+type requestInfo struct {
+	id string
+	ip netip.Addr
+}
+
+func requestInfoFrom(ctx context.Context) requestInfo {
+	info, _ := ctx.Value(requestInfoKey{}).(requestInfo)
+	return info
+}
 
 func requestID(ctx context.Context) string {
-	id, _ := ctx.Value(requestIDKey{}).(string)
-	return id
+	return requestInfoFrom(ctx).id
 }
 
 // withMiddleware applies request limits, response headers, panic recovery and
@@ -35,7 +45,8 @@ func (a *API) withMiddleware(next http.Handler) http.Handler {
 		id := rand.Text()
 		ctx, cancel := context.WithTimeout(r.Context(), RequestTimeout)
 		defer cancel()
-		r = r.WithContext(context.WithValue(ctx, requestIDKey{}, id))
+		info := requestInfo{id: id, ip: clientAddress(r, a.deps.TrustedProxyHops)}
+		r = r.WithContext(context.WithValue(ctx, requestInfoKey{}, info))
 		r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
 
 		headers := w.Header()

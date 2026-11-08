@@ -55,6 +55,8 @@ internal/config    environment parsing and redacting secret type
 internal/httpapi   OpenAPI-generated types, handlers, middleware on net/http
 internal/realtime  WebSocket hub and per-connection writers
 internal/auth      sessions, OTP, TOTP, step-up
+internal/sms       HostPinnacle client
+internal/testdb    private migrated database per test
 internal/rides     quotes, booking, trip state machine, completion
 internal/dispatch  candidates, offers, reassignment
 internal/location  driver location and supply index
@@ -82,7 +84,7 @@ migrations/  queries/  testdata/
 - Pick value or pointer semantics when declaring a type, and keep to it.
 - Prefer synchronous functions and let callers add concurrency.
 - Before adding a dependency, check source, tests, maintenance, vulnerability history, licence and transitive dependencies.
-- Approved so far: `pgx/v5`, `sqlc`, `oapi-codegen`, `goose`, River, `coder/websocket`, `go-cmp`, `goleak`, `x/sync/errgroup`. Choose and record a Redis client before first use.
+- Approved so far: `pgx/v5`, `sqlc`, `oapi-codegen` and its runtime, `google/uuid`, `goose`, River, `coder/websocket`, `go-cmp`, `goleak`, `x/sync/errgroup`. Choose and record a Redis client before first use.
 - Migrations are forward-only goose files, applied by `api migrate` as a deploy step and never at server start.
 - Copy a few lines instead of adding a tiny dependency.
 - Do not optimize a path without a benchmark or profile. API p95 budget: under 300ms.

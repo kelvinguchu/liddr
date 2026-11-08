@@ -26,27 +26,71 @@ func (Secret) GoString() string { return redacted }
 // LogValue redacts the value in structured logs.
 func (Secret) LogValue() slog.Value { return slog.StringValue(redacted) }
 
-// Config is the validated process configuration.
+const minHMACKeyBytes = 32
+
+// SMS holds HostPinnacle credentials.
+type SMS struct {
+	URL      string
+	APIKey   Secret
+	UserID   string
+	Password Secret
+	SenderID string
+}
+
+// Config is the validated configuration of the API server.
 type Config struct {
-	Addr            string
-	DatabaseURL     Secret
-	DBMaxConns      int32
-	DrainDelay      time.Duration
-	ShutdownTimeout time.Duration
+	Addr             string
+	DatabaseURL      Secret
+	DBMaxConns       int32
+	DrainDelay       time.Duration
+	ShutdownTimeout  time.Duration
+	TrustedProxyHops int
+	AuthHMACKey      Secret
+	SMS              SMS
+}
+
+// LoadDatabaseURL returns the only setting that migrations need.
+func LoadDatabaseURL(getenv func(string) string) (Secret, error) {
+	url := Secret(getenv("DATABASE_URL"))
+	if url == "" {
+		return "", errors.New("DATABASE_URL is required")
+	}
+	return url, nil
 }
 
 // Load validates the environment and reports every problem at once. Errors
 // name the variable and never include its value.
 func Load(getenv func(string) string) (Config, error) {
 	var errs []error
+	required := func(name string) string {
+		value := getenv(name)
+		if value == "" {
+			errs = append(errs, fmt.Errorf("%s is required", name))
+		}
+		return value
+	}
 
 	cfg := Config{
 		Addr:        withDefault(getenv("ADDR"), ":8080"),
-		DatabaseURL: Secret(getenv("DATABASE_URL")),
+		DatabaseURL: Secret(required("DATABASE_URL")),
+		AuthHMACKey: Secret(required("AUTH_HMAC_KEY")),
+		SMS: SMS{
+			URL:      required("HOSTPINNACLE_API_URL"),
+			APIKey:   Secret(required("HOSTPINNACLE_API_KEY")),
+			UserID:   required("HOSTPINNACLE_USER_ID"),
+			Password: Secret(required("HOSTPINNACLE_PASSWORD")),
+			SenderID: required("HOSTPINNACLE_SENDER_ID"),
+		},
 	}
-	if cfg.DatabaseURL == "" {
-		errs = append(errs, errors.New("DATABASE_URL is required"))
+	if cfg.AuthHMACKey != "" && len(cfg.AuthHMACKey) < minHMACKeyBytes {
+		errs = append(errs, fmt.Errorf("AUTH_HMAC_KEY must be at least %d bytes", minHMACKeyBytes))
 	}
+
+	hops, err := strconv.Atoi(withDefault(getenv("TRUSTED_PROXY_HOPS"), "0"))
+	if err != nil || hops < 0 {
+		errs = append(errs, errors.New("TRUSTED_PROXY_HOPS must be a non-negative integer"))
+	}
+	cfg.TrustedProxyHops = hops
 
 	maxConns, err := strconv.ParseInt(withDefault(getenv("DB_MAX_CONNS"), "20"), 10, 32)
 	if err != nil || maxConns < 1 {

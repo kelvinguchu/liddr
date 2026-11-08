@@ -4,3 +4,7 @@ generate:
   models: true
   std-http-server: true
   strict-server: true
+compatibility:
+  # Without this the generated routes carry no auth requirement at all, and the
+  # authenticate middleware would treat every route as public.
+  enable-auth-scopes-on-context: true

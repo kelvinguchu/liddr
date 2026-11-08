@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/kelvinguchu/liddr/apps/api/internal/auth"
 	"github.com/kelvinguchu/liddr/apps/api/internal/rides"
 )
 
@@ -27,6 +28,11 @@ type Deps struct {
 	Logger     *slog.Logger
 	Database   Pinger
 	Categories *rides.Catalog
+	Auth       *auth.Service
+
+	// TrustedProxyHops is how many proxies in front of this server append to
+	// X-Forwarded-For. Zero means clients connect directly.
+	TrustedProxyHops int
 }
 
 // API implements the generated contract and is the process HTTP handler.
@@ -44,7 +50,11 @@ func New(deps Deps) *API {
 		RequestErrorHandlerFunc:  a.requestError,
 		ResponseErrorHandlerFunc: a.responseError,
 	})
-	HandlerWithOptions(strict, StdHTTPServerOptions{BaseRouter: mux, ErrorHandlerFunc: a.requestError})
+	HandlerWithOptions(strict, StdHTTPServerOptions{
+		BaseRouter:       mux,
+		Middlewares:      []MiddlewareFunc{a.authenticate},
+		ErrorHandlerFunc: a.requestError,
+	})
 	a.handler = a.withMiddleware(mux)
 	return a
 }

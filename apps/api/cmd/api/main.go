@@ -14,9 +14,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/kelvinguchu/liddr/apps/api/internal/auth"
 	"github.com/kelvinguchu/liddr/apps/api/internal/config"
 	"github.com/kelvinguchu/liddr/apps/api/internal/httpapi"
 	"github.com/kelvinguchu/liddr/apps/api/internal/rides"
+	"github.com/kelvinguchu/liddr/apps/api/internal/sms"
 	"github.com/kelvinguchu/liddr/apps/api/internal/store"
 )
 
@@ -38,19 +40,24 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout,
 		_, _ = fmt.Fprintln(stderr, usage)
 		return errors.New("invalid command")
 	}
-	cfg, err := config.Load(getenv)
-	if err != nil {
-		return fmt.Errorf("load config: %w", err)
-	}
 	logger := slog.New(slog.NewJSONHandler(stdout, nil))
 
 	if args[1] == "migrate" {
-		applied, err := store.Migrate(ctx, cfg.DatabaseURL.Reveal())
+		databaseURL, err := config.LoadDatabaseURL(getenv)
+		if err != nil {
+			return fmt.Errorf("load config: %w", err)
+		}
+		applied, err := store.Migrate(ctx, databaseURL.Reveal())
 		if err != nil {
 			return err
 		}
 		logger.LogAttrs(ctx, slog.LevelInfo, "migrations applied", slog.Int("count", applied))
 		return nil
+	}
+
+	cfg, err := config.Load(getenv)
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
 	}
 	return serve(ctx, cfg, logger)
 }
@@ -66,6 +73,19 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		Logger:     logger,
 		Database:   pool,
 		Categories: rides.NewCatalog(store.New(pool)),
+		Auth: auth.NewService(auth.Config{
+			Pool: pool,
+			SMS: sms.NewClient(sms.Config{
+				URL:      cfg.SMS.URL,
+				APIKey:   cfg.SMS.APIKey.Reveal(),
+				UserID:   cfg.SMS.UserID,
+				Password: cfg.SMS.Password.Reveal(),
+				SenderID: cfg.SMS.SenderID,
+			}),
+			HMACKey: []byte(cfg.AuthHMACKey.Reveal()),
+			Now:     time.Now,
+		}),
+		TrustedProxyHops: cfg.TrustedProxyHops,
 	})
 	server := &http.Server{
 		Handler:           api,

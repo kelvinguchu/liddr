@@ -22,7 +22,9 @@ linters:
       rules:
         domain-stays-inward:
           files:
+            - "**/internal/auth/**"
             - "**/internal/rides/**"
+            - "**/internal/sms/**"
             - "**/internal/store/**"
           deny:
             - pkg: github.com/kelvinguchu/liddr/apps/api/internal/httpapi
@@ -33,6 +35,8 @@ linters:
           files:
             - "**/internal/store/**"
           deny:
+            - pkg: github.com/kelvinguchu/liddr/apps/api/internal/auth
+              desc: store must not depend on domain packages
             - pkg: github.com/kelvinguchu/liddr/apps/api/internal/rides
               desc: store must not depend on domain packages
     forbidigo:
@@ -55,6 +59,11 @@ linters:
         linters:
           - forbidigo
         text: time\.Sleep|context\.Background
+      # Tests use fake credentials to prove that real ones are redacted.
+      - path: _test\.go
+        linters:
+          - gosec
+        text: G101
       # Tests panic on purpose to exercise recovery.
       - path: _test\.go
         linters:

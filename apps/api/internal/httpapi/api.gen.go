@@ -11,6 +11,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
+
+	"github.com/oapi-codegen/runtime"
+	openapi_types "github.com/oapi-codegen/runtime/types"
+)
+
+const (
+	BearerAuthScopes bearerAuthContextKey = "bearerAuth.Scopes"
 )
 
 // Defines values for HealthStatus.
@@ -25,6 +33,48 @@ func (e HealthStatus) Valid() bool {
 	case Ok:
 		return true
 	case Unavailable:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for Role.
+const (
+	RoleAdmin  Role = "admin"
+	RoleDriver Role = "driver"
+	RoleOps    Role = "ops"
+	RoleRider  Role = "rider"
+)
+
+// Valid indicates whether the value is a known member of the Role enum.
+func (e Role) Valid() bool {
+	switch e {
+	case RoleAdmin:
+		return true
+	case RoleDriver:
+		return true
+	case RoleOps:
+		return true
+	case RoleRider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SignupRole.
+const (
+	SignupRoleDriver SignupRole = "driver"
+	SignupRoleRider  SignupRole = "rider"
+)
+
+// Valid indicates whether the value is a known member of the SignupRole enum.
+func (e SignupRole) Valid() bool {
+	switch e {
+	case SignupRoleDriver:
+		return true
+	case SignupRoleRider:
 		return true
 	default:
 		return false
@@ -53,6 +103,59 @@ type Health struct {
 // HealthStatus defines model for Health.Status.
 type HealthStatus string
 
+// Me defines model for Me.
+type Me struct {
+	Id    openapi_types.UUID `json:"id"`
+	Phone string             `json:"phone"`
+	Roles []Role             `json:"roles"`
+}
+
+// OtpChallenge defines model for OtpChallenge.
+type OtpChallenge struct {
+	ChallengeId openapi_types.UUID `json:"challenge_id"`
+	ExpiresAt   time.Time          `json:"expires_at"`
+}
+
+// OtpRequest defines model for OtpRequest.
+type OtpRequest struct {
+	// Phone Example: 0712345678
+	Phone string     `json:"phone"`
+	Role  SignupRole `json:"role"`
+}
+
+// OtpVerification defines model for OtpVerification.
+type OtpVerification struct {
+	ChallengeId openapi_types.UUID `json:"challenge_id"`
+
+	// Code Example: 123456
+	Code string `json:"code"`
+}
+
+// RefreshRequest defines model for RefreshRequest.
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token"`
+}
+
+// Role defines model for Role.
+type Role string
+
+// Session defines model for Session.
+type Session struct {
+	AccessToken string `json:"access_token"`
+
+	// AccessTokenExpiresIn Lifetime in seconds.
+	AccessTokenExpiresIn int32  `json:"access_token_expires_in"`
+	RefreshToken         string `json:"refresh_token"`
+
+	// RefreshTokenExpiresIn Lifetime in seconds.
+	RefreshTokenExpiresIn int32              `json:"refresh_token_expires_in"`
+	Roles                 []Role             `json:"roles"`
+	UserId                openapi_types.UUID `json:"user_id"`
+}
+
+// SignupRole defines model for SignupRole.
+type SignupRole string
+
 // VehicleCategory defines model for VehicleCategory.
 type VehicleCategory struct {
 	// Capacity Passenger seats. Zero for package delivery.
@@ -73,6 +176,21 @@ type VehicleCategoryList struct {
 	Data []VehicleCategory `json:"data"`
 }
 
+// bearerAuthContextKey is the context key for bearerAuth security scheme
+type bearerAuthContextKey string
+
+// LogoutJSONRequestBody defines body for Logout for application/json ContentType.
+type LogoutJSONRequestBody = RefreshRequest
+
+// RequestOtpJSONRequestBody defines body for RequestOtp for application/json ContentType.
+type RequestOtpJSONRequestBody = OtpRequest
+
+// VerifyOtpJSONRequestBody defines body for VerifyOtp for application/json ContentType.
+type VerifyOtpJSONRequestBody = OtpVerification
+
+// RefreshSessionJSONRequestBody defines body for RefreshSession for application/json ContentType.
+type RefreshSessionJSONRequestBody = RefreshRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// GetLiveness Report that the process is running
@@ -81,6 +199,21 @@ type ServerInterface interface {
 	// GetReadiness Report whether the instance can serve traffic
 	// (GET /readyz)
 	GetReadiness(w http.ResponseWriter, r *http.Request)
+	// Logout End the device's session. Succeeds even if already ended.
+	// (POST /v1/auth/logout)
+	Logout(w http.ResponseWriter, r *http.Request)
+	// RequestOtp Send a sign-in code to a Kenyan mobile number
+	// (POST /v1/auth/otp/request)
+	RequestOtp(w http.ResponseWriter, r *http.Request)
+	// VerifyOtp Exchange a sign-in code for a session, creating the account if new
+	// (POST /v1/auth/otp/verify)
+	VerifyOtp(w http.ResponseWriter, r *http.Request)
+	// RefreshSession Rotate a refresh token for new tokens
+	// (POST /v1/auth/refresh)
+	RefreshSession(w http.ResponseWriter, r *http.Request)
+	// GetMe Return the signed-in account
+	// (GET /v1/me)
+	GetMe(w http.ResponseWriter, r *http.Request)
 	// ListVehicleCategories List the vehicle categories open for booking and driver sign-up
 	// (GET /v1/vehicle-categories)
 	ListVehicleCategories(w http.ResponseWriter, r *http.Request)
@@ -114,6 +247,82 @@ func (siw *ServerInterfaceWrapper) GetReadiness(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetReadiness(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// Logout operation middleware
+func (siw *ServerInterfaceWrapper) Logout(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Logout(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RequestOtp operation middleware
+func (siw *ServerInterfaceWrapper) RequestOtp(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RequestOtp(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// VerifyOtp operation middleware
+func (siw *ServerInterfaceWrapper) VerifyOtp(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.VerifyOtp(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RefreshSession operation middleware
+func (siw *ServerInterfaceWrapper) RefreshSession(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RefreshSession(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMe operation middleware
+func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMe(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -260,6 +469,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/healthz", wrapper.GetLiveness)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/readyz", wrapper.GetReadiness)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/vehicle-categories", wrapper.ListVehicleCategories)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/auth/otp/request", wrapper.RequestOtp)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/auth/otp/verify", wrapper.VerifyOtp)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/auth/refresh", wrapper.RefreshSession)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/auth/logout", wrapper.Logout)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/me", wrapper.GetMe)
 
 	return m
 }
@@ -320,6 +534,229 @@ func (response GetReadiness503JSONResponse) VisitGetReadinessResponse(w http.Res
 	return err
 }
 
+type LogoutRequestObject struct {
+	Body *LogoutJSONRequestBody
+}
+
+type LogoutResponseObject interface {
+	VisitLogoutResponse(w http.ResponseWriter) error
+}
+
+type Logout204Response struct {
+}
+
+func (response Logout204Response) VisitLogoutResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RequestOtpRequestObject struct {
+	Body *RequestOtpJSONRequestBody
+}
+
+type RequestOtpResponseObject interface {
+	VisitRequestOtpResponse(w http.ResponseWriter) error
+}
+
+type RequestOtp201JSONResponse OtpChallenge
+
+func (response RequestOtp201JSONResponse) VisitRequestOtpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RequestOtp400JSONResponse Error
+
+func (response RequestOtp400JSONResponse) VisitRequestOtpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RequestOtp429ResponseHeaders struct {
+	RetryAfter int32
+}
+
+type RequestOtp429JSONResponse struct {
+	Body    Error
+	Headers RequestOtp429ResponseHeaders
+}
+
+func (response RequestOtp429JSONResponse) VisitRequestOtpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RequestOtp503JSONResponse Error
+
+func (response RequestOtp503JSONResponse) VisitRequestOtpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifyOtpRequestObject struct {
+	Body *VerifyOtpJSONRequestBody
+}
+
+type VerifyOtpResponseObject interface {
+	VisitVerifyOtpResponse(w http.ResponseWriter) error
+}
+
+type VerifyOtp200JSONResponse Session
+
+func (response VerifyOtp200JSONResponse) VisitVerifyOtpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifyOtp400JSONResponse Error
+
+func (response VerifyOtp400JSONResponse) VisitVerifyOtpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifyOtp403JSONResponse Error
+
+func (response VerifyOtp403JSONResponse) VisitVerifyOtpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifyOtp429JSONResponse Error
+
+func (response VerifyOtp429JSONResponse) VisitVerifyOtpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RefreshSessionRequestObject struct {
+	Body *RefreshSessionJSONRequestBody
+}
+
+type RefreshSessionResponseObject interface {
+	VisitRefreshSessionResponse(w http.ResponseWriter) error
+}
+
+type RefreshSession200JSONResponse Session
+
+func (response RefreshSession200JSONResponse) VisitRefreshSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RefreshSession401JSONResponse Error
+
+func (response RefreshSession401JSONResponse) VisitRefreshSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RefreshSession403JSONResponse Error
+
+func (response RefreshSession403JSONResponse) VisitRefreshSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMeRequestObject struct {
+}
+
+type GetMeResponseObject interface {
+	VisitGetMeResponse(w http.ResponseWriter) error
+}
+
+type GetMe200JSONResponse Me
+
+func (response GetMe200JSONResponse) VisitGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListVehicleCategoriesRequestObject struct {
 }
 
@@ -363,6 +800,21 @@ type StrictServerInterface interface {
 	// GetReadiness Report whether the instance can serve traffic
 	// (GET /readyz)
 	GetReadiness(ctx context.Context, request GetReadinessRequestObject) (GetReadinessResponseObject, error)
+	// Logout End the device's session. Succeeds even if already ended.
+	// (POST /v1/auth/logout)
+	Logout(ctx context.Context, request LogoutRequestObject) (LogoutResponseObject, error)
+	// RequestOtp Send a sign-in code to a Kenyan mobile number
+	// (POST /v1/auth/otp/request)
+	RequestOtp(ctx context.Context, request RequestOtpRequestObject) (RequestOtpResponseObject, error)
+	// VerifyOtp Exchange a sign-in code for a session, creating the account if new
+	// (POST /v1/auth/otp/verify)
+	VerifyOtp(ctx context.Context, request VerifyOtpRequestObject) (VerifyOtpResponseObject, error)
+	// RefreshSession Rotate a refresh token for new tokens
+	// (POST /v1/auth/refresh)
+	RefreshSession(ctx context.Context, request RefreshSessionRequestObject) (RefreshSessionResponseObject, error)
+	// GetMe Return the signed-in account
+	// (GET /v1/me)
+	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
 	// ListVehicleCategories List the vehicle categories open for booking and driver sign-up
 	// (GET /v1/vehicle-categories)
 	ListVehicleCategories(ctx context.Context, request ListVehicleCategoriesRequestObject) (ListVehicleCategoriesResponseObject, error)
@@ -448,6 +900,154 @@ func (sh *strictHandler) GetReadiness(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetReadinessResponseObject); ok {
 		if err := validResponse.VisitGetReadinessResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// Logout operation middleware
+func (sh *strictHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	var request LogoutRequestObject
+
+	var body LogoutJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.Logout(ctx, request.(LogoutRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "Logout")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(LogoutResponseObject); ok {
+		if err := validResponse.VisitLogoutResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RequestOtp operation middleware
+func (sh *strictHandler) RequestOtp(w http.ResponseWriter, r *http.Request) {
+	var request RequestOtpRequestObject
+
+	var body RequestOtpJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RequestOtp(ctx, request.(RequestOtpRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RequestOtp")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RequestOtpResponseObject); ok {
+		if err := validResponse.VisitRequestOtpResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// VerifyOtp operation middleware
+func (sh *strictHandler) VerifyOtp(w http.ResponseWriter, r *http.Request) {
+	var request VerifyOtpRequestObject
+
+	var body VerifyOtpJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.VerifyOtp(ctx, request.(VerifyOtpRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "VerifyOtp")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(VerifyOtpResponseObject); ok {
+		if err := validResponse.VisitVerifyOtpResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RefreshSession operation middleware
+func (sh *strictHandler) RefreshSession(w http.ResponseWriter, r *http.Request) {
+	var request RefreshSessionRequestObject
+
+	var body RefreshSessionJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RefreshSession(ctx, request.(RefreshSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RefreshSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RefreshSessionResponseObject); ok {
+		if err := validResponse.VisitRefreshSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetMe operation middleware
+func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
+	var request GetMeRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetMe(ctx, request.(GetMeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMe")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetMeResponseObject); ok {
+		if err := validResponse.VisitGetMeResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

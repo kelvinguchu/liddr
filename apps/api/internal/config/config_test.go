@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"log/slog"
+	"maps"
 	"strings"
 	"testing"
 	"time"
@@ -14,17 +15,43 @@ func env(values map[string]string) func(string) string {
 	return func(key string) string { return values[key] }
 }
 
+const testHMACKey = "0123456789abcdef0123456789abcdef"
+
+// validEnv returns a complete environment with overrides applied. An empty
+// override removes the variable.
+func validEnv(overrides map[string]string) map[string]string {
+	values := map[string]string{
+		"DATABASE_URL":           "postgres://user:hunter2@db",
+		"AUTH_HMAC_KEY":          testHMACKey,
+		"HOSTPINNACLE_API_URL":   "https://sms.example/send",
+		"HOSTPINNACLE_API_KEY":   "api-key",
+		"HOSTPINNACLE_USER_ID":   "user",
+		"HOSTPINNACLE_PASSWORD":  "password",
+		"HOSTPINNACLE_SENDER_ID": "LIDDR",
+	}
+	maps.Copy(values, overrides)
+	return values
+}
+
 func TestLoadAppliesDefaults(t *testing.T) {
-	got, err := Load(env(map[string]string{"DATABASE_URL": "postgres://db"}))
+	got, err := Load(env(validEnv(nil)))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
 	want := Config{
 		Addr:            ":8080",
-		DatabaseURL:     "postgres://db",
+		DatabaseURL:     "postgres://user:hunter2@db",
 		DBMaxConns:      20,
 		DrainDelay:      5 * time.Second,
 		ShutdownTimeout: 20 * time.Second,
+		AuthHMACKey:     testHMACKey,
+		SMS: SMS{
+			URL:      "https://sms.example/send",
+			APIKey:   "api-key",
+			UserID:   "user",
+			Password: "password",
+			SenderID: "LIDDR",
+		},
 	}
 	if diff := cmp.Diff(got, want); diff != "" {
 		t.Errorf("config mismatch (-got +want):\n%s", diff)
@@ -32,22 +59,24 @@ func TestLoadAppliesDefaults(t *testing.T) {
 }
 
 func TestLoadRejectsInvalidValues(t *testing.T) {
-	const url = "postgres://user:hunter2@db" //nolint:gosec // Fake credential that proves errors redact it.
 	tests := []struct {
-		name string
-		env  map[string]string
-		want string
+		name, key, value, want string
 	}{
-		{"missing database url", map[string]string{}, "DATABASE_URL is required"},
-		{"non-numeric pool", map[string]string{"DATABASE_URL": url, "DB_MAX_CONNS": "many"}, "DB_MAX_CONNS"},
-		{"zero pool", map[string]string{"DATABASE_URL": url, "DB_MAX_CONNS": "0"}, "DB_MAX_CONNS"},
-		{"pool beyond 32 bits", map[string]string{"DATABASE_URL": url, "DB_MAX_CONNS": "9999999999"}, "DB_MAX_CONNS"},
-		{"bad drain", map[string]string{"DATABASE_URL": url, "SHUTDOWN_DRAIN_DELAY": "soon"}, "SHUTDOWN_DRAIN_DELAY"},
-		{"negative timeout", map[string]string{"DATABASE_URL": url, "SHUTDOWN_TIMEOUT": "-1s"}, "SHUTDOWN_TIMEOUT"},
+		{"missing database url", "DATABASE_URL", "", "DATABASE_URL is required"},
+		{"missing hmac key", "AUTH_HMAC_KEY", "", "AUTH_HMAC_KEY is required"},
+		{"short hmac key", "AUTH_HMAC_KEY", "too-short", "AUTH_HMAC_KEY must be at least"},
+		{"missing sms url", "HOSTPINNACLE_API_URL", "", "HOSTPINNACLE_API_URL is required"},
+		{"missing sms password", "HOSTPINNACLE_PASSWORD", "", "HOSTPINNACLE_PASSWORD is required"},
+		{"non-numeric pool", "DB_MAX_CONNS", "many", "DB_MAX_CONNS"},
+		{"zero pool", "DB_MAX_CONNS", "0", "DB_MAX_CONNS"},
+		{"pool beyond 32 bits", "DB_MAX_CONNS", "9999999999", "DB_MAX_CONNS"},
+		{"negative proxy hops", "TRUSTED_PROXY_HOPS", "-1", "TRUSTED_PROXY_HOPS"},
+		{"bad drain", "SHUTDOWN_DRAIN_DELAY", "soon", "SHUTDOWN_DRAIN_DELAY"},
+		{"negative timeout", "SHUTDOWN_TIMEOUT", "-1s", "SHUTDOWN_TIMEOUT"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := Load(env(tt.env))
+			_, err := Load(env(validEnv(map[string]string{tt.key: tt.value})))
 			if err == nil {
 				t.Fatal("Load returned nil error")
 			}

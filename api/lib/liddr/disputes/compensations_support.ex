@@ -39,6 +39,26 @@ defmodule Liddr.Disputes.CompensationsSupport do
 
   def parse_positive_decimal(_value), do: :error
 
+  def positive_fare(%Decimal{} = fare) do
+    if Decimal.compare(fare, Decimal.new(0)) == :gt, do: Decimal.round(fare, 2)
+  end
+
+  def positive_fare(_fare), do: nil
+
+  def resolve_amount("refund_full", :error, fare), do: {:ok, fare}
+
+  def resolve_amount("refund_full", {:ok, amount}, fare) do
+    if Decimal.equal?(amount, fare), do: {:ok, fare}, else: {:error, :refund_amount_not_allowed}
+  end
+
+  def resolve_amount(_outcome, :error, _fare), do: {:error, :invalid_resolution_amount}
+
+  def resolve_amount(_outcome, {:ok, amount}, fare) do
+    if Decimal.compare(amount, fare) == :gt,
+      do: {:error, :refund_amount_not_allowed},
+      else: {:ok, amount}
+  end
+
   def resolve_processing_reference("paid", attrs) do
     reference =
       Query.get_value(attrs, :processing_reference) ||

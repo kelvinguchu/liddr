@@ -2,6 +2,28 @@ defmodule LiddrWeb.DisputeErrors do
   import Plug.Conn
   import Phoenix.Controller, only: [json: 2]
 
+  @policy_errors %{
+    dispute_ride_not_eligible:
+      {:unprocessable_entity, "DISPUTE_RIDE_NOT_ELIGIBLE",
+       "This ride cannot be disputed in its current state"},
+    dispute_window_closed:
+      {:unprocessable_entity, "DISPUTE_WINDOW_CLOSED",
+       "Disputes must be submitted within 48 hours of the ride ending"},
+    dispute_ride_limit_reached:
+      {:too_many_requests, "DISPUTE_RIDE_LIMIT_REACHED",
+       "Dispute limit reached for this ride. Please contact support"},
+    dispute_weekly_limit_reached:
+      {:too_many_requests, "DISPUTE_WEEKLY_LIMIT_REACHED",
+       "Weekly dispute limit reached. Please contact support"},
+    refund_amount_not_allowed:
+      {:unprocessable_entity, "REFUND_AMOUNT_NOT_ALLOWED",
+       "Refund cannot exceed the ride fare, and a full refund must equal it"},
+    refund_fare_unavailable:
+      {:unprocessable_entity, "REFUND_FARE_UNAVAILABLE",
+       "This ride has no recorded fare to refund against"}
+  }
+  @policy_error_reasons Map.keys(@policy_errors)
+
   def render(conn, :invalid_ride_id),
     do:
       error_response(
@@ -107,14 +129,10 @@ defmodule LiddrWeb.DisputeErrors do
         "resolution_amount_kes must be a positive number for this resolution outcome"
       )
 
-  def render(conn, :missing_resolution_amount),
-    do:
-      error_response(
-        conn,
-        :unprocessable_entity,
-        "MISSING_RESOLUTION_AMOUNT",
-        "resolution_amount_kes is required when the ride has no final fare to infer refund amount"
-      )
+  def render(conn, reason) when reason in @policy_error_reasons do
+    {status, code, message} = Map.fetch!(@policy_errors, reason)
+    error_response(conn, status, code, message)
+  end
 
   def render(conn, :invalid_dispute_ride_reference),
     do:

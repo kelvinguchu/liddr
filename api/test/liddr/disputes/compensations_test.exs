@@ -9,6 +9,7 @@ defmodule Liddr.Disputes.CompensationsTest do
   alias Liddr.Moderation.ReportCategory
   alias Liddr.Repo
   alias Liddr.Rides.Ride
+  alias Liddr.Rides.RideQuote
   alias Liddr.VerificationFixtures
 
   setup do
@@ -163,21 +164,117 @@ defmodule Liddr.Disputes.CompensationsTest do
     assert payload.compensation.amount_kes == Decimal.new("200.00")
   end
 
-  test "refund_full requires amount when final fare is unavailable" do
+  test "refunds require a recorded ride or quote fare" do
     %{rider: rider, ops: ops_user, ride: ride} = create_dispute_fixture!(final_fare_kes: nil)
+    report = submit_fare_dispute!(rider, ride)
 
+    assert {:error, :refund_fare_unavailable} =
+             Cases.resolve_for_ops(report.id, ops_user.id, %{
+               "resolution_outcome" => "refund_full",
+               "resolution_amount_kes" => "200.00",
+               "summary" => "Approved full refund."
+             })
+  end
+
+  test "partial refunds and credit notes cannot exceed the ride fare" do
+    for outcome <- ["refund_partial", "credit_note"] do
+      %{rider: rider, ops: ops_user, ride: ride} = create_dispute_fixture!()
+      report = submit_fare_dispute!(rider, ride)
+
+      assert {:error, :refund_amount_not_allowed} =
+               Cases.resolve_for_ops(report.id, ops_user.id, %{
+                 "resolution_outcome" => outcome,
+                 "resolution_amount_kes" => "200.01"
+               })
+
+      assert {:ok, payload} =
+               Cases.resolve_for_ops(report.id, ops_user.id, %{
+                 "resolution_outcome" => outcome,
+                 "resolution_amount_kes" => "200.00"
+               })
+
+      assert payload.compensation.amount_kes == Decimal.new("200.00")
+    end
+  end
+
+  test "refund_full only accepts the exact ride fare" do
+    %{rider: rider, ops: ops_user, ride: ride} = create_dispute_fixture!()
+    report = submit_fare_dispute!(rider, ride)
+
+    assert {:error, :refund_amount_not_allowed} =
+             Cases.resolve_for_ops(report.id, ops_user.id, %{
+               "resolution_outcome" => "refund_full",
+               "resolution_amount_kes" => "150.00"
+             })
+
+    assert {:ok, payload} =
+             Cases.resolve_for_ops(report.id, ops_user.id, %{
+               "resolution_outcome" => "refund_full",
+               "resolution_amount_kes" => "200.00"
+             })
+
+    assert payload.compensation.amount_kes == Decimal.new("200.00")
+  end
+
+  test "refund cap falls back to the quoted fare" do
+    %{rider: rider, ops: ops_user, ride: ride} = create_dispute_fixture!(final_fare_kes: nil)
+    quote = insert_quote!(ride, Decimal.new("150.00"))
+    ride = ride |> Ecto.Changeset.change(quote_id: quote.id) |> Repo.update!()
+    report = submit_fare_dispute!(rider, ride)
+
+    assert {:error, :refund_amount_not_allowed} =
+             Cases.resolve_for_ops(report.id, ops_user.id, %{
+               "resolution_outcome" => "refund_partial",
+               "resolution_amount_kes" => "150.01"
+             })
+
+    assert {:ok, payload} =
+             Cases.resolve_for_ops(report.id, ops_user.id, %{
+               "resolution_outcome" => "refund_full"
+             })
+
+    assert payload.compensation.amount_kes == Decimal.new("150.00")
+  end
+
+  defp submit_fare_dispute!(rider, ride) do
     {:ok, report} =
       Disputes.submit_for_ride(rider.id, %{
         "ride_id" => ride.id,
         "dispute_type" => "fare_dispute",
-        "description" => "Fare should be fully refunded."
+        "description" => "Fare did not match the trip."
       })
 
-    assert {:error, :missing_resolution_amount} =
-             Cases.resolve_for_ops(report.id, ops_user.id, %{
-               "resolution_outcome" => "refund_full",
-               "summary" => "Approved full refund."
-             })
+    report
+  end
+
+  defp insert_quote!(ride, fare) do
+    now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
+    zero = Decimal.new("0.00")
+
+    Repo.insert!(%RideQuote{
+      rider_id: ride.rider_id,
+      vehicle_category_id: ride.vehicle_category_id,
+      pickup_lat: ride.pickup_lat,
+      pickup_lng: ride.pickup_lng,
+      dropoff_lat: ride.dropoff_lat,
+      dropoff_lng: ride.dropoff_lng,
+      distance_m: 1000,
+      duration_s: 300,
+      base_amount_kes: zero,
+      distance_amount_kes: zero,
+      time_amount_kes: zero,
+      min_fare_kes: zero,
+      surge_multiplier: Decimal.new("1.00"),
+      subtotal_kes: fare,
+      base_fare_kes: fare,
+      discount_percent: zero,
+      discount_amount_kes: zero,
+      final_fare_kes: fare,
+      currency: "KES",
+      provider: "google_routes",
+      provider_payload: %{},
+      expires_at: DateTime.add(now, 600, :second)
+    })
   end
 
   defp create_dispute_fixture!(overrides \\ %{}) do

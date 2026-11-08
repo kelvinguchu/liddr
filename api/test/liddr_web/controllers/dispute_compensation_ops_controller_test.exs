@@ -123,13 +123,15 @@ defmodule LiddrWeb.DisputeCompensationOpsControllerTest do
       rider_id: rider_id,
       driver_id: driver_id,
       vehicle_category_id: category_id,
-      status: "accepted",
+      status: "completed",
       pickup_lat: Decimal.new("-1.2921000"),
       pickup_lng: Decimal.new("36.8219000"),
       dropoff_lat: Decimal.new("-1.3000000"),
       dropoff_lng: Decimal.new("36.8000000"),
       requested_at: DateTime.add(now, -120, :second),
       accepted_at: DateTime.add(now, -60, :second),
+      completed_at: now,
+      final_fare_kes: Decimal.new("500.00"),
       metadata: %{}
     })
   end

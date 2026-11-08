@@ -32,7 +32,7 @@ defmodule LiddrWeb.DisputeControllerTest do
   test "POST /api/disputes submits ride dispute for participant", %{conn: conn} do
     %{auth_conn: rider_conn, user_id: rider_id} = AuthFixtures.authenticate_rider!(conn)
     %{user_id: driver_id} = AuthFixtures.authenticate_driver!(conn)
-    ride = create_ride!(rider_id, driver_id, "accepted")
+    ride = create_ride!(rider_id, driver_id, "completed")
 
     conn =
       post(rider_conn, "/api/disputes", %{
@@ -57,7 +57,7 @@ defmodule LiddrWeb.DisputeControllerTest do
     %{user_id: rider_id} = AuthFixtures.authenticate_rider!(conn)
     %{user_id: driver_id} = AuthFixtures.authenticate_driver!(conn)
     %{auth_conn: outsider_conn} = AuthFixtures.authenticate_rider!(conn)
-    ride = create_ride!(rider_id, driver_id, "accepted")
+    ride = create_ride!(rider_id, driver_id, "completed")
 
     conn =
       post(outsider_conn, "/api/disputes", %{
@@ -107,7 +107,7 @@ defmodule LiddrWeb.DisputeControllerTest do
       AuthFixtures.authenticate_rider!(conn)
 
     opened_ride = create_ride!(rider_id, driver_id, "completed")
-    received_ride = create_ride!(other_rider_id, driver_id, "accepted")
+    received_ride = create_ride!(other_rider_id, driver_id, "completed")
 
     _ =
       post(driver_conn, "/api/disputes", %{
@@ -200,6 +200,64 @@ defmodule LiddrWeb.DisputeControllerTest do
     assert opened["dispute_type"] == "safety_incident"
   end
 
+  test "POST /api/disputes rejects non-safety disputes on active rides", %{conn: conn} do
+    %{auth_conn: rider_conn, ride: ride} = dispute_parties!(conn, "accepted")
+
+    assert %{"error" => %{"code" => "DISPUTE_RIDE_NOT_ELIGIBLE"}} =
+             rider_conn |> submit_dispute(ride, "fare_dispute") |> json_response(422)
+  end
+
+  test "POST /api/disputes allows safety disputes during an active ride", %{conn: conn} do
+    ensure_dispute_category!("harassment_or_abuse")
+    %{auth_conn: rider_conn, ride: ride} = dispute_parties!(conn, "in_progress")
+
+    assert %{"data" => %{"dispute_type" => "safety_incident"}} =
+             rider_conn |> submit_dispute(ride, "safety_incident") |> json_response(201)
+  end
+
+  test "POST /api/disputes rejects disputes more than 48 hours after the ride", %{conn: conn} do
+    %{auth_conn: rider_conn, ride: ride} = dispute_parties!(conn, "completed")
+    ended_at = DateTime.utc_now() |> DateTime.add(-49, :hour) |> DateTime.truncate(:microsecond)
+    ride = ride |> Ecto.Changeset.change(completed_at: ended_at) |> Repo.update!()
+
+    assert %{"error" => %{"code" => "DISPUTE_WINDOW_CLOSED"}} =
+             rider_conn |> submit_dispute(ride, "fare_dispute") |> json_response(422)
+  end
+
+  test "POST /api/disputes allows three disputes per ride", %{conn: conn} do
+    %{auth_conn: rider_conn, ride: ride} = dispute_parties!(conn, "completed")
+
+    for _attempt <- 1..3 do
+      assert rider_conn |> submit_dispute(ride, "fare_dispute") |> json_response(201)
+    end
+
+    assert %{"error" => %{"code" => "DISPUTE_RIDE_LIMIT_REACHED"}} =
+             rider_conn |> submit_dispute(ride, "fare_dispute") |> json_response(429)
+  end
+
+  test "POST /api/disputes allows ten disputes per week", %{conn: conn} do
+    limiter = Liddr.Moderation.ActionRateLimiter
+    previous_config = Application.get_env(:liddr, limiter, [])
+    on_exit(fn -> Application.put_env(:liddr, limiter, previous_config) end)
+    Application.put_env(:liddr, limiter, dispute_create_max_requests: 100)
+
+    %{auth_conn: rider_conn, user_id: rider_id, driver_id: driver_id} =
+      dispute_parties!(conn, "completed")
+
+    for _attempt <- 1..9 do
+      ride = create_ride!(rider_id, driver_id, "completed")
+      assert rider_conn |> submit_dispute(ride, "fare_dispute") |> json_response(201)
+    end
+
+    ride = create_ride!(rider_id, driver_id, "completed")
+    assert rider_conn |> submit_dispute(ride, "fare_dispute") |> json_response(201)
+
+    blocked_ride = create_ride!(rider_id, driver_id, "completed")
+
+    assert %{"error" => %{"code" => "DISPUTE_WEEKLY_LIMIT_REACHED"}} =
+             rider_conn |> submit_dispute(blocked_ride, "fare_dispute") |> json_response(429)
+  end
+
   test "POST /api/ops/disputes/:id/resolve supports partial refund outcome", %{conn: conn} do
     %{auth_conn: rider_conn, user_id: rider_id} = AuthFixtures.authenticate_rider!(conn)
     %{user_id: driver_id} = AuthFixtures.authenticate_driver!(conn)
@@ -209,7 +267,7 @@ defmodule LiddrWeb.DisputeControllerTest do
       |> Map.fetch!(:auth_conn)
       |> AuthFixtures.with_step_up!()
 
-    ride = create_ride!(rider_id, driver_id, "accepted")
+    ride = create_ride!(rider_id, driver_id, "completed")
 
     %{"data" => dispute} =
       post(rider_conn, "/api/disputes", %{
@@ -253,7 +311,7 @@ defmodule LiddrWeb.DisputeControllerTest do
       |> Map.fetch!(:auth_conn)
       |> AuthFixtures.with_step_up!()
 
-    ride = create_ride!(rider_id, driver_id, "accepted")
+    ride = create_ride!(rider_id, driver_id, "completed")
 
     %{"data" => dispute} =
       post(rider_conn, "/api/disputes", %{
@@ -338,7 +396,7 @@ defmodule LiddrWeb.DisputeControllerTest do
       |> Map.fetch!(:auth_conn)
       |> AuthFixtures.with_step_up!()
 
-    ride = create_ride!(rider_id, driver_id, "accepted")
+    ride = create_ride!(rider_id, driver_id, "completed")
 
     %{"data" => dispute} =
       post(rider_conn, "/api/disputes", %{
@@ -372,6 +430,26 @@ defmodule LiddrWeb.DisputeControllerTest do
     assert hd(ops_compensations)["beneficiary_user_id"] == rider_id
   end
 
+  defp dispute_parties!(conn, status) do
+    %{auth_conn: rider_conn, user_id: rider_id} = AuthFixtures.authenticate_rider!(conn)
+    %{user_id: driver_id} = AuthFixtures.authenticate_driver!(conn)
+
+    %{
+      auth_conn: rider_conn,
+      user_id: rider_id,
+      driver_id: driver_id,
+      ride: create_ride!(rider_id, driver_id, status)
+    }
+  end
+
+  defp submit_dispute(rider_conn, ride, dispute_type) do
+    post(rider_conn, "/api/disputes", %{
+      "ride_id" => ride.id,
+      "dispute_type" => dispute_type,
+      "description" => "Dispute eligibility probe."
+    })
+  end
+
   defp create_ride!(rider_id, driver_id, status) do
     now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
     category_id = VerificationFixtures.insert_vehicle_category!()
@@ -389,6 +467,7 @@ defmodule LiddrWeb.DisputeControllerTest do
       requested_at: DateTime.add(now, -120, :second),
       accepted_at: DateTime.add(now, -60, :second),
       completed_at: if(status == "completed", do: now, else: nil),
+      final_fare_kes: if(status == "completed", do: Decimal.new("500.00"), else: nil),
       metadata: %{}
     })
   end

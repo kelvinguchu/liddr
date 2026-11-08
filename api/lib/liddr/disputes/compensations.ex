@@ -7,6 +7,7 @@ defmodule Liddr.Disputes.Compensations do
   alias Liddr.Moderation.Report
   alias Liddr.Repo
   alias Liddr.Rides.Ride
+  alias Liddr.Rides.RideQuote
 
   @compensation_outcomes ~w(refund_full refund_partial credit_note)
   @sort_fields %{"inserted_at" => :inserted_at, "status" => :status, "amount_kes" => :amount_kes}
@@ -98,34 +99,30 @@ defmodule Liddr.Disputes.Compensations do
     end
   end
 
-  defp resolve_amount_kes("refund_full", attrs, %Ride{} = ride) do
-    case CompensationsSupport.parse_positive_decimal(
-           Query.get_value(attrs, :resolution_amount_kes)
-         ) do
-      {:ok, amount} ->
-        {:ok, amount}
+  defp resolve_amount_kes(outcome, attrs, %Ride{} = ride) do
+    requested =
+      attrs
+      |> Query.get_value(:resolution_amount_kes)
+      |> CompensationsSupport.parse_positive_decimal()
 
-      :error ->
-        case ride.final_fare_kes do
-          %Decimal{} = amount ->
-            if Decimal.compare(amount, Decimal.new(0)) == :gt do
-              {:ok, Decimal.round(amount, 2)}
-            else
-              {:error, :missing_resolution_amount}
-            end
-
-          _ ->
-            {:error, :missing_resolution_amount}
-        end
+    with {:ok, fare} <- refundable_fare(ride) do
+      CompensationsSupport.resolve_amount(outcome, requested, fare)
     end
   end
 
-  defp resolve_amount_kes(_outcome, attrs, _ride) do
-    case CompensationsSupport.parse_positive_decimal(
-           Query.get_value(attrs, :resolution_amount_kes)
-         ) do
-      {:ok, amount} -> {:ok, amount}
-      :error -> {:error, :invalid_resolution_amount}
+  defp refundable_fare(%Ride{} = ride) do
+    case CompensationsSupport.positive_fare(ride.final_fare_kes) || quoted_fare(ride.quote_id) do
+      nil -> {:error, :refund_fare_unavailable}
+      fare -> {:ok, fare}
+    end
+  end
+
+  defp quoted_fare(nil), do: nil
+
+  defp quoted_fare(quote_id) do
+    case Repo.get(RideQuote, quote_id) do
+      %RideQuote{final_fare_kes: fare} -> CompensationsSupport.positive_fare(fare)
+      nil -> nil
     end
   end
 

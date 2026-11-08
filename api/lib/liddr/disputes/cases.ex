@@ -3,6 +3,7 @@ defmodule Liddr.Disputes.Cases do
 
   alias Liddr.Disputes.Compensations
   alias Liddr.Disputes.CasesSupport
+  alias Liddr.Disputes.Eligibility
   alias Liddr.Moderation
   alias Liddr.Moderation.Query
   alias Liddr.Moderation.Report
@@ -32,6 +33,7 @@ defmodule Liddr.Disputes.Cases do
          %Ride{} = ride <- Repo.get(Ride, ride_id),
          {:ok, reported_user_id} <- resolve_reported_user_id(ride, requester_user_id),
          {:ok, dispute_type} <- fetch_dispute_type(attrs),
+         :ok <- Eligibility.check(ride, dispute_type, requester_user_id),
          {:ok, mapping} <- fetch_dispute_mapping(dispute_type),
          {:ok, report_attrs} <-
            build_report_attrs(

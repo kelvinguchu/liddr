@@ -8,55 +8,17 @@ defmodule Liddr.Auth.Sessions do
   alias Liddr.Auth.Policy
   alias Liddr.Repo
 
+  @last_seen_refresh_seconds 60
+
   def authenticate_access_token(access_token, _meta \\ %{}) do
     now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
     session_hash = Crypto.token_hash(access_token)
 
-    Repo.transaction(fn ->
-      session =
-        Repo.one(
-          from s in AuthSession,
-            where: s.session_token_hash == ^session_hash,
-            lock: "FOR UPDATE"
-        ) || Repo.rollback(:invalid_access_token)
-
-      cond do
-        not is_nil(session.revoked_at) ->
-          Repo.rollback(:access_token_revoked)
-
-        DateTime.compare(
-          DateTime.add(session.issued_at, Crypto.access_ttl_seconds(), :second),
-          now
-        ) in [
-          :lt,
-          :eq
-        ] ->
-          Repo.rollback(:access_token_expired)
-
-        true ->
-          user = Repo.get(User, session.user_id) || Repo.rollback(:user_not_found)
-
-          case Policy.ensure_user_can_authenticate(user) do
-            :ok ->
-              updated_session =
-                Repo.update!(
-                  Ecto.Changeset.change(session, %{
-                    last_seen_at: now
-                  })
-                )
-
-              %{
-                user: user,
-                session_id: updated_session.id,
-                auth_method: updated_session.auth_method
-              }
-
-            {:error, reason} ->
-              revoke_and_fail(session, now, "account_restricted", reason)
-          end
-      end
-    end)
-    |> unwrap_session_result()
+    with {:ok, session} <- fetch_usable_session(session_hash, now),
+         {:ok, user} <- fetch_authenticatable_user(session, now) do
+      touch_last_seen(session, now)
+      {:ok, %{user: user, session_id: session.id, auth_method: session.auth_method}}
+    end
   end
 
   def refresh_session(attrs, meta \\ %{}) do
@@ -175,6 +137,57 @@ defmodule Liddr.Auth.Sessions do
       refresh_token_expires_in: Crypto.refresh_ttl_seconds(),
       session_id: session.id
     }
+  end
+
+  defp fetch_usable_session(session_hash, now) do
+    session = Repo.get_by(AuthSession, session_token_hash: session_hash)
+
+    cond do
+      is_nil(session) ->
+        {:error, :invalid_access_token}
+
+      not is_nil(session.revoked_at) ->
+        {:error, :access_token_revoked}
+
+      DateTime.compare(
+        DateTime.add(session.issued_at, Crypto.access_ttl_seconds(), :second),
+        now
+      ) in [:lt, :eq] ->
+        {:error, :access_token_expired}
+
+      true ->
+        {:ok, session}
+    end
+  end
+
+  defp fetch_authenticatable_user(session, now) do
+    case Repo.get(User, session.user_id) do
+      nil ->
+        {:error, :user_not_found}
+
+      user ->
+        with :ok <- ensure_authenticatable(user, session, now), do: {:ok, user}
+    end
+  end
+
+  defp ensure_authenticatable(user, session, now) do
+    with {:error, reason} <- Policy.ensure_user_can_authenticate(user) do
+      revoke_family!(session.session_family_id, now, "account_restricted")
+      {:error, reason}
+    end
+  end
+
+  defp touch_last_seen(session, now) do
+    cutoff = DateTime.add(now, -@last_seen_refresh_seconds, :second)
+
+    if DateTime.compare(session.last_seen_at, cutoff) != :gt do
+      Repo.update_all(
+        from(s in AuthSession, where: s.id == ^session.id and s.last_seen_at <= ^cutoff),
+        set: [last_seen_at: now]
+      )
+    end
+
+    :ok
   end
 
   defp rotate_session!(session, now, meta) do

@@ -29,6 +29,11 @@ defmodule Liddr.Subscriptions.PaymentUtils do
   def parse_integer(value, _default) when is_integer(value), do: value
   def parse_integer(_value, default), do: default
 
+  def current_week_range(date) do
+    week_start = Date.beginning_of_week(date, :monday)
+    {week_start, Date.add(week_start, 6)}
+  end
+
   def reason_message(reason) when is_atom(reason),
     do: reason |> Atom.to_string() |> String.replace("_", " ")
 

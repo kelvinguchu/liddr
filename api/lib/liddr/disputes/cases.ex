@@ -191,6 +191,9 @@ defmodule Liddr.Disputes.Cases do
       ride.driver_id == requester_user_id and is_integer(ride.rider_id) ->
         {:ok, ride.rider_id}
 
+      is_integer(ride.driver_id) and CasesSupport.shared_member?(ride, requester_user_id) ->
+        {:ok, ride.driver_id}
+
       ride.rider_id == requester_user_id ->
         {:error, :ride_not_assigned_to_driver}
 

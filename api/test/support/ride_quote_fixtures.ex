@@ -6,7 +6,8 @@ defmodule LiddrWeb.RideQuoteFixtures do
   import Plug.Conn, only: [get_req_header: 2]
 
   alias Decimal, as: D
-  alias Liddr.Auth
+  alias Liddr.Auth.AuthSession
+  alias Liddr.Auth.Crypto
   alias Liddr.Repo
   alias Liddr.Rides.RideQuote
   alias Liddr.Rides.VehicleCategory
@@ -25,7 +26,7 @@ defmodule LiddrWeb.RideQuoteFixtures do
   defp with_quote(conn, params, category_id) do
     with nil <- params["quote_id"],
          rider_id when is_integer(rider_id) <- rider_id(conn),
-         true <- is_integer(category_id),
+         true <- is_integer(category_id) and Repo.exists?(category_query(category_id)),
          {:ok, points} <- route_points(params) do
       Map.put(params, "quote_id", quote_id!(rider_id, category_id, points, params))
     else
@@ -35,12 +36,15 @@ defmodule LiddrWeb.RideQuoteFixtures do
 
   defp rider_id(conn) do
     with ["Bearer " <> token | _] <- get_req_header(conn, "authorization"),
-         {:ok, %{user: user}} <- Auth.authenticate_access_token(token) do
-      user.id
+         %AuthSession{user_id: user_id} <-
+           Repo.get_by(AuthSession, session_token_hash: Crypto.token_hash(token)) do
+      user_id
     else
       _ -> nil
     end
   end
+
+  defp category_query(category_id), do: from(c in VehicleCategory, where: c.id == ^category_id)
 
   defp send_category_id do
     Repo.one(from c in VehicleCategory, where: c.slug == "send", select: c.id, limit: 1)

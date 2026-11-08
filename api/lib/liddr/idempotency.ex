@@ -13,6 +13,8 @@ defmodule Liddr.Idempotency do
             request_hash: String.t()
           }
 
+  @stale_claim_seconds 300
+
   def claim(user_id, operation, idempotency_key, payload) do
     with {:ok, normalized_key} <- normalize_key(idempotency_key),
          {:ok, normalized_operation} <- normalize_operation(operation) do
@@ -42,7 +44,15 @@ defmodule Liddr.Idempotency do
            }}
 
         {:ok, _} ->
-          resolve_existing(user_id, normalized_operation, normalized_key, request_hash)
+          retry_claim = fn -> claim(user_id, operation, idempotency_key, payload) end
+
+          resolve_existing(
+            user_id,
+            normalized_operation,
+            normalized_key,
+            request_hash,
+            retry_claim
+          )
 
         {:error, _changeset} ->
           {:error, :invalid_idempotency_key}
@@ -86,7 +96,7 @@ defmodule Liddr.Idempotency do
 
   def abandon(_claim), do: :ok
 
-  defp resolve_existing(user_id, operation, idempotency_key, request_hash) do
+  defp resolve_existing(user_id, operation, idempotency_key, request_hash, retry_claim) do
     existing =
       Repo.one(
         from r in Request,
@@ -106,9 +116,24 @@ defmodule Liddr.Idempotency do
       is_integer(existing.response_status) and is_map(existing.response_body) ->
         {:replay, %{status: existing.response_status, body: existing.response_body}}
 
+      release_stale_claim(existing) ->
+        retry_claim.()
+
       true ->
         {:error, :idempotency_in_progress}
     end
+  end
+
+  defp release_stale_claim(%Request{id: id}) do
+    cutoff = DateTime.utc_now() |> DateTime.add(-@stale_claim_seconds, :second)
+
+    {released, _} =
+      Repo.delete_all(
+        from r in Request,
+          where: r.id == ^id and is_nil(r.response_status) and r.inserted_at < ^cutoff
+      )
+
+    released == 1
   end
 
   defp normalize_response_body(body) when is_map(body) do

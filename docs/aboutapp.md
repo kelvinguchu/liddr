@@ -1050,6 +1050,7 @@ POST	/send/quote	Quote a Send delivery fare	Yes — Rider
 POST	/send/requests	Create a Send delivery request (quote_id required)	Yes — Rider
 GET	/send/history/sender	Sender delivery history	Yes — Rider
 GET	/send/history/courier	Courier delivery history	Yes — Driver
+POST	/send/rides/:ride_id/proof-uploads/presign	Get a signed upload URL for a pickup or dropoff proof photo	Yes — Driver
 POST	/send/rides/:ride_id/pickup-proof	Capture package pickup proof photo reference	Yes — Driver
 POST	/send/rides/:ride_id/dropoff-proof	Capture dropoff proof and issue recipient confirmation link	Yes — Driver
 POST	/send/recipient-confirmations/:token	Recipient confirms delivery via one-time link	No

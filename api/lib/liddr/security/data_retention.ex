@@ -46,7 +46,9 @@ defmodule Liddr.Security.DataRetention do
     cutoff = cutoff_for_days(now, ttl_days)
 
     from(r in Request,
-      where: not is_nil(r.completed_at) and r.completed_at < ^cutoff
+      where:
+        (not is_nil(r.completed_at) and r.completed_at < ^cutoff) or
+          (is_nil(r.completed_at) and r.inserted_at < ^cutoff)
     )
     |> Repo.delete_all()
     |> elem(0)

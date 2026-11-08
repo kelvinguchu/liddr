@@ -8,6 +8,7 @@ defmodule Liddr.Disputes.Compensations do
   alias Liddr.Repo
   alias Liddr.Rides.Ride
   alias Liddr.Rides.RideQuote
+  alias Liddr.Rides.SharedRideMember
 
   @compensation_outcomes ~w(refund_full refund_partial credit_note)
   @sort_fields %{"inserted_at" => :inserted_at, "status" => :status, "amount_kes" => :amount_kes}
@@ -15,7 +16,8 @@ defmodule Liddr.Disputes.Compensations do
   def create_for_outcome(%Report{} = report, outcome, attrs, actor_user_id) do
     if outcome in @compensation_outcomes do
       with {:ok, ride_id, ride} <- fetch_report_ride(report),
-           {:ok, amount_kes} <- resolve_amount_kes(outcome, attrs, ride) do
+           {:ok, amount_kes} <-
+             resolve_amount_kes(outcome, attrs, ride, report.reporter_user_id) do
         compensation_attrs = %{
           "report_id" => report.id,
           "ride_id" => ride_id,
@@ -99,23 +101,39 @@ defmodule Liddr.Disputes.Compensations do
     end
   end
 
-  defp resolve_amount_kes(outcome, attrs, %Ride{} = ride) do
+  defp resolve_amount_kes(outcome, attrs, %Ride{} = ride, beneficiary_user_id) do
     requested =
       attrs
       |> Query.get_value(:resolution_amount_kes)
       |> CompensationsSupport.parse_positive_decimal()
 
-    with {:ok, fare} <- refundable_fare(ride) do
+    with {:ok, fare} <- refundable_fare(ride, beneficiary_user_id) do
       CompensationsSupport.resolve_amount(outcome, requested, fare)
     end
   end
 
-  defp refundable_fare(%Ride{} = ride) do
-    case CompensationsSupport.positive_fare(ride.final_fare_kes) || quoted_fare(ride.quote_id) do
+  defp refundable_fare(%Ride{} = ride, beneficiary_user_id) do
+    fare =
+      member_fare(ride, beneficiary_user_id) ||
+        CompensationsSupport.positive_fare(ride.final_fare_kes) ||
+        quoted_fare(ride.quote_id)
+
+    case fare do
       nil -> {:error, :refund_fare_unavailable}
       fare -> {:ok, fare}
     end
   end
+
+  defp member_fare(%Ride{product_type: "shared", id: ride_id}, user_id) do
+    Repo.one(
+      from m in SharedRideMember,
+        where: m.ride_id == ^ride_id and m.rider_user_id == ^user_id,
+        select: m.fare_kes
+    )
+    |> CompensationsSupport.positive_fare()
+  end
+
+  defp member_fare(_ride, _user_id), do: nil
 
   defp quoted_fare(nil), do: nil
 

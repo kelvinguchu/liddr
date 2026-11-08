@@ -98,6 +98,7 @@ Do not hand-edit this file.
 | POST | `/api/rides/:ride_id/shared/members/:member_id/dropped-off` | `authenticated` | `no` | `LiddrWeb.SharedRideController#mark_member_dropped_off` |
 | POST | `/api/rides/:ride_id/destination-change-requests/:id/accept` | `authenticated` | `yes` | `LiddrWeb.RideDestinationChangeController#accept` |
 | POST | `/api/rides/:ride_id/destination-change-requests/:id/reject` | `authenticated` | `yes` | `LiddrWeb.RideDestinationChangeController#reject` |
+| POST | `/api/send/rides/:ride_id/proof-uploads/presign` | `authenticated` | `no` | `LiddrWeb.SendDeliveryController#presign_proof` |
 | POST | `/api/send/rides/:ride_id/pickup-proof` | `authenticated` | `no` | `LiddrWeb.SendDeliveryController#pickup_proof` |
 | POST | `/api/send/rides/:ride_id/dropoff-proof` | `authenticated` | `no` | `LiddrWeb.SendDeliveryController#dropoff_proof` |
 | GET | `/api/send/history/courier` | `authenticated` | `no` | `LiddrWeb.SendController#courier_history` |

@@ -2,8 +2,16 @@ defmodule Liddr.Disputes.CasesSupport do
   import Ecto.Query
 
   alias Liddr.Moderation.Query
+  alias Liddr.Repo
+  alias Liddr.Rides.SharedRideMember
 
   @reporter_only_dispute_types ~w(safety_incident wrong_driver)
+
+  def shared_member?(ride, user_id) do
+    Repo.exists?(
+      from m in SharedRideMember, where: m.ride_id == ^ride.id and m.rider_user_id == ^user_id
+    )
+  end
 
   def visible_to_reported_user(user_id) do
     dynamic(

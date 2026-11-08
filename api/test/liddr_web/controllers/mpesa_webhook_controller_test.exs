@@ -136,6 +136,37 @@ defmodule LiddrWeb.MpesaWebhookControllerTest do
     end
   end
 
+  test "POST /api/payments/mpesa/stk-callback credits an old-week payment to the current week",
+       %{conn: conn} do
+    %{driver: driver, subscription: old_subscription, payment: payment} =
+      create_pending_subscription_payment!()
+
+    old_subscription =
+      old_subscription
+      |> Ecto.Changeset.change(
+        week_start: Date.add(old_subscription.week_start, -7),
+        week_end: Date.add(old_subscription.week_end, -7)
+      )
+      |> Repo.update!()
+
+    payload = stk_callback_payload(payment.checkout_request_id, payment.merchant_request_id, 0)
+
+    assert %{"ResultCode" => 0} =
+             conn
+             |> post("/api/payments/mpesa/stk-callback?token=#{@callback_token}", payload)
+             |> json_response(200)
+
+    current_week_start = Date.beginning_of_week(Date.utc_today(), :monday)
+
+    current_subscription =
+      Repo.get_by!(Subscription, driver_id: driver.user_id, week_start: current_week_start)
+
+    assert current_subscription.status == "active"
+    assert Repo.get!(Subscription, old_subscription.id).status == "pending"
+    assert Repo.get!(SubscriptionPayment, payment.id).subscription_id == current_subscription.id
+    assert Repo.get!(Liddr.Accounts.Driver, driver.user_id).subscription_status == "active"
+  end
+
   test "POST /api/payments/mpesa/stk-callback is idempotent for duplicate callbacks", %{
     conn: conn
   } do

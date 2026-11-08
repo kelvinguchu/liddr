@@ -6,8 +6,25 @@ defmodule LiddrWeb.SendDeliveryControllerTest do
   alias Liddr.Accounts.User
   alias Liddr.Repo
   alias Liddr.Rides.SendDelivery
+  alias Liddr.TestSupport.GCSMetadataStub
+  alias Liddr.TestSupport.GCSUploadPresignerStub
   alias Liddr.VerificationFixtures
   alias LiddrWeb.AuthFixtures
+
+  setup do
+    previous_fetcher = Application.get_env(:liddr, :gcs_object_metadata_fetcher)
+    previous_presigner = Application.get_env(:liddr, :gcs_upload_presigner)
+    Application.put_env(:liddr, :gcs_object_metadata_fetcher, GCSMetadataStub)
+    Application.put_env(:liddr, :gcs_upload_presigner, GCSUploadPresignerStub)
+    :ok = GCSMetadataStub.reset()
+
+    on_exit(fn ->
+      restore_env(:gcs_object_metadata_fetcher, previous_fetcher)
+      restore_env(:gcs_upload_presigner, previous_presigner)
+    end)
+
+    :ok
+  end
 
   test "send proof flow gates start/complete until proofs + recipient confirmation", %{conn: conn} do
     %{auth_conn: rider_conn} = AuthFixtures.authenticate_rider!(conn)
@@ -44,9 +61,11 @@ defmodule LiddrWeb.SendDeliveryControllerTest do
     assert %{"error" => %{"code" => "SEND_PICKUP_PROOF_REQUIRED"}} =
              post(driver_conn, "/api/rides/#{ride_id}/start", %{}) |> json_response(422)
 
-    assert %{"data" => %{"delivery" => %{"pickup_proof_key" => "gcs://send/pickup-1.jpg"}}} =
+    pickup_key = uploaded_proof!(ride_id, driver_user_id, "pickup")
+
+    assert %{"data" => %{"delivery" => %{"pickup_proof_key" => ^pickup_key}}} =
              post(driver_conn, "/api/send/rides/#{ride_id}/pickup-proof", %{
-               "pickup_proof_key" => "gcs://send/pickup-1.jpg"
+               "pickup_proof_key" => pickup_key
              })
              |> json_response(201)
 
@@ -56,14 +75,16 @@ defmodule LiddrWeb.SendDeliveryControllerTest do
       post(driver_conn, "/api/drivers/me/location", %{"lat" => "-1.3000", "lng" => "36.8000"})
       |> json_response(200)
 
+    dropoff_key = uploaded_proof!(ride_id, driver_user_id, "dropoff")
+
     %{
       "data" => %{
         "recipient_confirmation_channel" => "in_app",
-        "delivery" => %{"dropoff_proof_key" => "gcs://send/dropoff-1.jpg"}
+        "delivery" => %{"dropoff_proof_key" => ^dropoff_key}
       }
     } =
       post(driver_conn, "/api/send/rides/#{ride_id}/dropoff-proof", %{
-        "dropoff_proof_key" => "gcs://send/dropoff-1.jpg"
+        "dropoff_proof_key" => dropoff_key
       })
       |> json_response(201)
 
@@ -126,7 +147,7 @@ defmodule LiddrWeb.SendDeliveryControllerTest do
 
     _ =
       post(driver_conn, "/api/send/rides/#{ride_id}/pickup-proof", %{
-        "pickup_proof_key" => "gcs://send/pickup-2.jpg"
+        "pickup_proof_key" => uploaded_proof!(ride_id, driver_user_id, "pickup")
       })
 
     _ = post(driver_conn, "/api/rides/#{ride_id}/start", %{}) |> json_response(200)
@@ -137,7 +158,7 @@ defmodule LiddrWeb.SendDeliveryControllerTest do
 
     _ =
       post(driver_conn, "/api/send/rides/#{ride_id}/dropoff-proof", %{
-        "dropoff_proof_key" => "gcs://send/dropoff-2.jpg"
+        "dropoff_proof_key" => uploaded_proof!(ride_id, driver_user_id, "dropoff")
       })
       |> json_response(201)
 
@@ -196,7 +217,7 @@ defmodule LiddrWeb.SendDeliveryControllerTest do
 
     _ =
       post(driver_conn, "/api/send/rides/#{ride_id}/pickup-proof", %{
-        "pickup_proof_key" => "gcs://send/pickup-in-app.jpg"
+        "pickup_proof_key" => uploaded_proof!(ride_id, driver_user_id, "pickup")
       })
       |> json_response(201)
 
@@ -213,7 +234,7 @@ defmodule LiddrWeb.SendDeliveryControllerTest do
              }
            } =
              post(driver_conn, "/api/send/rides/#{ride_id}/dropoff-proof", %{
-               "dropoff_proof_key" => "gcs://send/dropoff-in-app.jpg"
+               "dropoff_proof_key" => uploaded_proof!(ride_id, driver_user_id, "dropoff")
              })
              |> json_response(201)
 
@@ -239,6 +260,171 @@ defmodule LiddrWeb.SendDeliveryControllerTest do
              post(recipient_conn, "/api/send/rides/#{ride_id}/recipient-confirm", %{})
              |> json_response(200)
   end
+
+  test "proof upload URLs are scoped to the ride and driver", %{conn: conn} do
+    %{driver_conn: driver_conn, driver_user_id: driver_id, ride_id: ride_id} =
+      send_ride_at_pickup!(conn)
+
+    assert %{"data" => %{"storage_key" => key, "upload_url" => url}} =
+             post(driver_conn, "/api/send/rides/#{ride_id}/proof-uploads/presign", %{
+               "proof_kind" => "pickup",
+               "file_mime" => "image/jpeg",
+               "file_size_bytes" => 2048
+             })
+             |> json_response(201)
+
+    assert String.starts_with?(key, "send/proofs/#{ride_id}/pickup/#{driver_id}_")
+    assert is_binary(url)
+  end
+
+  test "proof uploads reject non-image files", %{conn: conn} do
+    %{driver_conn: driver_conn, ride_id: ride_id} = send_ride_at_pickup!(conn)
+
+    assert %{"error" => %{"code" => "INVALID_FILE_MIME"}} =
+             post(driver_conn, "/api/send/rides/#{ride_id}/proof-uploads/presign", %{
+               "proof_kind" => "pickup",
+               "file_mime" => "application/pdf",
+               "file_size_bytes" => 2048
+             })
+             |> json_response(422)
+  end
+
+  test "a proof key must point to a file that was uploaded", %{conn: conn} do
+    %{driver_conn: driver_conn, driver_user_id: driver_id, ride_id: ride_id} =
+      send_ride_at_pickup!(conn)
+
+    assert %{"error" => %{"code" => "PROOF_UPLOAD_NOT_FOUND"}} =
+             post(driver_conn, "/api/send/rides/#{ride_id}/pickup-proof", %{
+               "pickup_proof_key" => proof_key(ride_id, driver_id, "pickup")
+             })
+             |> json_response(422)
+  end
+
+  test "proof keys for another ride, driver, or made-up path are rejected", %{conn: conn} do
+    %{driver_conn: driver_conn, driver_user_id: driver_id, ride_id: ride_id} =
+      send_ride_at_pickup!(conn)
+
+    invalid_keys = [
+      "x",
+      proof_key(ride_id + 1, driver_id, "pickup"),
+      proof_key(ride_id, driver_id + 1, "pickup"),
+      proof_key(ride_id, driver_id, "dropoff")
+    ]
+
+    for key <- invalid_keys do
+      assert %{"error" => %{"code" => "INVALID_PROOF_KEY"}} =
+               post(driver_conn, "/api/send/rides/#{ride_id}/pickup-proof", %{
+                 "pickup_proof_key" => key
+               })
+               |> json_response(422)
+    end
+  end
+
+  test "a recipient cannot confirm before the drop-off proof exists", %{conn: conn} do
+    %{
+      driver_conn: driver_conn,
+      driver_user_id: driver_id,
+      recipient_conn: recipient_conn,
+      ride_id: ride_id
+    } = send_ride_at_pickup!(conn)
+
+    _ =
+      post(driver_conn, "/api/send/rides/#{ride_id}/pickup-proof", %{
+        "pickup_proof_key" => uploaded_proof!(ride_id, driver_id, "pickup")
+      })
+      |> json_response(201)
+
+    assert %{"error" => %{"code" => "SEND_DROPOFF_PROOF_REQUIRED"}} =
+             post(recipient_conn, "/api/send/rides/#{ride_id}/recipient-confirm", %{})
+             |> json_response(422)
+  end
+
+  test "the drop-off proof cannot change after recipient confirmation", %{conn: conn} do
+    %{
+      driver_conn: driver_conn,
+      driver_user_id: driver_id,
+      recipient_conn: recipient_conn,
+      ride_id: ride_id
+    } = send_ride_at_pickup!(conn)
+
+    _ =
+      post(driver_conn, "/api/send/rides/#{ride_id}/pickup-proof", %{
+        "pickup_proof_key" => uploaded_proof!(ride_id, driver_id, "pickup")
+      })
+      |> json_response(201)
+
+    _ = post(driver_conn, "/api/rides/#{ride_id}/start", %{}) |> json_response(200)
+    dropoff_key = uploaded_proof!(ride_id, driver_id, "dropoff")
+
+    _ =
+      post(driver_conn, "/api/send/rides/#{ride_id}/dropoff-proof", %{
+        "dropoff_proof_key" => dropoff_key
+      })
+      |> json_response(201)
+
+    _ =
+      post(recipient_conn, "/api/send/rides/#{ride_id}/recipient-confirm", %{})
+      |> json_response(200)
+
+    assert %{"error" => %{"code" => "SEND_RECIPIENT_ALREADY_CONFIRMED"}} =
+             post(driver_conn, "/api/send/rides/#{ride_id}/dropoff-proof", %{
+               "dropoff_proof_key" => dropoff_key
+             })
+             |> json_response(422)
+  end
+
+  defp send_ride_at_pickup!(conn) do
+    %{auth_conn: rider_conn} = AuthFixtures.authenticate_rider!(conn)
+
+    %{auth_conn: recipient_conn, user_id: recipient_user_id} =
+      AuthFixtures.authenticate_rider!(conn)
+
+    recipient_phone = Repo.get!(User, recipient_user_id).phone
+    %{auth_conn: driver_conn, user_id: driver_user_id} = AuthFixtures.authenticate_driver!(conn)
+    send_category_id = VerificationFixtures.insert_vehicle_category!(%{slug: "send"})
+    _ = create_eligible_driver_profile!(driver_user_id, send_category_id)
+
+    %{"data" => %{"ride" => %{"id" => ride_id}, "offers" => [%{"id" => offer_id}]}} =
+      rider_conn
+      |> post_send_request(%{
+        "pickup_lat" => "-1.2921",
+        "pickup_lng" => "36.8219",
+        "dropoff_lat" => "-1.3000",
+        "dropoff_lng" => "36.8000",
+        "sender_name" => "Alice",
+        "recipient_name" => "Bob",
+        "recipient_phone" => recipient_phone,
+        "item_description" => "Office parcel",
+        "item_size" => "small",
+        "payer" => "sender",
+        "payment_timing" => "after",
+        "offer_limit" => 1
+      })
+      |> json_response(201)
+
+    _ = post(driver_conn, "/api/rides/offers/#{offer_id}/accept", %{}) |> json_response(200)
+    _ = post(driver_conn, "/api/rides/#{ride_id}/arrived", %{}) |> json_response(200)
+
+    %{
+      driver_conn: driver_conn,
+      driver_user_id: driver_user_id,
+      recipient_conn: recipient_conn,
+      ride_id: ride_id
+    }
+  end
+
+  defp proof_key(ride_id, driver_user_id, kind) do
+    "send/proofs/#{ride_id}/#{kind}/#{driver_user_id}_proof.jpg"
+  end
+
+  defp uploaded_proof!(ride_id, driver_user_id, kind) do
+    key = proof_key(ride_id, driver_user_id, kind)
+    :ok = GCSMetadataStub.put_response(key, %{content_type: "image/jpeg", file_size_bytes: 2048})
+    key
+  end
+
+  defp restore_env(key, nil), do: Application.delete_env(:liddr, key)
+  defp restore_env(key, value), do: Application.put_env(:liddr, key, value)
 
   defp create_eligible_driver_profile!(user_id, category_id) do
     user = Repo.get!(User, user_id)

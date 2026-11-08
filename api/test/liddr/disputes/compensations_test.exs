@@ -10,6 +10,8 @@ defmodule Liddr.Disputes.CompensationsTest do
   alias Liddr.Repo
   alias Liddr.Rides.Ride
   alias Liddr.Rides.RideQuote
+  alias Liddr.Rides.SharedRideGroup
+  alias Liddr.Rides.SharedRideMember
   alias Liddr.VerificationFixtures
 
   setup do
@@ -183,6 +185,36 @@ defmodule Liddr.Disputes.CompensationsTest do
     assert payload.compensation.amount_kes == Decimal.new("200.00")
   end
 
+  test "a shared-ride passenger can dispute and is refunded up to their own fare" do
+    %{ops: ops_user, driver: driver, ride: ride} = create_dispute_fixture!()
+    ride = ride |> Ecto.Changeset.change(product_type: "shared") |> Repo.update!()
+    member = VerificationFixtures.create_user!()
+    insert_shared_member!(ride, member, "120.00")
+
+    assert {:ok, report} =
+             Disputes.submit_for_ride(member.id, %{
+               "ride_id" => ride.id,
+               "dispute_type" => "fare_dispute",
+               "description" => "Charged too much for my seat."
+             })
+
+    assert report.reported_user_id == driver.id
+
+    assert {:error, :refund_amount_not_allowed} =
+             Cases.resolve_for_ops(report.id, ops_user.id, %{
+               "resolution_outcome" => "refund_partial",
+               "resolution_amount_kes" => "120.01"
+             })
+
+    assert {:ok, payload} =
+             Cases.resolve_for_ops(report.id, ops_user.id, %{
+               "resolution_outcome" => "refund_partial",
+               "resolution_amount_kes" => "120.00"
+             })
+
+    assert payload.compensation.beneficiary_user_id == member.id
+  end
+
   test "refunds require a recorded ride or quote fare" do
     %{rider: rider, ops: ops_user, ride: ride} = create_dispute_fixture!(final_fare_kes: nil)
     report = submit_fare_dispute!(rider, ride)
@@ -253,6 +285,26 @@ defmodule Liddr.Disputes.CompensationsTest do
              })
 
     assert payload.compensation.amount_kes == Decimal.new("150.00")
+  end
+
+  defp insert_shared_member!(ride, user, fare) do
+    now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
+
+    group =
+      %SharedRideGroup{}
+      |> SharedRideGroup.create_changeset(%{"ride_id" => ride.id, "max_members" => 2})
+      |> Repo.insert!()
+
+    %SharedRideMember{}
+    |> SharedRideMember.create_changeset(%{
+      "group_id" => group.id,
+      "ride_id" => ride.id,
+      "rider_user_id" => user.id,
+      "status" => "dropped_off",
+      "requested_at" => now,
+      "fare_kes" => Decimal.new(fare)
+    })
+    |> Repo.insert!()
   end
 
   defp submit_fare_dispute!(rider, ride) do

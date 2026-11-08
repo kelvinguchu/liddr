@@ -178,6 +178,7 @@ defmodule LiddrWeb.Router do
          RideDestinationChangeController,
          :reject
 
+    post "/send/rides/:ride_id/proof-uploads/presign", SendDeliveryController, :presign_proof
     post "/send/rides/:ride_id/pickup-proof", SendDeliveryController, :pickup_proof
     post "/send/rides/:ride_id/dropoff-proof", SendDeliveryController, :dropoff_proof
     get "/send/history/courier", SendController, :courier_history

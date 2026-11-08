@@ -3,6 +3,7 @@ defmodule LiddrWeb.SendDeliveryController do
 
   alias Ecto.Changeset
   alias Liddr.Rides
+  alias Liddr.Rides.SendProofUploads
   alias LiddrWeb.RideSerializer
   alias LiddrWeb.SendDeliverySerializer
 
@@ -39,6 +40,21 @@ defmodule LiddrWeb.SendDeliveryController do
       {:unprocessable_entity, "MISSING_PICKUP_PROOF_KEY", "pickup_proof_key is required"},
     missing_dropoff_proof_key:
       {:unprocessable_entity, "MISSING_DROPOFF_PROOF_KEY", "dropoff_proof_key is required"},
+    send_recipient_already_confirmed:
+      {:unprocessable_entity, "SEND_RECIPIENT_ALREADY_CONFIRMED",
+       "Dropoff proof cannot change after the recipient has confirmed delivery"},
+    invalid_proof_kind:
+      {:unprocessable_entity, "INVALID_PROOF_KIND", "proof_kind must be pickup or dropoff"},
+    missing_file_mime: {:unprocessable_entity, "MISSING_FILE_MIME", "file_mime is required"},
+    invalid_file_mime:
+      {:unprocessable_entity, "INVALID_FILE_MIME", "Proof must be a JPEG or PNG image"},
+    invalid_file_size_bytes:
+      {:unprocessable_entity, "INVALID_FILE_SIZE_BYTES", "file_size_bytes must be positive"},
+    file_too_large: {:unprocessable_entity, "FILE_TOO_LARGE", "Proof image is too large"},
+    invalid_storage_key:
+      {:unprocessable_entity, "INVALID_PROOF_KEY", "Proof key does not belong to this ride"},
+    uploaded_file_not_found:
+      {:unprocessable_entity, "PROOF_UPLOAD_NOT_FOUND", "Proof image has not been uploaded"},
     send_recipient_in_app_only:
       {:unprocessable_entity, "SEND_RECIPIENT_IN_APP_ONLY",
        "Recipient confirmation is only available in-app"},
@@ -46,6 +62,20 @@ defmodule LiddrWeb.SendDeliveryController do
       {:forbidden, "RECIPIENT_NOT_AUTHORIZED_FOR_DELIVERY",
        "Current user is not authorized to confirm this delivery"}
   }
+
+  def presign_proof(conn, %{"ride_id" => ride_id} = params) do
+    driver_user_id = conn.assigns.current_user.id
+
+    case SendProofUploads.prepare_upload(driver_user_id, ride_id, params) do
+      {:ok, payload} ->
+        conn
+        |> put_status(:created)
+        |> json(%{data: payload})
+
+      {:error, reason} ->
+        render_error(conn, reason)
+    end
+  end
 
   def pickup_proof(conn, %{"ride_id" => ride_id} = params) do
     driver_user_id = conn.assigns.current_user.id

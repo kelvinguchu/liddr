@@ -71,7 +71,7 @@ defmodule LiddrWeb.Idempotency do
   end
 
   defp run_with_claim(conn, claim, execute_fun, render_error_fun) do
-    case execute_fun.() do
+    case execute_claimed(claim, execute_fun) do
       {:ok, status, body} ->
         _ = Idempotency.complete(claim, status, body)
 
@@ -83,6 +83,14 @@ defmodule LiddrWeb.Idempotency do
         _ = Idempotency.abandon(claim)
         render_error_fun.(conn, reason)
     end
+  end
+
+  defp execute_claimed(claim, execute_fun) do
+    execute_fun.()
+  catch
+    kind, reason ->
+      _ = Idempotency.abandon(claim)
+      :erlang.raise(kind, reason, __STACKTRACE__)
   end
 
   defp request_header(conn, name) do

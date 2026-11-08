@@ -18,7 +18,7 @@ defmodule Liddr.Subscriptions.Payments do
 
   def initiate_payment(driver_user_id, attrs \\ %{}) do
     now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
-    {week_start, week_end} = current_week_range(Date.utc_today())
+    {week_start, week_end} = PaymentUtils.current_week_range(Date.utc_today())
 
     with {:ok, prepared} <-
            prepare_payment_attempt(driver_user_id, attrs, now, week_start, week_end),
@@ -256,11 +256,6 @@ defmodule Liddr.Subscriptions.Payments do
       )
 
     if category, do: category, else: Repo.rollback(:vehicle_category_not_found)
-  end
-
-  defp current_week_range(date) do
-    week_start = Date.beginning_of_week(date, :monday)
-    {week_start, Date.add(week_start, 6)}
   end
 
   defp mpesa_client_module,

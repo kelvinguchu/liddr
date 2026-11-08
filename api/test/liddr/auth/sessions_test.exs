@@ -67,6 +67,37 @@ defmodule Liddr.Auth.SessionsTest do
     assert {:ok, _payload} = Sessions.authenticate_access_token(rotated.access_token)
   end
 
+  test "a recent session is authenticated without rewriting last seen" do
+    %{first: first} = session_fixture()
+    seen_at = set_last_seen!(first.session_id, -10)
+
+    assert {:ok, _payload} = Sessions.authenticate_access_token(first.access_token)
+    assert DateTime.compare(Repo.get!(AuthSession, first.session_id).last_seen_at, seen_at) == :eq
+  end
+
+  test "last seen is refreshed once it is over a minute old" do
+    %{first: first} = session_fixture()
+    seen_at = set_last_seen!(first.session_id, -120)
+
+    assert {:ok, _payload} = Sessions.authenticate_access_token(first.access_token)
+    assert DateTime.compare(Repo.get!(AuthSession, first.session_id).last_seen_at, seen_at) == :gt
+  end
+
+  test "an unknown access token is rejected" do
+    assert {:error, :invalid_access_token} = Sessions.authenticate_access_token("missing")
+  end
+
+  defp set_last_seen!(session_id, offset_seconds) do
+    seen_at =
+      DateTime.utc_now() |> DateTime.add(offset_seconds) |> DateTime.truncate(:microsecond)
+
+    Repo.get!(AuthSession, session_id)
+    |> Ecto.Changeset.change(last_seen_at: seen_at)
+    |> Repo.update!()
+
+    seen_at
+  end
+
   defp session_fixture do
     user = VerificationFixtures.create_user!()
     now = DateTime.utc_now() |> DateTime.truncate(:microsecond)

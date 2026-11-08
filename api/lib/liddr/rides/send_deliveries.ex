@@ -9,11 +9,19 @@ defmodule Liddr.Rides.SendDeliveries do
   alias Liddr.Rides.Realtime
   alias Liddr.Rides.SendDelivery
   alias Liddr.Rides.SendDeliverySupport
+  alias Liddr.Rides.SendProofUploads
   alias Liddr.Rides.Ride
 
   def capture_pickup_proof(driver_user_id, ride_id, attrs \\ %{}) do
     with {:ok, pickup_proof_key} <-
-           SendDeliverySupport.required_text(attrs, :pickup_proof_key, :missing_pickup_proof_key) do
+           SendDeliverySupport.required_text(attrs, :pickup_proof_key, :missing_pickup_proof_key),
+         {:ok, pickup_proof_key} <-
+           SendProofUploads.verify_uploaded_proof(
+             driver_user_id,
+             ride_id,
+             "pickup",
+             pickup_proof_key
+           ) do
       now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
 
       Repo.transaction(fn ->
@@ -68,6 +76,13 @@ defmodule Liddr.Rides.SendDeliveries do
              attrs,
              :dropoff_proof_key,
              :missing_dropoff_proof_key
+           ),
+         {:ok, dropoff_proof_key} <-
+           SendProofUploads.verify_uploaded_proof(
+             driver_user_id,
+             ride_id,
+             "dropoff",
+             dropoff_proof_key
            ) do
       now = DateTime.utc_now() |> DateTime.truncate(:microsecond)
 
@@ -86,6 +101,10 @@ defmodule Liddr.Rides.SendDeliveries do
 
         if is_nil(delivery.pickup_proof_captured_at) do
           Repo.rollback(:send_pickup_proof_required)
+        end
+
+        if delivery.recipient_confirmed_at do
+          Repo.rollback(:send_recipient_already_confirmed)
         end
 
         delivery =
@@ -152,6 +171,10 @@ defmodule Liddr.Rides.SendDeliveries do
 
       if recipient.phone != delivery.recipient_phone do
         Repo.rollback(:recipient_not_authorized_for_delivery)
+      end
+
+      if is_nil(delivery.dropoff_proof_captured_at) do
+        Repo.rollback(:send_dropoff_proof_required)
       end
 
       cond do

@@ -114,7 +114,7 @@ func (s *Service) Authenticate(ctx context.Context, accessToken string) (Princip
 func lockFamily(ctx context.Context, q *store.Queries, hash []byte) (store.GetSessionByRefreshHashRow, error) {
 	family, err := q.GetFamilyByRefreshHash(ctx, hash)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return store.GetSessionByRefreshHashRow{}, reject(ErrInvalidToken)
+		return store.GetSessionByRefreshHashRow{}, store.Reject(ErrInvalidToken)
 	}
 	if err != nil {
 		return store.GetSessionByRefreshHashRow{}, fmt.Errorf("find session family: %w", err)
@@ -133,7 +133,7 @@ func lockFamily(ctx context.Context, q *store.Queries, hash []byte) (store.GetSe
 func (s *Service) Refresh(ctx context.Context, refreshToken string, meta RequestMeta) (Tokens, error) {
 	var tokens Tokens
 	now := s.now()
-	err := s.tx(ctx, func(q *store.Queries) error {
+	err := store.InTx(ctx, s.pool, func(q *store.Queries) error {
 		session, err := lockFamily(ctx, q, hashToken(refreshToken))
 		if err != nil {
 			return err
@@ -143,7 +143,7 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string, meta Request
 				return err
 			}
 		} else if !now.Before(session.RefreshExpiresAt) {
-			return reject(ErrInvalidToken)
+			return store.Reject(ErrInvalidToken)
 		}
 
 		status, err := q.GetUserAccountStatus(ctx, session.UserID)
@@ -154,7 +154,7 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string, meta Request
 			if err := revokeFamily(ctx, q, session, "account_blocked", meta, now); err != nil {
 				return err
 			}
-			return reject(err)
+			return store.Reject(err)
 		}
 
 		var newID uuid.UUID
@@ -186,7 +186,7 @@ func wrapReplace(err error) error {
 // spent token means it was copied, so the whole family is revoked.
 func (s *Service) checkRetry(ctx context.Context, q *store.Queries, session store.GetSessionByRefreshHashRow, meta RequestMeta, now time.Time) error {
 	if session.RevokedReason == nil || *session.RevokedReason != "rotated" {
-		return reject(ErrInvalidToken)
+		return store.Reject(ErrInvalidToken)
 	}
 	if now.Sub(*session.RevokedAt) <= refreshRetryGrace && session.ReplacedByID != nil {
 		replacementRevokedAt, err := q.GetSessionRevokedAt(ctx, *session.ReplacedByID)
@@ -203,7 +203,7 @@ func (s *Service) checkRetry(ctx context.Context, q *store.Queries, session stor
 	if err := revokeFamily(ctx, q, session, "reuse_detected", meta, now); err != nil {
 		return err
 	}
-	return reject(ErrInvalidToken)
+	return store.Reject(ErrInvalidToken)
 }
 
 func revokeFamily(ctx context.Context, q *store.Queries, session store.GetSessionByRefreshHashRow, reason string, meta RequestMeta, now time.Time) error {
@@ -224,7 +224,7 @@ func revokeFamily(ctx context.Context, q *store.Queries, session store.GetSessio
 // token is success, because the caller's goal has been met either way.
 func (s *Service) Logout(ctx context.Context, refreshToken string, meta RequestMeta) error {
 	now := s.now()
-	err := s.tx(ctx, func(q *store.Queries) error {
+	err := store.InTx(ctx, s.pool, func(q *store.Queries) error {
 		session, err := lockFamily(ctx, q, hashToken(refreshToken))
 		if err != nil {
 			return err

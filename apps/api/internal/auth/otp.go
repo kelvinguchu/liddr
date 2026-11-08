@@ -61,7 +61,7 @@ func (s *Service) RequestOTP(ctx context.Context, req OTPRequest) (Challenge, er
 	challenge := Challenge{ID: uuid.New(), ExpiresAt: now.Add(otpTTL)}
 	ipHash := s.hasher.ip(req.Meta.IP)
 
-	err = s.tx(ctx, func(q *store.Queries) error {
+	err = store.InTx(ctx, s.pool, func(q *store.Queries) error {
 		if err := enforceLimits(ctx, q, phone, ipHash, now); err != nil {
 			return err
 		}
@@ -156,10 +156,10 @@ func (e *RateLimitError) RetryAfterSeconds() int32 {
 func (s *Service) VerifyOTP(ctx context.Context, challengeID uuid.UUID, code string, meta RequestMeta) (Tokens, error) {
 	var tokens Tokens
 	now := s.now()
-	err := s.tx(ctx, func(q *store.Queries) error {
+	err := store.InTx(ctx, s.pool, func(q *store.Queries) error {
 		challenge, err := q.GetChallengeForUpdate(ctx, challengeID)
 		if errors.Is(err, pgx.ErrNoRows) {
-			return reject(ErrCodeExpired)
+			return store.Reject(ErrCodeExpired)
 		}
 		if err != nil {
 			return fmt.Errorf("load challenge: %w", err)
@@ -167,9 +167,9 @@ func (s *Service) VerifyOTP(ctx context.Context, challengeID uuid.UUID, code str
 
 		switch {
 		case challenge.Attempts >= maxOTPAttempts:
-			return reject(ErrTooManyAttempts)
+			return store.Reject(ErrTooManyAttempts)
 		case challenge.ClosedAt != nil || !now.Before(challenge.ExpiresAt):
-			return reject(ErrCodeExpired)
+			return store.Reject(ErrCodeExpired)
 		}
 		if !hmac.Equal(challenge.CodeHash, s.hasher.code(challenge.ID, code)) {
 			return recordWrongCode(ctx, q, challenge.ID, challenge.Attempts, now)
@@ -188,7 +188,7 @@ func (s *Service) VerifyOTP(ctx context.Context, challengeID uuid.UUID, code str
 			if auditErr := audit(ctx, q, entry); auditErr != nil {
 				return auditErr
 			}
-			return reject(err)
+			return store.Reject(err)
 		}
 
 		err = q.GrantInitialRole(ctx, store.GrantInitialRoleParams{UserID: user.ID, Role: challenge.RequestedRole})
@@ -217,7 +217,7 @@ func recordWrongCode(ctx context.Context, q *store.Queries, id uuid.UUID, attemp
 		return fmt.Errorf("record failed attempt: %w", err)
 	}
 	if attempts+1 >= maxOTPAttempts {
-		return reject(ErrTooManyAttempts)
+		return store.Reject(ErrTooManyAttempts)
 	}
-	return reject(ErrInvalidCode)
+	return store.Reject(ErrInvalidCode)
 }

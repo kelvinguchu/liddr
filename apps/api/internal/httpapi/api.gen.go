@@ -21,6 +21,51 @@ const (
 	BearerAuthScopes bearerAuthContextKey = "bearerAuth.Scopes"
 )
 
+// Defines values for DriverProfileSubscriptionStatus.
+const (
+	Active    DriverProfileSubscriptionStatus = "active"
+	Grace     DriverProfileSubscriptionStatus = "grace"
+	Inactive  DriverProfileSubscriptionStatus = "inactive"
+	Suspended DriverProfileSubscriptionStatus = "suspended"
+)
+
+// Valid indicates whether the value is a known member of the DriverProfileSubscriptionStatus enum.
+func (e DriverProfileSubscriptionStatus) Valid() bool {
+	switch e {
+	case Active:
+		return true
+	case Grace:
+		return true
+	case Inactive:
+		return true
+	case Suspended:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DriverProfileVerificationStatus.
+const (
+	Approved DriverProfileVerificationStatus = "approved"
+	Pending  DriverProfileVerificationStatus = "pending"
+	Rejected DriverProfileVerificationStatus = "rejected"
+)
+
+// Valid indicates whether the value is a known member of the DriverProfileVerificationStatus enum.
+func (e DriverProfileVerificationStatus) Valid() bool {
+	switch e {
+	case Approved:
+		return true
+	case Pending:
+		return true
+	case Rejected:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for HealthStatus.
 const (
 	Ok          HealthStatus = "ok"
@@ -33,6 +78,60 @@ func (e HealthStatus) Valid() bool {
 	case Ok:
 		return true
 	case Unavailable:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PaymentMode.
+const (
+	CashDirect  PaymentMode = "cash_direct"
+	MpesaDirect PaymentMode = "mpesa_direct"
+)
+
+// Valid indicates whether the value is a known member of the PaymentMode enum.
+func (e PaymentMode) Valid() bool {
+	switch e {
+	case CashDirect:
+		return true
+	case MpesaDirect:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RideStatus.
+const (
+	Accepted       RideStatus = "accepted"
+	Arrived        RideStatus = "arrived"
+	Cancelled      RideStatus = "cancelled"
+	Completed      RideStatus = "completed"
+	DriverArriving RideStatus = "driver_arriving"
+	InProgress     RideStatus = "in_progress"
+	NoDrivers      RideStatus = "no_drivers"
+	Searching      RideStatus = "searching"
+)
+
+// Valid indicates whether the value is a known member of the RideStatus enum.
+func (e RideStatus) Valid() bool {
+	switch e {
+	case Accepted:
+		return true
+	case Arrived:
+		return true
+	case Cancelled:
+		return true
+	case Completed:
+		return true
+	case DriverArriving:
+		return true
+	case InProgress:
+		return true
+	case NoDrivers:
+		return true
+	case Searching:
 		return true
 	default:
 		return false
@@ -81,6 +180,44 @@ func (e SignupRole) Valid() bool {
 	}
 }
 
+// BookRideRequest defines model for BookRideRequest.
+type BookRideRequest struct {
+	QuoteId openapi_types.UUID `json:"quote_id"`
+}
+
+// CancelRideRequest defines model for CancelRideRequest.
+type CancelRideRequest struct {
+	// Reason A reason code allowed for the caller's side of the ride.
+	//
+	// Example: rider_changed_mind
+	Reason string `json:"reason"`
+}
+
+// CompleteTripRequest defines model for CompleteTripRequest.
+type CompleteTripRequest struct {
+	PaymentMode PaymentMode `json:"payment_mode"`
+}
+
+// Coordinates defines model for Coordinates.
+type Coordinates struct {
+	Lat float64 `json:"lat"`
+	Lng float64 `json:"lng"`
+}
+
+// DriverProfile defines model for DriverProfile.
+type DriverProfile struct {
+	IsOnline           bool                            `json:"is_online"`
+	SubscriptionStatus DriverProfileSubscriptionStatus `json:"subscription_status"`
+	VehicleCategory    string                          `json:"vehicle_category"`
+	VerificationStatus DriverProfileVerificationStatus `json:"verification_status"`
+}
+
+// DriverProfileSubscriptionStatus defines model for DriverProfile.SubscriptionStatus.
+type DriverProfileSubscriptionStatus string
+
+// DriverProfileVerificationStatus defines model for DriverProfile.VerificationStatus.
+type DriverProfileVerificationStatus string
+
 // Error defines model for Error.
 type Error struct {
 	// Code Stable machine-readable error code.
@@ -110,6 +247,21 @@ type Me struct {
 	Roles []Role             `json:"roles"`
 }
 
+// Offer defines model for Offer.
+type Offer struct {
+	DistanceToPickupM int32              `json:"distance_to_pickup_m"`
+	ExpiresAt         time.Time          `json:"expires_at"`
+	FareKes           int32              `json:"fare_kes"`
+	Id                openapi_types.UUID `json:"id"`
+	Pickup            Coordinates        `json:"pickup"`
+	RideId            openapi_types.UUID `json:"ride_id"`
+}
+
+// OfferList defines model for OfferList.
+type OfferList struct {
+	Data []Offer `json:"data"`
+}
+
 // OtpChallenge defines model for OtpChallenge.
 type OtpChallenge struct {
 	ChallengeId openapi_types.UUID `json:"challenge_id"`
@@ -131,10 +283,60 @@ type OtpVerification struct {
 	Code string `json:"code"`
 }
 
+// PaymentMode defines model for PaymentMode.
+type PaymentMode string
+
+// Quote defines model for Quote.
+type Quote struct {
+	// BaseFareKes The price before the discount.
+	BaseFareKes int32     `json:"base_fare_kes"`
+	DiscountKes int32     `json:"discount_kes"`
+	DistanceM   int32     `json:"distance_m"`
+	DurationS   int32     `json:"duration_s"`
+	ExpiresAt   time.Time `json:"expires_at"`
+
+	// FareKes The price the rider pays.
+	FareKes int32              `json:"fare_kes"`
+	Id      openapi_types.UUID `json:"id"`
+
+	// Polyline Encoded route for display.
+	Polyline string `json:"polyline"`
+
+	// SurgeBps Demand multiplier in basis points. 10000 means no surge.
+	SurgeBps int32 `json:"surge_bps"`
+}
+
+// QuoteRequest defines model for QuoteRequest.
+type QuoteRequest struct {
+	Dropoff Coordinates `json:"dropoff"`
+	Pickup  Coordinates `json:"pickup"`
+
+	// VehicleCategory Example: motorbike
+	VehicleCategory string `json:"vehicle_category"`
+}
+
 // RefreshRequest defines model for RefreshRequest.
 type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
+
+// Ride defines model for Ride.
+type Ride struct {
+	DriverId *openapi_types.UUID `json:"driver_id,omitempty"`
+
+	// DriverLocation Present only while the driver is on the way or on the trip.
+	DriverLocation *Coordinates       `json:"driver_location,omitempty"`
+	Dropoff        Coordinates        `json:"dropoff"`
+	FareKes        int32              `json:"fare_kes"`
+	Id             openapi_types.UUID `json:"id"`
+	PaymentMode    *PaymentMode       `json:"payment_mode,omitempty"`
+	Pickup         Coordinates        `json:"pickup"`
+	RequestedAt    time.Time          `json:"requested_at"`
+	Status         RideStatus         `json:"status"`
+}
+
+// RideStatus defines model for RideStatus.
+type RideStatus string
 
 // Role defines model for Role.
 type Role string
@@ -151,6 +353,11 @@ type Session struct {
 	RefreshTokenExpiresIn int32              `json:"refresh_token_expires_in"`
 	Roles                 []Role             `json:"roles"`
 	UserId                openapi_types.UUID `json:"user_id"`
+}
+
+// SetDriverCategoryRequest defines model for SetDriverCategoryRequest.
+type SetDriverCategoryRequest struct {
+	VehicleCategory string `json:"vehicle_category"`
 }
 
 // SignupRole defines model for SignupRole.
@@ -176,6 +383,15 @@ type VehicleCategoryList struct {
 	Data []VehicleCategory `json:"data"`
 }
 
+// OfferId defines model for OfferId.
+type OfferId = openapi_types.UUID
+
+// RideId defines model for RideId.
+type RideId = openapi_types.UUID
+
+// Problem defines model for Problem.
+type Problem = Error
+
 // bearerAuthContextKey is the context key for bearerAuth security scheme
 type bearerAuthContextKey string
 
@@ -190,6 +406,24 @@ type VerifyOtpJSONRequestBody = OtpVerification
 
 // RefreshSessionJSONRequestBody defines body for RefreshSession for application/json ContentType.
 type RefreshSessionJSONRequestBody = RefreshRequest
+
+// SetDriverCategoryJSONRequestBody defines body for SetDriverCategory for application/json ContentType.
+type SetDriverCategoryJSONRequestBody = SetDriverCategoryRequest
+
+// UpdateDriverLocationJSONRequestBody defines body for UpdateDriverLocation for application/json ContentType.
+type UpdateDriverLocationJSONRequestBody = Coordinates
+
+// BookRideJSONRequestBody defines body for BookRide for application/json ContentType.
+type BookRideJSONRequestBody = BookRideRequest
+
+// CreateQuoteJSONRequestBody defines body for CreateQuote for application/json ContentType.
+type CreateQuoteJSONRequestBody = QuoteRequest
+
+// CancelRideJSONRequestBody defines body for CancelRide for application/json ContentType.
+type CancelRideJSONRequestBody = CancelRideRequest
+
+// CompleteTripJSONRequestBody defines body for CompleteTrip for application/json ContentType.
+type CompleteTripJSONRequestBody = CompleteTripRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -211,9 +445,60 @@ type ServerInterface interface {
 	// RefreshSession Rotate a refresh token for new tokens
 	// (POST /v1/auth/refresh)
 	RefreshSession(w http.ResponseWriter, r *http.Request)
+	// GetDriverProfile Return the signed-in driver's profile
+	// (GET /v1/drivers/me)
+	GetDriverProfile(w http.ResponseWriter, r *http.Request)
+	// SetDriverCategory Choose a vehicle category. Locked once the driver is approved.
+	// (PUT /v1/drivers/me)
+	SetDriverCategory(w http.ResponseWriter, r *http.Request)
+	// UpdateDriverLocation Report the driver's position. Excess pings are dropped silently.
+	// (POST /v1/drivers/me/location)
+	UpdateDriverLocation(w http.ResponseWriter, r *http.Request)
+	// ListDriverOffers List the driver's open offers
+	// (GET /v1/drivers/me/offers)
+	ListDriverOffers(w http.ResponseWriter, r *http.Request)
+	// GoOffline Stop receiving offers
+	// (POST /v1/drivers/me/offline)
+	GoOffline(w http.ResponseWriter, r *http.Request)
+	// GoOnline Start receiving offers
+	// (POST /v1/drivers/me/online)
+	GoOnline(w http.ResponseWriter, r *http.Request)
 	// GetMe Return the signed-in account
 	// (GET /v1/me)
 	GetMe(w http.ResponseWriter, r *http.Request)
+	// AcceptOffer Accept an offer
+	// (POST /v1/offers/{offer_id}/accept)
+	AcceptOffer(w http.ResponseWriter, r *http.Request, offerId OfferId)
+	// RejectOffer Reject an offer
+	// (POST /v1/offers/{offer_id}/reject)
+	RejectOffer(w http.ResponseWriter, r *http.Request, offerId OfferId)
+	// BookRide Book a quoted trip. Repeating the call returns the same ride.
+	// (POST /v1/rides)
+	BookRide(w http.ResponseWriter, r *http.Request)
+	// CreateQuote Price a trip. The quote is required to book and expires quickly.
+	// (POST /v1/rides/quotes)
+	CreateQuote(w http.ResponseWriter, r *http.Request)
+	// GetRide Return a ride to its rider or assigned driver
+	// (GET /v1/rides/{ride_id})
+	GetRide(w http.ResponseWriter, r *http.Request, rideId RideId)
+	// MarkArrived Report arrival at pickup. The driver must be near it.
+	// (POST /v1/rides/{ride_id}/arrived)
+	MarkArrived(w http.ResponseWriter, r *http.Request, rideId RideId)
+	// MarkArriving Report that the driver is heading to pickup
+	// (POST /v1/rides/{ride_id}/arriving)
+	MarkArriving(w http.ResponseWriter, r *http.Request, rideId RideId)
+	// CancelRide Cancel a ride as its rider or assigned driver
+	// (POST /v1/rides/{ride_id}/cancel)
+	CancelRide(w http.ResponseWriter, r *http.Request, rideId RideId)
+	// CompleteTrip Complete the trip at the quoted fare. The driver must be near dropoff.
+	// (POST /v1/rides/{ride_id}/complete)
+	CompleteTrip(w http.ResponseWriter, r *http.Request, rideId RideId)
+	// MarkNoShow Report that the rider did not come after the waiting period
+	// (POST /v1/rides/{ride_id}/no-show)
+	MarkNoShow(w http.ResponseWriter, r *http.Request, rideId RideId)
+	// StartTrip Start the trip
+	// (POST /v1/rides/{ride_id}/start)
+	StartTrip(w http.ResponseWriter, r *http.Request, rideId RideId)
 	// ListVehicleCategories List the vehicle categories open for booking and driver sign-up
 	// (GET /v1/vehicle-categories)
 	ListVehicleCategories(w http.ResponseWriter, r *http.Request)
@@ -312,6 +597,126 @@ func (siw *ServerInterfaceWrapper) RefreshSession(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// GetDriverProfile operation middleware
+func (siw *ServerInterfaceWrapper) GetDriverProfile(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDriverProfile(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetDriverCategory operation middleware
+func (siw *ServerInterfaceWrapper) SetDriverCategory(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetDriverCategory(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateDriverLocation operation middleware
+func (siw *ServerInterfaceWrapper) UpdateDriverLocation(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateDriverLocation(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListDriverOffers operation middleware
+func (siw *ServerInterfaceWrapper) ListDriverOffers(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDriverOffers(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GoOffline operation middleware
+func (siw *ServerInterfaceWrapper) GoOffline(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GoOffline(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GoOnline operation middleware
+func (siw *ServerInterfaceWrapper) GoOnline(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GoOnline(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetMe operation middleware
 func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request) {
 
@@ -323,6 +728,334 @@ func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AcceptOffer operation middleware
+func (siw *ServerInterfaceWrapper) AcceptOffer(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "offer_id" -------------
+	var offerId OfferId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "offer_id", r.PathValue("offer_id"), &offerId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offer_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AcceptOffer(w, r, offerId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RejectOffer operation middleware
+func (siw *ServerInterfaceWrapper) RejectOffer(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "offer_id" -------------
+	var offerId OfferId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "offer_id", r.PathValue("offer_id"), &offerId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offer_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RejectOffer(w, r, offerId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// BookRide operation middleware
+func (siw *ServerInterfaceWrapper) BookRide(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BookRide(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateQuote operation middleware
+func (siw *ServerInterfaceWrapper) CreateQuote(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateQuote(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetRide operation middleware
+func (siw *ServerInterfaceWrapper) GetRide(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "ride_id" -------------
+	var rideId RideId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ride_id", r.PathValue("ride_id"), &rideId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ride_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider", "driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetRide(w, r, rideId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MarkArrived operation middleware
+func (siw *ServerInterfaceWrapper) MarkArrived(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "ride_id" -------------
+	var rideId RideId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ride_id", r.PathValue("ride_id"), &rideId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ride_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MarkArrived(w, r, rideId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MarkArriving operation middleware
+func (siw *ServerInterfaceWrapper) MarkArriving(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "ride_id" -------------
+	var rideId RideId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ride_id", r.PathValue("ride_id"), &rideId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ride_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MarkArriving(w, r, rideId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CancelRide operation middleware
+func (siw *ServerInterfaceWrapper) CancelRide(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "ride_id" -------------
+	var rideId RideId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ride_id", r.PathValue("ride_id"), &rideId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ride_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider", "driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CancelRide(w, r, rideId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CompleteTrip operation middleware
+func (siw *ServerInterfaceWrapper) CompleteTrip(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "ride_id" -------------
+	var rideId RideId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ride_id", r.PathValue("ride_id"), &rideId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ride_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CompleteTrip(w, r, rideId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MarkNoShow operation middleware
+func (siw *ServerInterfaceWrapper) MarkNoShow(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "ride_id" -------------
+	var rideId RideId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ride_id", r.PathValue("ride_id"), &rideId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ride_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MarkNoShow(w, r, rideId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StartTrip operation middleware
+func (siw *ServerInterfaceWrapper) StartTrip(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "ride_id" -------------
+	var rideId RideId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ride_id", r.PathValue("ride_id"), &rideId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ride_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StartTrip(w, r, rideId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -474,9 +1207,28 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/auth/refresh", wrapper.RefreshSession)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/auth/logout", wrapper.Logout)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/me", wrapper.GetMe)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides/quotes", wrapper.CreateQuote)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides", wrapper.BookRide)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/rides/{ride_id}", wrapper.GetRide)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides/{ride_id}/cancel", wrapper.CancelRide)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides/{ride_id}/arriving", wrapper.MarkArriving)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides/{ride_id}/arrived", wrapper.MarkArrived)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides/{ride_id}/start", wrapper.StartTrip)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides/{ride_id}/complete", wrapper.CompleteTrip)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides/{ride_id}/no-show", wrapper.MarkNoShow)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/drivers/me", wrapper.GetDriverProfile)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/v1/drivers/me", wrapper.SetDriverCategory)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/drivers/me/online", wrapper.GoOnline)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/drivers/me/offline", wrapper.GoOffline)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/drivers/me/location", wrapper.UpdateDriverLocation)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/drivers/me/offers", wrapper.ListDriverOffers)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/offers/{offer_id}/accept", wrapper.AcceptOffer)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/offers/{offer_id}/reject", wrapper.RejectOffer)
 
 	return m
 }
+
+type ProblemJSONResponse Error
 
 type GetLivenessRequestObject struct {
 }
@@ -736,6 +1488,218 @@ func (response RefreshSession403JSONResponse) VisitRefreshSessionResponse(w http
 	return err
 }
 
+type GetDriverProfileRequestObject struct {
+}
+
+type GetDriverProfileResponseObject interface {
+	VisitGetDriverProfileResponse(w http.ResponseWriter) error
+}
+
+type GetDriverProfile200JSONResponse DriverProfile
+
+func (response GetDriverProfile200JSONResponse) VisitGetDriverProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDriverProfiledefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetDriverProfiledefaultJSONResponse) VisitGetDriverProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetDriverCategoryRequestObject struct {
+	Body *SetDriverCategoryJSONRequestBody
+}
+
+type SetDriverCategoryResponseObject interface {
+	VisitSetDriverCategoryResponse(w http.ResponseWriter) error
+}
+
+type SetDriverCategory200JSONResponse DriverProfile
+
+func (response SetDriverCategory200JSONResponse) VisitSetDriverCategoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetDriverCategorydefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response SetDriverCategorydefaultJSONResponse) VisitSetDriverCategoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateDriverLocationRequestObject struct {
+	Body *UpdateDriverLocationJSONRequestBody
+}
+
+type UpdateDriverLocationResponseObject interface {
+	VisitUpdateDriverLocationResponse(w http.ResponseWriter) error
+}
+
+type UpdateDriverLocation204Response struct {
+}
+
+func (response UpdateDriverLocation204Response) VisitUpdateDriverLocationResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type UpdateDriverLocationdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response UpdateDriverLocationdefaultJSONResponse) VisitUpdateDriverLocationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDriverOffersRequestObject struct {
+}
+
+type ListDriverOffersResponseObject interface {
+	VisitListDriverOffersResponse(w http.ResponseWriter) error
+}
+
+type ListDriverOffers200JSONResponse OfferList
+
+func (response ListDriverOffers200JSONResponse) VisitListDriverOffersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDriverOffersdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListDriverOffersdefaultJSONResponse) VisitListDriverOffersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GoOfflineRequestObject struct {
+}
+
+type GoOfflineResponseObject interface {
+	VisitGoOfflineResponse(w http.ResponseWriter) error
+}
+
+type GoOffline204Response struct {
+}
+
+func (response GoOffline204Response) VisitGoOfflineResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type GoOfflinedefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GoOfflinedefaultJSONResponse) VisitGoOfflineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GoOnlineRequestObject struct {
+}
+
+type GoOnlineResponseObject interface {
+	VisitGoOnlineResponse(w http.ResponseWriter) error
+}
+
+type GoOnline204Response struct {
+}
+
+func (response GoOnline204Response) VisitGoOnlineResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type GoOnlinedefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GoOnlinedefaultJSONResponse) VisitGoOnlineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetMeRequestObject struct {
 }
 
@@ -753,6 +1717,431 @@ func (response GetMe200JSONResponse) VisitGetMeResponse(w http.ResponseWriter) e
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AcceptOfferRequestObject struct {
+	OfferId OfferId `json:"offer_id"`
+}
+
+type AcceptOfferResponseObject interface {
+	VisitAcceptOfferResponse(w http.ResponseWriter) error
+}
+
+type AcceptOffer200JSONResponse Ride
+
+func (response AcceptOffer200JSONResponse) VisitAcceptOfferResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AcceptOfferdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response AcceptOfferdefaultJSONResponse) VisitAcceptOfferResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RejectOfferRequestObject struct {
+	OfferId OfferId `json:"offer_id"`
+}
+
+type RejectOfferResponseObject interface {
+	VisitRejectOfferResponse(w http.ResponseWriter) error
+}
+
+type RejectOffer204Response struct {
+}
+
+func (response RejectOffer204Response) VisitRejectOfferResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RejectOfferdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response RejectOfferdefaultJSONResponse) VisitRejectOfferResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BookRideRequestObject struct {
+	Body *BookRideJSONRequestBody
+}
+
+type BookRideResponseObject interface {
+	VisitBookRideResponse(w http.ResponseWriter) error
+}
+
+type BookRide201JSONResponse Ride
+
+func (response BookRide201JSONResponse) VisitBookRideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BookRidedefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response BookRidedefaultJSONResponse) VisitBookRideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateQuoteRequestObject struct {
+	Body *CreateQuoteJSONRequestBody
+}
+
+type CreateQuoteResponseObject interface {
+	VisitCreateQuoteResponse(w http.ResponseWriter) error
+}
+
+type CreateQuote201JSONResponse Quote
+
+func (response CreateQuote201JSONResponse) VisitCreateQuoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateQuotedefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response CreateQuotedefaultJSONResponse) VisitCreateQuoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetRideRequestObject struct {
+	RideId RideId `json:"ride_id"`
+}
+
+type GetRideResponseObject interface {
+	VisitGetRideResponse(w http.ResponseWriter) error
+}
+
+type GetRide200JSONResponse Ride
+
+func (response GetRide200JSONResponse) VisitGetRideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetRidedefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetRidedefaultJSONResponse) VisitGetRideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkArrivedRequestObject struct {
+	RideId RideId `json:"ride_id"`
+}
+
+type MarkArrivedResponseObject interface {
+	VisitMarkArrivedResponse(w http.ResponseWriter) error
+}
+
+type MarkArrived200JSONResponse Ride
+
+func (response MarkArrived200JSONResponse) VisitMarkArrivedResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkArriveddefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response MarkArriveddefaultJSONResponse) VisitMarkArrivedResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkArrivingRequestObject struct {
+	RideId RideId `json:"ride_id"`
+}
+
+type MarkArrivingResponseObject interface {
+	VisitMarkArrivingResponse(w http.ResponseWriter) error
+}
+
+type MarkArriving200JSONResponse Ride
+
+func (response MarkArriving200JSONResponse) VisitMarkArrivingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkArrivingdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response MarkArrivingdefaultJSONResponse) VisitMarkArrivingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelRideRequestObject struct {
+	RideId RideId `json:"ride_id"`
+	Body   *CancelRideJSONRequestBody
+}
+
+type CancelRideResponseObject interface {
+	VisitCancelRideResponse(w http.ResponseWriter) error
+}
+
+type CancelRide200JSONResponse Ride
+
+func (response CancelRide200JSONResponse) VisitCancelRideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelRidedefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response CancelRidedefaultJSONResponse) VisitCancelRideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteTripRequestObject struct {
+	RideId RideId `json:"ride_id"`
+	Body   *CompleteTripJSONRequestBody
+}
+
+type CompleteTripResponseObject interface {
+	VisitCompleteTripResponse(w http.ResponseWriter) error
+}
+
+type CompleteTrip200JSONResponse Ride
+
+func (response CompleteTrip200JSONResponse) VisitCompleteTripResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CompleteTripdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response CompleteTripdefaultJSONResponse) VisitCompleteTripResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkNoShowRequestObject struct {
+	RideId RideId `json:"ride_id"`
+}
+
+type MarkNoShowResponseObject interface {
+	VisitMarkNoShowResponse(w http.ResponseWriter) error
+}
+
+type MarkNoShow200JSONResponse Ride
+
+func (response MarkNoShow200JSONResponse) VisitMarkNoShowResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkNoShowdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response MarkNoShowdefaultJSONResponse) VisitMarkNoShowResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartTripRequestObject struct {
+	RideId RideId `json:"ride_id"`
+}
+
+type StartTripResponseObject interface {
+	VisitStartTripResponse(w http.ResponseWriter) error
+}
+
+type StartTrip200JSONResponse Ride
+
+func (response StartTrip200JSONResponse) VisitStartTripResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartTripdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response StartTripdefaultJSONResponse) VisitStartTripResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -812,9 +2201,60 @@ type StrictServerInterface interface {
 	// RefreshSession Rotate a refresh token for new tokens
 	// (POST /v1/auth/refresh)
 	RefreshSession(ctx context.Context, request RefreshSessionRequestObject) (RefreshSessionResponseObject, error)
+	// GetDriverProfile Return the signed-in driver's profile
+	// (GET /v1/drivers/me)
+	GetDriverProfile(ctx context.Context, request GetDriverProfileRequestObject) (GetDriverProfileResponseObject, error)
+	// SetDriverCategory Choose a vehicle category. Locked once the driver is approved.
+	// (PUT /v1/drivers/me)
+	SetDriverCategory(ctx context.Context, request SetDriverCategoryRequestObject) (SetDriverCategoryResponseObject, error)
+	// UpdateDriverLocation Report the driver's position. Excess pings are dropped silently.
+	// (POST /v1/drivers/me/location)
+	UpdateDriverLocation(ctx context.Context, request UpdateDriverLocationRequestObject) (UpdateDriverLocationResponseObject, error)
+	// ListDriverOffers List the driver's open offers
+	// (GET /v1/drivers/me/offers)
+	ListDriverOffers(ctx context.Context, request ListDriverOffersRequestObject) (ListDriverOffersResponseObject, error)
+	// GoOffline Stop receiving offers
+	// (POST /v1/drivers/me/offline)
+	GoOffline(ctx context.Context, request GoOfflineRequestObject) (GoOfflineResponseObject, error)
+	// GoOnline Start receiving offers
+	// (POST /v1/drivers/me/online)
+	GoOnline(ctx context.Context, request GoOnlineRequestObject) (GoOnlineResponseObject, error)
 	// GetMe Return the signed-in account
 	// (GET /v1/me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
+	// AcceptOffer Accept an offer
+	// (POST /v1/offers/{offer_id}/accept)
+	AcceptOffer(ctx context.Context, request AcceptOfferRequestObject) (AcceptOfferResponseObject, error)
+	// RejectOffer Reject an offer
+	// (POST /v1/offers/{offer_id}/reject)
+	RejectOffer(ctx context.Context, request RejectOfferRequestObject) (RejectOfferResponseObject, error)
+	// BookRide Book a quoted trip. Repeating the call returns the same ride.
+	// (POST /v1/rides)
+	BookRide(ctx context.Context, request BookRideRequestObject) (BookRideResponseObject, error)
+	// CreateQuote Price a trip. The quote is required to book and expires quickly.
+	// (POST /v1/rides/quotes)
+	CreateQuote(ctx context.Context, request CreateQuoteRequestObject) (CreateQuoteResponseObject, error)
+	// GetRide Return a ride to its rider or assigned driver
+	// (GET /v1/rides/{ride_id})
+	GetRide(ctx context.Context, request GetRideRequestObject) (GetRideResponseObject, error)
+	// MarkArrived Report arrival at pickup. The driver must be near it.
+	// (POST /v1/rides/{ride_id}/arrived)
+	MarkArrived(ctx context.Context, request MarkArrivedRequestObject) (MarkArrivedResponseObject, error)
+	// MarkArriving Report that the driver is heading to pickup
+	// (POST /v1/rides/{ride_id}/arriving)
+	MarkArriving(ctx context.Context, request MarkArrivingRequestObject) (MarkArrivingResponseObject, error)
+	// CancelRide Cancel a ride as its rider or assigned driver
+	// (POST /v1/rides/{ride_id}/cancel)
+	CancelRide(ctx context.Context, request CancelRideRequestObject) (CancelRideResponseObject, error)
+	// CompleteTrip Complete the trip at the quoted fare. The driver must be near dropoff.
+	// (POST /v1/rides/{ride_id}/complete)
+	CompleteTrip(ctx context.Context, request CompleteTripRequestObject) (CompleteTripResponseObject, error)
+	// MarkNoShow Report that the rider did not come after the waiting period
+	// (POST /v1/rides/{ride_id}/no-show)
+	MarkNoShow(ctx context.Context, request MarkNoShowRequestObject) (MarkNoShowResponseObject, error)
+	// StartTrip Start the trip
+	// (POST /v1/rides/{ride_id}/start)
+	StartTrip(ctx context.Context, request StartTripRequestObject) (StartTripResponseObject, error)
 	// ListVehicleCategories List the vehicle categories open for booking and driver sign-up
 	// (GET /v1/vehicle-categories)
 	ListVehicleCategories(ctx context.Context, request ListVehicleCategoriesRequestObject) (ListVehicleCategoriesResponseObject, error)
@@ -1031,6 +2471,164 @@ func (sh *strictHandler) RefreshSession(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+// GetDriverProfile operation middleware
+func (sh *strictHandler) GetDriverProfile(w http.ResponseWriter, r *http.Request) {
+	var request GetDriverProfileRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDriverProfile(ctx, request.(GetDriverProfileRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDriverProfile")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDriverProfileResponseObject); ok {
+		if err := validResponse.VisitGetDriverProfileResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetDriverCategory operation middleware
+func (sh *strictHandler) SetDriverCategory(w http.ResponseWriter, r *http.Request) {
+	var request SetDriverCategoryRequestObject
+
+	var body SetDriverCategoryJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetDriverCategory(ctx, request.(SetDriverCategoryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetDriverCategory")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetDriverCategoryResponseObject); ok {
+		if err := validResponse.VisitSetDriverCategoryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateDriverLocation operation middleware
+func (sh *strictHandler) UpdateDriverLocation(w http.ResponseWriter, r *http.Request) {
+	var request UpdateDriverLocationRequestObject
+
+	var body UpdateDriverLocationJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateDriverLocation(ctx, request.(UpdateDriverLocationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateDriverLocation")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateDriverLocationResponseObject); ok {
+		if err := validResponse.VisitUpdateDriverLocationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListDriverOffers operation middleware
+func (sh *strictHandler) ListDriverOffers(w http.ResponseWriter, r *http.Request) {
+	var request ListDriverOffersRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListDriverOffers(ctx, request.(ListDriverOffersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDriverOffers")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDriverOffersResponseObject); ok {
+		if err := validResponse.VisitListDriverOffersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GoOffline operation middleware
+func (sh *strictHandler) GoOffline(w http.ResponseWriter, r *http.Request) {
+	var request GoOfflineRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GoOffline(ctx, request.(GoOfflineRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GoOffline")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GoOfflineResponseObject); ok {
+		if err := validResponse.VisitGoOfflineResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GoOnline operation middleware
+func (sh *strictHandler) GoOnline(w http.ResponseWriter, r *http.Request) {
+	var request GoOnlineRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GoOnline(ctx, request.(GoOnlineRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GoOnline")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GoOnlineResponseObject); ok {
+		if err := validResponse.VisitGoOnlineResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetMe operation middleware
 func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	var request GetMeRequestObject
@@ -1048,6 +2646,316 @@ func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMeResponseObject); ok {
 		if err := validResponse.VisitGetMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AcceptOffer operation middleware
+func (sh *strictHandler) AcceptOffer(w http.ResponseWriter, r *http.Request, offerId OfferId) {
+	var request AcceptOfferRequestObject
+
+	request.OfferId = offerId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AcceptOffer(ctx, request.(AcceptOfferRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AcceptOffer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AcceptOfferResponseObject); ok {
+		if err := validResponse.VisitAcceptOfferResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RejectOffer operation middleware
+func (sh *strictHandler) RejectOffer(w http.ResponseWriter, r *http.Request, offerId OfferId) {
+	var request RejectOfferRequestObject
+
+	request.OfferId = offerId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RejectOffer(ctx, request.(RejectOfferRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RejectOffer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RejectOfferResponseObject); ok {
+		if err := validResponse.VisitRejectOfferResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// BookRide operation middleware
+func (sh *strictHandler) BookRide(w http.ResponseWriter, r *http.Request) {
+	var request BookRideRequestObject
+
+	var body BookRideJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.BookRide(ctx, request.(BookRideRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "BookRide")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(BookRideResponseObject); ok {
+		if err := validResponse.VisitBookRideResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateQuote operation middleware
+func (sh *strictHandler) CreateQuote(w http.ResponseWriter, r *http.Request) {
+	var request CreateQuoteRequestObject
+
+	var body CreateQuoteJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateQuote(ctx, request.(CreateQuoteRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateQuote")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateQuoteResponseObject); ok {
+		if err := validResponse.VisitCreateQuoteResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetRide operation middleware
+func (sh *strictHandler) GetRide(w http.ResponseWriter, r *http.Request, rideId RideId) {
+	var request GetRideRequestObject
+
+	request.RideId = rideId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetRide(ctx, request.(GetRideRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetRide")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetRideResponseObject); ok {
+		if err := validResponse.VisitGetRideResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// MarkArrived operation middleware
+func (sh *strictHandler) MarkArrived(w http.ResponseWriter, r *http.Request, rideId RideId) {
+	var request MarkArrivedRequestObject
+
+	request.RideId = rideId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.MarkArrived(ctx, request.(MarkArrivedRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "MarkArrived")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(MarkArrivedResponseObject); ok {
+		if err := validResponse.VisitMarkArrivedResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// MarkArriving operation middleware
+func (sh *strictHandler) MarkArriving(w http.ResponseWriter, r *http.Request, rideId RideId) {
+	var request MarkArrivingRequestObject
+
+	request.RideId = rideId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.MarkArriving(ctx, request.(MarkArrivingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "MarkArriving")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(MarkArrivingResponseObject); ok {
+		if err := validResponse.VisitMarkArrivingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CancelRide operation middleware
+func (sh *strictHandler) CancelRide(w http.ResponseWriter, r *http.Request, rideId RideId) {
+	var request CancelRideRequestObject
+
+	request.RideId = rideId
+
+	var body CancelRideJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CancelRide(ctx, request.(CancelRideRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CancelRide")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CancelRideResponseObject); ok {
+		if err := validResponse.VisitCancelRideResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CompleteTrip operation middleware
+func (sh *strictHandler) CompleteTrip(w http.ResponseWriter, r *http.Request, rideId RideId) {
+	var request CompleteTripRequestObject
+
+	request.RideId = rideId
+
+	var body CompleteTripJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CompleteTrip(ctx, request.(CompleteTripRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CompleteTrip")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CompleteTripResponseObject); ok {
+		if err := validResponse.VisitCompleteTripResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// MarkNoShow operation middleware
+func (sh *strictHandler) MarkNoShow(w http.ResponseWriter, r *http.Request, rideId RideId) {
+	var request MarkNoShowRequestObject
+
+	request.RideId = rideId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.MarkNoShow(ctx, request.(MarkNoShowRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "MarkNoShow")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(MarkNoShowResponseObject); ok {
+		if err := validResponse.VisitMarkNoShowResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// StartTrip operation middleware
+func (sh *strictHandler) StartTrip(w http.ResponseWriter, r *http.Request, rideId RideId) {
+	var request StartTripRequestObject
+
+	request.RideId = rideId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.StartTrip(ctx, request.(StartTripRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "StartTrip")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(StartTripResponseObject); ok {
+		if err := validResponse.VisitStartTripResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

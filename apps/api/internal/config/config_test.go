@@ -21,13 +21,14 @@ const testHMACKey = "0123456789abcdef0123456789abcdef"
 // override removes the variable.
 func validEnv(overrides map[string]string) map[string]string {
 	values := map[string]string{
-		"DATABASE_URL":           "postgres://user:hunter2@db",
-		"AUTH_HMAC_KEY":          testHMACKey,
-		"HOSTPINNACLE_API_URL":   "https://sms.example/send",
-		"HOSTPINNACLE_API_KEY":   "api-key",
-		"HOSTPINNACLE_USER_ID":   "user",
-		"HOSTPINNACLE_PASSWORD":  "password",
-		"HOSTPINNACLE_SENDER_ID": "LIDDR",
+		"DATABASE_URL":               "postgres://user:hunter2@db",
+		"AUTH_HMAC_KEY":              testHMACKey,
+		"GOOGLE_MAPS_API_KEY_SERVER": "maps-key",
+		"HOSTPINNACLE_API_URL":       "https://sms.example/send",
+		"HOSTPINNACLE_API_KEY":       "api-key",
+		"HOSTPINNACLE_USER_ID":       "user",
+		"HOSTPINNACLE_PASSWORD":      "password",
+		"HOSTPINNACLE_SENDER_ID":     "LIDDR",
 	}
 	maps.Copy(values, overrides)
 	return values
@@ -45,6 +46,8 @@ func TestLoadAppliesDefaults(t *testing.T) {
 		DrainDelay:      5 * time.Second,
 		ShutdownTimeout: 20 * time.Second,
 		AuthHMACKey:     testHMACKey,
+		GoogleMapsKey:   "maps-key",
+		GoogleRoutesURL: "https://routes.googleapis.com",
 		SMS: SMS{
 			URL:      "https://sms.example/send",
 			APIKey:   "api-key",

@@ -47,6 +47,8 @@ type Config struct {
 	TrustedProxyHops int
 	AuthHMACKey      Secret
 	SMS              SMS
+	GoogleMapsKey    Secret
+	GoogleRoutesURL  string
 }
 
 // LoadDatabaseURL returns the only setting that migrations need.
@@ -71,9 +73,11 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 
 	cfg := Config{
-		Addr:        withDefault(getenv("ADDR"), ":8080"),
-		DatabaseURL: Secret(required("DATABASE_URL")),
-		AuthHMACKey: Secret(required("AUTH_HMAC_KEY")),
+		Addr:            withDefault(getenv("ADDR"), ":8080"),
+		DatabaseURL:     Secret(required("DATABASE_URL")),
+		AuthHMACKey:     Secret(required("AUTH_HMAC_KEY")),
+		GoogleMapsKey:   Secret(required("GOOGLE_MAPS_API_KEY_SERVER")),
+		GoogleRoutesURL: withDefault(getenv("GOOGLE_ROUTES_BASE_URL"), "https://routes.googleapis.com"),
 		SMS: SMS{
 			URL:      required("HOSTPINNACLE_API_URL"),
 			APIKey:   Secret(required("HOSTPINNACLE_API_KEY")),

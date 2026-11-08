@@ -49,18 +49,24 @@ func (c *capture) String() string {
 }
 
 func envFor(databaseURL, smsURL string) func(string) string {
+	return envWithRoutes(databaseURL, smsURL, "http://127.0.0.1:1")
+}
+
+func envWithRoutes(databaseURL, smsURL, routesURL string) func(string) string {
 	values := map[string]string{
-		"ADDR":                   "127.0.0.1:0",
-		"DATABASE_URL":           databaseURL,
-		"DB_MAX_CONNS":           "4",
-		"SHUTDOWN_DRAIN_DELAY":   "0s",
-		"SHUTDOWN_TIMEOUT":       "5s",
-		"AUTH_HMAC_KEY":          "integration-test-key-of-sufficient-length",
-		"HOSTPINNACLE_API_URL":   withDefaultURL(smsURL),
-		"HOSTPINNACLE_API_KEY":   "test-key",
-		"HOSTPINNACLE_USER_ID":   "test-user",
-		"HOSTPINNACLE_PASSWORD":  "test-password",
-		"HOSTPINNACLE_SENDER_ID": "LIDDR",
+		"ADDR":                       "127.0.0.1:0",
+		"DATABASE_URL":               databaseURL,
+		"DB_MAX_CONNS":               "4",
+		"SHUTDOWN_DRAIN_DELAY":       "0s",
+		"SHUTDOWN_TIMEOUT":           "5s",
+		"AUTH_HMAC_KEY":              "integration-test-key-of-sufficient-length",
+		"GOOGLE_MAPS_API_KEY_SERVER": "test-maps-key",
+		"GOOGLE_ROUTES_BASE_URL":     routesURL,
+		"HOSTPINNACLE_API_URL":       withDefaultURL(smsURL),
+		"HOSTPINNACLE_API_KEY":       "test-key",
+		"HOSTPINNACLE_USER_ID":       "test-user",
+		"HOSTPINNACLE_PASSWORD":      "test-password",
+		"HOSTPINNACLE_SENDER_ID":     "LIDDR",
 	}
 	return func(key string) string { return values[key] }
 }
@@ -77,10 +83,15 @@ func withDefaultURL(smsURL string) string {
 // failing the test unless shutdown is clean.
 func startServer(t *testing.T, databaseURL, smsURL string) (string, *capture) {
 	t.Helper()
+	return startServerWithRoutes(t, databaseURL, smsURL, "http://127.0.0.1:1")
+}
+
+func startServerWithRoutes(t *testing.T, databaseURL, smsURL, routesURL string) (string, *capture) {
+	t.Helper()
 	ctx, cancel := context.WithCancel(t.Context())
 	output := &capture{addr: make(chan string, 1)}
 	done := make(chan error, 1)
-	env := envFor(databaseURL, smsURL)
+	env := envWithRoutes(databaseURL, smsURL, routesURL)
 	go func() { done <- run(ctx, []string{"api", "serve"}, env, output, io.Discard) }()
 
 	t.Cleanup(func() {

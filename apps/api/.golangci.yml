@@ -23,6 +23,9 @@ linters:
         domain-stays-inward:
           files:
             - "**/internal/auth/**"
+            - "**/internal/dispatch/**"
+            - "**/internal/geo/**"
+            - "**/internal/maps/**"
             - "**/internal/rides/**"
             - "**/internal/sms/**"
             - "**/internal/store/**"
@@ -36,6 +39,8 @@ linters:
             - "**/internal/store/**"
           deny:
             - pkg: github.com/kelvinguchu/liddr/apps/api/internal/auth
+              desc: store must not depend on domain packages
+            - pkg: github.com/kelvinguchu/liddr/apps/api/internal/dispatch
               desc: store must not depend on domain packages
             - pkg: github.com/kelvinguchu/liddr/apps/api/internal/rides
               desc: store must not depend on domain packages

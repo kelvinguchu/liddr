@@ -48,6 +48,93 @@ type AuthSession struct {
 	CreatedAt        time.Time
 }
 
+type Driver struct {
+	UserID             uuid.UUID
+	VehicleCategoryID  int64
+	VerificationStatus string
+	SubscriptionStatus string
+	IsOnline           bool
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+}
+
+type DriverLocation struct {
+	DriverID   uuid.UUID
+	Lat        float64
+	Lng        float64
+	CapturedAt time.Time
+}
+
+type Ride struct {
+	ID                  uuid.UUID
+	RiderID             uuid.UUID
+	DriverID            *uuid.UUID
+	QuoteID             uuid.UUID
+	VehicleCategoryID   int64
+	Status              string
+	PickupLat           float64
+	PickupLng           float64
+	DropoffLat          float64
+	DropoffLng          float64
+	FareKes             int32
+	PaymentMode         *string
+	SearchExpiresAt     time.Time
+	NextDispatchAt      *time.Time
+	DispatchWave        int32
+	RequestedAt         time.Time
+	AcceptedAt          *time.Time
+	ArrivingAt          *time.Time
+	ArrivedAt           *time.Time
+	StartedAt           *time.Time
+	CompletedAt         *time.Time
+	CancelledAt         *time.Time
+	CancelledBy         *string
+	CancelReason        *string
+	ArrivalDistanceM    *int32
+	CompletionDistanceM *int32
+}
+
+type RideEvent struct {
+	ID          int64
+	RideID      uuid.UUID
+	FromStatus  *string
+	ToStatus    string
+	ActorUserID *uuid.UUID
+	Reason      *string
+	OccurredAt  time.Time
+}
+
+type RideOffer struct {
+	ID          uuid.UUID
+	RideID      uuid.UUID
+	DriverID    uuid.UUID
+	Status      string
+	DistanceM   int32
+	OfferedAt   time.Time
+	ExpiresAt   time.Time
+	RespondedAt *time.Time
+}
+
+type RideQuote struct {
+	ID                uuid.UUID
+	RiderID           uuid.UUID
+	VehicleCategoryID int64
+	PickupLat         float64
+	PickupLng         float64
+	DropoffLat        float64
+	DropoffLng        float64
+	DistanceM         int32
+	DurationS         int32
+	Polyline          string
+	SurgeBps          int32
+	SubtotalCents     int64
+	BaseFareKes       int32
+	DiscountKes       int32
+	FinalFareKes      int32
+	ExpiresAt         time.Time
+	CreatedAt         time.Time
+}
+
 type User struct {
 	ID            uuid.UUID
 	Phone         string
@@ -73,4 +160,10 @@ type VehicleCategory struct {
 	DisplayOrder          int32
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
+	BaseFeeCents          int64
+	PricePerKmCents       int64
+	PricePerMinCents      int64
+	MinFareCents          int64
+	DiscountBps           int32
+	SearchRadiusM         int32
 }

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/kelvinguchu/liddr/apps/api/internal/auth"
+	"github.com/kelvinguchu/liddr/apps/api/internal/dispatch"
 	"github.com/kelvinguchu/liddr/apps/api/internal/rides"
 )
 
@@ -29,6 +30,8 @@ type Deps struct {
 	Database   Pinger
 	Categories *rides.Catalog
 	Auth       *auth.Service
+	Rides      *rides.Service
+	Dispatch   *dispatch.Service
 
 	// TrustedProxyHops is how many proxies in front of this server append to
 	// X-Forwarded-For. Zero means clients connect directly.
@@ -110,6 +113,10 @@ func (a *API) requestError(w http.ResponseWriter, r *http.Request, _ error) {
 }
 
 func (a *API) responseError(w http.ResponseWriter, r *http.Request, err error) {
+	if p, ok := findProblem(err); ok {
+		writeError(w, r, p.status, p.code, p.message)
+		return
+	}
 	if !errors.Is(err, context.Canceled) {
 		a.deps.Logger.LogAttrs(r.Context(), slog.LevelError, "request failed",
 			slog.String("request_id", requestID(r.Context())),

@@ -199,7 +199,339 @@ paths:
               schema:
                 $ref: "#/components/schemas/Me"
 
+  /v1/rides/quotes:
+    post:
+      operationId: createQuote
+      summary: Price a trip. The quote is required to book and expires quickly.
+      security:
+        - bearerAuth: [rider]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuoteRequest"
+      responses:
+        "201":
+          description: The priced trip.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quote"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides:
+    post:
+      operationId: bookRide
+      summary: Book a quoted trip. Repeating the call returns the same ride.
+      security:
+        - bearerAuth: [rider]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookRideRequest"
+      responses:
+        "201":
+          description: The ride.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ride"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}:
+    parameters:
+      - $ref: "#/components/parameters/RideId"
+    get:
+      operationId: getRide
+      summary: Return a ride to its rider or assigned driver
+      security:
+        - bearerAuth: [rider, driver]
+      responses:
+        "200":
+          description: The ride.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ride"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/RideId"
+    post:
+      operationId: cancelRide
+      summary: Cancel a ride as its rider or assigned driver
+      security:
+        - bearerAuth: [rider, driver]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelRideRequest"
+      responses:
+        "200":
+          description: The ride.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ride"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/arriving:
+    parameters:
+      - $ref: "#/components/parameters/RideId"
+    post:
+      operationId: markArriving
+      summary: Report that the driver is heading to pickup
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "200":
+          description: The ride.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ride"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/arrived:
+    parameters:
+      - $ref: "#/components/parameters/RideId"
+    post:
+      operationId: markArrived
+      summary: Report arrival at pickup. The driver must be near it.
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "200":
+          description: The ride.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ride"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/start:
+    parameters:
+      - $ref: "#/components/parameters/RideId"
+    post:
+      operationId: startTrip
+      summary: Start the trip
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "200":
+          description: The ride.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ride"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/complete:
+    parameters:
+      - $ref: "#/components/parameters/RideId"
+    post:
+      operationId: completeTrip
+      summary: Complete the trip at the quoted fare. The driver must be near dropoff.
+      security:
+        - bearerAuth: [driver]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompleteTripRequest"
+      responses:
+        "200":
+          description: The ride.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ride"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/no-show:
+    parameters:
+      - $ref: "#/components/parameters/RideId"
+    post:
+      operationId: markNoShow
+      summary: Report that the rider did not come after the waiting period
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "200":
+          description: The ride.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ride"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/drivers/me:
+    get:
+      operationId: getDriverProfile
+      summary: Return the signed-in driver's profile
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "200":
+          description: The profile.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DriverProfile"
+        default:
+          $ref: "#/components/responses/Problem"
+    put:
+      operationId: setDriverCategory
+      summary: Choose a vehicle category. Locked once the driver is approved.
+      security:
+        - bearerAuth: [driver]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetDriverCategoryRequest"
+      responses:
+        "200":
+          description: The profile.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DriverProfile"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/drivers/me/online:
+    post:
+      operationId: goOnline
+      summary: Start receiving offers
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "204":
+          description: The driver is online.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/drivers/me/offline:
+    post:
+      operationId: goOffline
+      summary: Stop receiving offers
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "204":
+          description: The driver is offline.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/drivers/me/location:
+    post:
+      operationId: updateDriverLocation
+      summary: Report the driver's position. Excess pings are dropped silently.
+      security:
+        - bearerAuth: [driver]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Coordinates"
+      responses:
+        "204":
+          description: The position was accepted or dropped as excess.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/drivers/me/offers:
+    get:
+      operationId: listDriverOffers
+      summary: List the driver's open offers
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "200":
+          description: Open offers.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OfferList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/offers/{offer_id}/accept:
+    parameters:
+      - $ref: "#/components/parameters/OfferId"
+    post:
+      operationId: acceptOffer
+      summary: Accept an offer
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "200":
+          description: The ride.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ride"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/offers/{offer_id}/reject:
+    parameters:
+      - $ref: "#/components/parameters/OfferId"
+    post:
+      operationId: rejectOffer
+      summary: Reject an offer
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "204":
+          description: The offer was rejected.
+        default:
+          $ref: "#/components/responses/Problem"
+
 components:
+  parameters:
+    RideId:
+      name: ride_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    OfferId:
+      name: offer_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    Problem:
+      description: The request could not be completed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
   securitySchemes:
     # Operation scopes name the roles allowed in. No scopes means any account.
     bearerAuth:
@@ -207,6 +539,206 @@ components:
       scheme: bearer
 
   schemas:
+    Coordinates:
+      type: object
+      additionalProperties: false
+      required: [lat, lng]
+      properties:
+        lat:
+          type: number
+          format: double
+        lng:
+          type: number
+          format: double
+
+    QuoteRequest:
+      type: object
+      additionalProperties: false
+      required: [vehicle_category, pickup, dropoff]
+      properties:
+        vehicle_category:
+          type: string
+          example: motorbike
+        pickup:
+          $ref: "#/components/schemas/Coordinates"
+        dropoff:
+          $ref: "#/components/schemas/Coordinates"
+
+    Quote:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - fare_kes
+        - base_fare_kes
+        - discount_kes
+        - surge_bps
+        - distance_m
+        - duration_s
+        - polyline
+        - expires_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        fare_kes:
+          type: integer
+          format: int32
+          description: The price the rider pays.
+        base_fare_kes:
+          type: integer
+          format: int32
+          description: The price before the discount.
+        discount_kes:
+          type: integer
+          format: int32
+        surge_bps:
+          type: integer
+          format: int32
+          description: Demand multiplier in basis points. 10000 means no surge.
+        distance_m:
+          type: integer
+          format: int32
+        duration_s:
+          type: integer
+          format: int32
+        polyline:
+          type: string
+          description: Encoded route for display.
+        expires_at:
+          type: string
+          format: date-time
+
+    BookRideRequest:
+      type: object
+      additionalProperties: false
+      required: [quote_id]
+      properties:
+        quote_id:
+          type: string
+          format: uuid
+
+    RideStatus:
+      type: string
+      enum:
+        - searching
+        - accepted
+        - driver_arriving
+        - arrived
+        - in_progress
+        - completed
+        - cancelled
+        - no_drivers
+
+    PaymentMode:
+      type: string
+      enum: [cash_direct, mpesa_direct]
+
+    Ride:
+      type: object
+      additionalProperties: false
+      required: [id, status, pickup, dropoff, fare_kes, requested_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/RideStatus"
+        pickup:
+          $ref: "#/components/schemas/Coordinates"
+        dropoff:
+          $ref: "#/components/schemas/Coordinates"
+        fare_kes:
+          type: integer
+          format: int32
+        requested_at:
+          type: string
+          format: date-time
+        driver_id:
+          type: string
+          format: uuid
+        driver_location:
+          allOf:
+            - $ref: "#/components/schemas/Coordinates"
+          description: Present only while the driver is on the way or on the trip.
+        payment_mode:
+          $ref: "#/components/schemas/PaymentMode"
+
+    CancelRideRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          description: A reason code allowed for the caller's side of the ride.
+          example: rider_changed_mind
+
+    CompleteTripRequest:
+      type: object
+      additionalProperties: false
+      required: [payment_mode]
+      properties:
+        payment_mode:
+          $ref: "#/components/schemas/PaymentMode"
+
+    DriverProfile:
+      type: object
+      additionalProperties: false
+      required: [vehicle_category, verification_status, subscription_status, is_online]
+      properties:
+        vehicle_category:
+          type: string
+        verification_status:
+          type: string
+          enum: [pending, approved, rejected]
+        subscription_status:
+          type: string
+          enum: [inactive, active, grace, suspended]
+        is_online:
+          type: boolean
+
+    SetDriverCategoryRequest:
+      type: object
+      additionalProperties: false
+      required: [vehicle_category]
+      properties:
+        vehicle_category:
+          type: string
+
+    Offer:
+      type: object
+      additionalProperties: false
+      required: [id, ride_id, pickup, distance_to_pickup_m, fare_kes, expires_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        ride_id:
+          type: string
+          format: uuid
+        pickup:
+          $ref: "#/components/schemas/Coordinates"
+        distance_to_pickup_m:
+          type: integer
+          format: int32
+        fare_kes:
+          type: integer
+          format: int32
+        expires_at:
+          type: string
+          format: date-time
+
+    OfferList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Offer"
+
     SignupRole:
       type: string
       enum: [rider, driver]

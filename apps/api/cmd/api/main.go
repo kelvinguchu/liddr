@@ -11,12 +11,15 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/kelvinguchu/liddr/apps/api/internal/auth"
 	"github.com/kelvinguchu/liddr/apps/api/internal/config"
+	"github.com/kelvinguchu/liddr/apps/api/internal/dispatch"
 	"github.com/kelvinguchu/liddr/apps/api/internal/httpapi"
+	"github.com/kelvinguchu/liddr/apps/api/internal/maps"
 	"github.com/kelvinguchu/liddr/apps/api/internal/rides"
 	"github.com/kelvinguchu/liddr/apps/api/internal/sms"
 	"github.com/kelvinguchu/liddr/apps/api/internal/store"
@@ -69,6 +72,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	}
 	defer pool.Close()
 
+	dispatcher := dispatch.NewService(dispatch.Config{Pool: pool, Now: time.Now})
 	api := httpapi.New(httpapi.Deps{
 		Logger:     logger,
 		Database:   pool,
@@ -85,6 +89,12 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 			HMACKey: []byte(cfg.AuthHMACKey.Reveal()),
 			Now:     time.Now,
 		}),
+		Rides: rides.NewService(rides.Config{
+			Pool:   pool,
+			Routes: maps.NewClient(cfg.GoogleRoutesURL, cfg.GoogleMapsKey.Reveal()),
+			Now:    time.Now,
+		}),
+		Dispatch:         dispatcher,
 		TrustedProxyHops: cfg.TrustedProxyHops,
 	})
 	server := &http.Server{
@@ -102,6 +112,14 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		return fmt.Errorf("listen: %w", err)
 	}
 	logger.LogAttrs(ctx, slog.LevelInfo, "http server listening", slog.String("addr", listener.Addr().String()))
+
+	// Background work stops when stopWorkers runs, and waiting on workers.Wait
+	// before the deferred pool.Close guarantees nothing uses the pool after it.
+	workerCtx, stopWorkers := context.WithCancel(context.WithoutCancel(ctx))
+	var workers sync.WaitGroup
+	workers.Go(func() { dispatcher.Run(workerCtx, logger) })
+	defer workers.Wait()
+	defer stopWorkers()
 
 	// Serve returns once Shutdown or Close is called below, and this function
 	// waits for that result on every path after this point.

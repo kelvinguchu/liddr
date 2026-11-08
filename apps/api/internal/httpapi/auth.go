@@ -119,7 +119,7 @@ func (a *API) Logout(ctx context.Context, req LogoutRequestObject) (LogoutRespon
 func (a *API) GetMe(ctx context.Context, _ GetMeRequestObject) (GetMeResponseObject, error) {
 	p, ok := principal(ctx)
 	if !ok {
-		return nil, errors.New("protected route ran without a principal")
+		return nil, errNoPrincipal
 	}
 	return GetMe200JSONResponse{Id: p.UserID, Phone: p.Phone, Roles: toRoles(p.Roles)}, nil
 }

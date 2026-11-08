@@ -87,35 +87,6 @@ type RequestMeta struct {
 	RequestID string
 }
 
-// rejection carries a domain error out of a transaction that must still commit.
-type rejection struct {
-	err error
-}
-
-func (r rejection) Error() string { return r.err.Error() }
-
-// reject makes tx commit the writes made so far and return err to the caller.
-// It exists for failed attempts and revocations, which a rollback would erase.
-func reject(err error) error {
-	return rejection{err: err}
-}
-
-func (s *Service) tx(ctx context.Context, fn func(*store.Queries) error) error {
-	var rejected error
-	err := store.InTx(ctx, s.pool, func(q *store.Queries) error {
-		err := fn(q)
-		if r, ok := errors.AsType[rejection](err); ok {
-			rejected = r.err
-			return nil
-		}
-		return err
-	})
-	if err != nil {
-		return err
-	}
-	return rejected
-}
-
 // statusError returns the error for a status that cannot sign in. Anything not
 // known to be allowed is denied.
 func statusError(status string) error {

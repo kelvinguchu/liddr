@@ -166,6 +166,7 @@ func (e Role) Valid() bool {
 const (
 	SignupRoleDriver SignupRole = "driver"
 	SignupRoleRider  SignupRole = "rider"
+	SignupRoleStaff  SignupRole = "staff"
 )
 
 // Valid indicates whether the value is a known member of the SignupRole enum.
@@ -174,6 +175,8 @@ func (e SignupRole) Valid() bool {
 	case SignupRoleDriver:
 		return true
 	case SignupRoleRider:
+		return true
+	case SignupRoleStaff:
 		return true
 	default:
 		return false
@@ -444,6 +447,12 @@ type SetDriverCategoryRequest struct {
 // SignupRole defines model for SignupRole.
 type SignupRole string
 
+// StepUpGrant defines model for StepUpGrant.
+type StepUpGrant struct {
+	ExpiresIn   int32  `json:"expires_in"`
+	StepUpToken string `json:"step_up_token"`
+}
+
 // Subscription defines model for Subscription.
 type Subscription struct {
 	AmountKes        int32  `json:"amount_kes"`
@@ -481,6 +490,18 @@ type SubscriptionPaymentList struct {
 	Data []SubscriptionPayment `json:"data"`
 }
 
+// TotpCode defines model for TotpCode.
+type TotpCode struct {
+	Code string `json:"code"`
+}
+
+// TotpSetup defines model for TotpSetup.
+type TotpSetup struct {
+	ExpiresAt  time.Time `json:"expires_at"`
+	OtpauthUri string    `json:"otpauth_uri"`
+	Secret     string    `json:"secret"`
+}
+
 // VehicleCategory defines model for VehicleCategory.
 type VehicleCategory struct {
 	// Capacity Passenger seats. Zero for package delivery.
@@ -510,14 +531,25 @@ type OfferId = openapi_types.UUID
 // RideId defines model for RideId.
 type RideId = openapi_types.UUID
 
+// StepUpToken defines model for StepUpToken.
+type StepUpToken = string
+
 // Problem defines model for Problem.
 type Problem = Error
 
 // bearerAuthContextKey is the context key for bearerAuth security scheme
 type bearerAuthContextKey string
 
+// BeginTotpSetupParams defines parameters for BeginTotpSetup.
+type BeginTotpSetupParams struct {
+	XStepUpToken *StepUpToken `json:"X-Step-Up-Token,omitempty"`
+}
+
 // LogoutJSONRequestBody defines body for Logout for application/json ContentType.
 type LogoutJSONRequestBody = RefreshRequest
+
+// ConfirmTotpSetupJSONRequestBody defines body for ConfirmTotpSetup for application/json ContentType.
+type ConfirmTotpSetupJSONRequestBody = TotpCode
 
 // RequestOtpJSONRequestBody defines body for RequestOtp for application/json ContentType.
 type RequestOtpJSONRequestBody = OtpRequest
@@ -527,6 +559,9 @@ type VerifyOtpJSONRequestBody = OtpVerification
 
 // RefreshSessionJSONRequestBody defines body for RefreshSession for application/json ContentType.
 type RefreshSessionJSONRequestBody = RefreshRequest
+
+// VerifyStepUpJSONRequestBody defines body for VerifyStepUp for application/json ContentType.
+type VerifyStepUpJSONRequestBody = TotpCode
 
 // SetDriverCategoryJSONRequestBody defines body for SetDriverCategory for application/json ContentType.
 type SetDriverCategoryJSONRequestBody = SetDriverCategoryRequest
@@ -566,6 +601,12 @@ type ServerInterface interface {
 	// Logout End the device's session. Succeeds even if already ended.
 	// (POST /v1/auth/logout)
 	Logout(w http.ResponseWriter, r *http.Request)
+	// ConfirmTotpSetup Activate an authenticator with a code from it
+	// (POST /v1/auth/mfa/totp/confirm)
+	ConfirmTotpSetup(w http.ResponseWriter, r *http.Request)
+	// BeginTotpSetup Start enrolling an authenticator app
+	// (POST /v1/auth/mfa/totp/setup)
+	BeginTotpSetup(w http.ResponseWriter, r *http.Request, params BeginTotpSetupParams)
 	// RequestOtp Send a sign-in code to a Kenyan mobile number
 	// (POST /v1/auth/otp/request)
 	RequestOtp(w http.ResponseWriter, r *http.Request)
@@ -575,6 +616,9 @@ type ServerInterface interface {
 	// RefreshSession Rotate a refresh token for new tokens
 	// (POST /v1/auth/refresh)
 	RefreshSession(w http.ResponseWriter, r *http.Request)
+	// VerifyStepUp Exchange an authenticator code for a short-lived step-up token
+	// (POST /v1/auth/step-up)
+	VerifyStepUp(w http.ResponseWriter, r *http.Request)
 	// GetDriverProfile Return the signed-in driver's profile
 	// (GET /v1/drivers/me)
 	GetDriverProfile(w http.ResponseWriter, r *http.Request)
@@ -703,6 +747,73 @@ func (siw *ServerInterfaceWrapper) Logout(w http.ResponseWriter, r *http.Request
 	handler.ServeHTTP(w, r)
 }
 
+// ConfirmTotpSetup operation middleware
+func (siw *ServerInterfaceWrapper) ConfirmTotpSetup(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin", "mfa:exempt"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ConfirmTotpSetup(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// BeginTotpSetup operation middleware
+func (siw *ServerInterfaceWrapper) BeginTotpSetup(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin", "mfa:exempt"})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params BeginTotpSetupParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Step-Up-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Step-Up-Token")]; found {
+		var XStepUpToken StepUpToken
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Step-Up-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Step-Up-Token", valueList[0], &XStepUpToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Step-Up-Token", Err: err})
+			return
+		}
+
+		params.XStepUpToken = &XStepUpToken
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BeginTotpSetup(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // RequestOtp operation middleware
 func (siw *ServerInterfaceWrapper) RequestOtp(w http.ResponseWriter, r *http.Request) {
 
@@ -736,6 +847,26 @@ func (siw *ServerInterfaceWrapper) RefreshSession(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RefreshSession(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// VerifyStepUp operation middleware
+func (siw *ServerInterfaceWrapper) VerifyStepUp(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin", "mfa:exempt"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.VerifyStepUp(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1516,6 +1647,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/webhooks/mpesa/{token}/stk", wrapper.MpesaStkCallback)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/webhooks/mpesa/{token}/c2b/validation", wrapper.MpesaC2bValidation)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/webhooks/mpesa/{token}/c2b/confirmation", wrapper.MpesaC2bConfirmation)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/auth/mfa/totp/setup", wrapper.BeginTotpSetup)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/auth/mfa/totp/confirm", wrapper.ConfirmTotpSetup)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/auth/step-up", wrapper.VerifyStepUp)
 
 	return m
 }
@@ -1592,6 +1726,78 @@ type Logout204Response struct {
 func (response Logout204Response) VisitLogoutResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
+}
+
+type ConfirmTotpSetupRequestObject struct {
+	Body *ConfirmTotpSetupJSONRequestBody
+}
+
+type ConfirmTotpSetupResponseObject interface {
+	VisitConfirmTotpSetupResponse(w http.ResponseWriter) error
+}
+
+type ConfirmTotpSetup204Response struct {
+}
+
+func (response ConfirmTotpSetup204Response) VisitConfirmTotpSetupResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type ConfirmTotpSetupdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ConfirmTotpSetupdefaultJSONResponse) VisitConfirmTotpSetupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BeginTotpSetupRequestObject struct {
+	Params BeginTotpSetupParams
+}
+
+type BeginTotpSetupResponseObject interface {
+	VisitBeginTotpSetupResponse(w http.ResponseWriter) error
+}
+
+type BeginTotpSetup201JSONResponse TotpSetup
+
+func (response BeginTotpSetup201JSONResponse) VisitBeginTotpSetupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BeginTotpSetupdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response BeginTotpSetupdefaultJSONResponse) VisitBeginTotpSetupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type RequestOtpRequestObject struct {
@@ -1776,6 +1982,45 @@ func (response RefreshSession403JSONResponse) VisitRefreshSessionResponse(w http
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifyStepUpRequestObject struct {
+	Body *VerifyStepUpJSONRequestBody
+}
+
+type VerifyStepUpResponseObject interface {
+	VisitVerifyStepUpResponse(w http.ResponseWriter) error
+}
+
+type VerifyStepUp200JSONResponse StepUpGrant
+
+func (response VerifyStepUp200JSONResponse) VisitVerifyStepUpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifyStepUpdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response VerifyStepUpdefaultJSONResponse) VisitVerifyStepUpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -2718,6 +2963,12 @@ type StrictServerInterface interface {
 	// Logout End the device's session. Succeeds even if already ended.
 	// (POST /v1/auth/logout)
 	Logout(ctx context.Context, request LogoutRequestObject) (LogoutResponseObject, error)
+	// ConfirmTotpSetup Activate an authenticator with a code from it
+	// (POST /v1/auth/mfa/totp/confirm)
+	ConfirmTotpSetup(ctx context.Context, request ConfirmTotpSetupRequestObject) (ConfirmTotpSetupResponseObject, error)
+	// BeginTotpSetup Start enrolling an authenticator app
+	// (POST /v1/auth/mfa/totp/setup)
+	BeginTotpSetup(ctx context.Context, request BeginTotpSetupRequestObject) (BeginTotpSetupResponseObject, error)
 	// RequestOtp Send a sign-in code to a Kenyan mobile number
 	// (POST /v1/auth/otp/request)
 	RequestOtp(ctx context.Context, request RequestOtpRequestObject) (RequestOtpResponseObject, error)
@@ -2727,6 +2978,9 @@ type StrictServerInterface interface {
 	// RefreshSession Rotate a refresh token for new tokens
 	// (POST /v1/auth/refresh)
 	RefreshSession(ctx context.Context, request RefreshSessionRequestObject) (RefreshSessionResponseObject, error)
+	// VerifyStepUp Exchange an authenticator code for a short-lived step-up token
+	// (POST /v1/auth/step-up)
+	VerifyStepUp(ctx context.Context, request VerifyStepUpRequestObject) (VerifyStepUpResponseObject, error)
 	// GetDriverProfile Return the signed-in driver's profile
 	// (GET /v1/drivers/me)
 	GetDriverProfile(ctx context.Context, request GetDriverProfileRequestObject) (GetDriverProfileResponseObject, error)
@@ -2922,6 +3176,63 @@ func (sh *strictHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ConfirmTotpSetup operation middleware
+func (sh *strictHandler) ConfirmTotpSetup(w http.ResponseWriter, r *http.Request) {
+	var request ConfirmTotpSetupRequestObject
+
+	var body ConfirmTotpSetupJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ConfirmTotpSetup(ctx, request.(ConfirmTotpSetupRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ConfirmTotpSetup")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ConfirmTotpSetupResponseObject); ok {
+		if err := validResponse.VisitConfirmTotpSetupResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// BeginTotpSetup operation middleware
+func (sh *strictHandler) BeginTotpSetup(w http.ResponseWriter, r *http.Request, params BeginTotpSetupParams) {
+	var request BeginTotpSetupRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.BeginTotpSetup(ctx, request.(BeginTotpSetupRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "BeginTotpSetup")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(BeginTotpSetupResponseObject); ok {
+		if err := validResponse.VisitBeginTotpSetupResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // RequestOtp operation middleware
 func (sh *strictHandler) RequestOtp(w http.ResponseWriter, r *http.Request) {
 	var request RequestOtpRequestObject
@@ -3008,6 +3319,37 @@ func (sh *strictHandler) RefreshSession(w http.ResponseWriter, r *http.Request) 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RefreshSessionResponseObject); ok {
 		if err := validResponse.VisitRefreshSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// VerifyStepUp operation middleware
+func (sh *strictHandler) VerifyStepUp(w http.ResponseWriter, r *http.Request) {
+	var request VerifyStepUpRequestObject
+
+	var body VerifyStepUpJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.VerifyStepUp(ctx, request.(VerifyStepUpRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "VerifyStepUp")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(VerifyStepUpResponseObject); ok {
+		if err := validResponse.VisitVerifyStepUpResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

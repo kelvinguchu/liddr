@@ -48,6 +48,9 @@ type Deps struct {
 	// MpesaAllowedIPs restricts callbacks when it is not empty.
 	MpesaAllowedIPs []netip.Addr
 
+	// OpsAllowedNets restricts staff routes when it is not empty.
+	OpsAllowedNets []netip.Prefix
+
 	// TrustedProxyHops is how many proxies in front of this server append to
 	// X-Forwarded-For. Zero means clients connect directly.
 	TrustedProxyHops int

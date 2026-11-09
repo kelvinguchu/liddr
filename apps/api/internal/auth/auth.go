@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/kelvinguchu/liddr/apps/api/internal/sealing"
 	"github.com/kelvinguchu/liddr/apps/api/internal/store"
 )
 
@@ -23,6 +24,10 @@ const (
 	RoleDriver Role = "driver"
 	RoleOps    Role = "ops"
 	RoleAdmin  Role = "admin"
+
+	// RoleStaff is only a sign-in intent. It is never granted, and it succeeds
+	// only for an account that already holds ops or admin.
+	RoleStaff Role = "staff"
 )
 
 // Errors returned to callers. RateLimitError is also returned.
@@ -37,6 +42,7 @@ var (
 	ErrAccountSuspended    = errors.New("account is suspended")
 	ErrAccountBanned       = errors.New("account is banned")
 	ErrAccountDeactivated  = errors.New("account is deactivated")
+	ErrNotStaff            = errors.New("account has no staff access")
 )
 
 // RateLimitError reports that a request must wait before being retried.
@@ -58,6 +64,7 @@ type Config struct {
 	Pool    *pgxpool.Pool
 	SMS     SMSSender
 	HMACKey []byte
+	Box     *sealing.Box
 	Now     func() time.Time
 }
 
@@ -67,6 +74,7 @@ type Service struct {
 	queries *store.Queries
 	sms     SMSSender
 	hasher  hasher
+	box     *sealing.Box
 	now     func() time.Time
 }
 
@@ -77,6 +85,7 @@ func NewService(cfg Config) *Service {
 		queries: store.New(cfg.Pool),
 		sms:     cfg.SMS,
 		hasher:  hasher{key: cfg.HMACKey},
+		box:     cfg.Box,
 		now:     cfg.Now,
 	}
 }

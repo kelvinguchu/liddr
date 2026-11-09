@@ -177,6 +177,20 @@ type SubscriptionPayment struct {
 	LastCheckedAt     *time.Time
 }
 
+type TotpCredential struct {
+	UserID              uuid.UUID
+	SecretSealed        []byte
+	ConfirmedAt         *time.Time
+	LastCounter         int64
+	FailedAttempts      int32
+	LockedUntil         *time.Time
+	PendingSecretSealed []byte
+	PendingExpiresAt    *time.Time
+	PendingAttempts     int32
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+}
+
 type User struct {
 	ID            uuid.UUID
 	Phone         string

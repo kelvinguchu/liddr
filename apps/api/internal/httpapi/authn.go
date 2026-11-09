@@ -52,13 +52,18 @@ func (a *API) authenticate(next http.Handler) http.Handler {
 			return
 		}
 
-		if !hasAllowedRole(p.Roles, allowedRoles) {
+		roles, requirement := splitScopes(allowedRoles)
+		if !hasAllowedRole(p.Roles, roles) {
 			a.deps.Logger.LogAttrs(r.Context(), slog.LevelWarn, "role check denied request",
 				slog.String("request_id", requestID(r.Context())),
 				slog.String("route", r.Pattern),
 				slog.String("user_id", p.UserID.String()),
 			)
 			writeError(w, r, http.StatusForbidden, "FORBIDDEN", "You do not have permission to do this.")
+			return
+		}
+		if err := a.checkStaffAccess(r, p, roles, requirement); err != nil {
+			a.responseError(w, r, err)
 			return
 		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), principalKey{}, p)))

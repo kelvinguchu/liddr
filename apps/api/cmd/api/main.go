@@ -25,12 +25,13 @@ import (
 	"github.com/kelvinguchu/liddr/apps/api/internal/payments"
 	"github.com/kelvinguchu/liddr/apps/api/internal/realtime"
 	"github.com/kelvinguchu/liddr/apps/api/internal/rides"
+	"github.com/kelvinguchu/liddr/apps/api/internal/sealing"
 	"github.com/kelvinguchu/liddr/apps/api/internal/sms"
 	"github.com/kelvinguchu/liddr/apps/api/internal/store"
 	"github.com/kelvinguchu/liddr/apps/api/internal/subscriptions"
 )
 
-const usage = "usage: api <serve|migrate|register-c2b-urls>"
+const usage = "usage: api <serve|migrate|register-c2b-urls|grant-role PHONE ROLE>"
 
 func main() {
 	if err := run(context.Background(), os.Args, os.Getenv, os.Stdout, os.Stderr); err != nil {
@@ -43,7 +44,7 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout,
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	if len(args) != 2 || (args[1] != "serve" && args[1] != "migrate" && args[1] != "register-c2b-urls") {
+	if !validCommand(args) {
 		// The returned error reports the failure even if stderr is closed.
 		_, _ = fmt.Fprintln(stderr, usage)
 		return errors.New("invalid command")
@@ -70,7 +71,59 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdout,
 	if args[1] == "register-c2b-urls" {
 		return registerC2BURLs(ctx, cfg, logger)
 	}
+	if len(args) == 4 {
+		return grantRole(ctx, cfg, args[2], args[3], logger) //nolint:gosec // validCommand and the length check above guarantee four arguments.
+	}
 	return serve(ctx, cfg, logger)
+}
+
+func validCommand(args []string) bool {
+	switch {
+	case len(args) == 4:
+		return args[1] == "grant-role"
+	case len(args) == 2:
+		return args[1] == "serve" || args[1] == "migrate" || args[1] == "register-c2b-urls"
+	default:
+		return false
+	}
+}
+
+func newAuth(cfg config.Config, pool *pgxpool.Pool) (*auth.Service, error) {
+	box, err := sealing.New([]byte(cfg.DataKey.Reveal()))
+	if err != nil {
+		return nil, err
+	}
+	return auth.NewService(auth.Config{
+		Pool: pool,
+		SMS: sms.NewClient(sms.Config{
+			URL:      cfg.SMS.URL,
+			APIKey:   cfg.SMS.APIKey.Reveal(),
+			UserID:   cfg.SMS.UserID,
+			Password: cfg.SMS.Password.Reveal(),
+			SenderID: cfg.SMS.SenderID,
+		}),
+		HMACKey: []byte(cfg.AuthHMACKey.Reveal()),
+		Box:     box,
+		Now:     time.Now,
+	}), nil
+}
+
+// grantRole creates staff. It is a command so no public route can ever do it.
+func grantRole(ctx context.Context, cfg config.Config, phone, role string, logger *slog.Logger) error {
+	pool, err := store.OpenPool(ctx, cfg.DatabaseURL.Reveal(), cfg.DBMaxConns)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	service, err := newAuth(cfg, pool)
+	if err != nil {
+		return err
+	}
+	if err := service.GrantRole(ctx, phone, auth.Role(role)); err != nil {
+		return fmt.Errorf("grant role: %w", err)
+	}
+	logger.LogAttrs(ctx, slog.LevelInfo, "role granted", slog.String("role", role))
+	return nil
 }
 
 func newGateway(cfg config.Config) *payments.Client {
@@ -113,6 +166,10 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	}
 	defer pool.Close()
 
+	authService, err := newAuth(cfg, pool)
+	if err != nil {
+		return err
+	}
 	dispatcher := dispatch.NewService(dispatch.Config{Pool: pool, Now: time.Now})
 	billing := newSubscriptions(cfg, pool, logger)
 	hub := realtime.NewHub(logger)
@@ -120,18 +177,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		Logger:     logger,
 		Database:   pool,
 		Categories: rides.NewCatalog(store.New(pool)),
-		Auth: auth.NewService(auth.Config{
-			Pool: pool,
-			SMS: sms.NewClient(sms.Config{
-				URL:      cfg.SMS.URL,
-				APIKey:   cfg.SMS.APIKey.Reveal(),
-				UserID:   cfg.SMS.UserID,
-				Password: cfg.SMS.Password.Reveal(),
-				SenderID: cfg.SMS.SenderID,
-			}),
-			HMACKey: []byte(cfg.AuthHMACKey.Reveal()),
-			Now:     time.Now,
-		}),
+		Auth:       authService,
 		Rides: rides.NewService(rides.Config{
 			Pool:   pool,
 			Routes: maps.NewClient(cfg.GoogleRoutesURL, cfg.GoogleMapsKey.Reveal()),
@@ -144,6 +190,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		RealtimeOrigins:  cfg.RealtimeOrigins,
 		RealtimeJitter:   cfg.DrainDelay,
 		MpesaAllowedIPs:  cfg.Mpesa.AllowedIPs,
+		OpsAllowedNets:   cfg.OpsAllowedNets,
 		TrustedProxyHops: cfg.TrustedProxyHops,
 	})
 	server := &http.Server{

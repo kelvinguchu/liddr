@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/kelvinguchu/liddr/apps/api/internal/auth"
 	"github.com/kelvinguchu/liddr/apps/api/internal/dispatch"
 	"github.com/kelvinguchu/liddr/apps/api/internal/payments"
 	"github.com/kelvinguchu/liddr/apps/api/internal/rides"
@@ -21,6 +22,15 @@ type problem struct {
 // problems maps domain errors to responses. Handlers return these errors
 // unchanged, and anything not listed becomes a generic 500.
 var problems = []problem{
+	{errMFAEnrolmentRequired, http.StatusForbidden, "MFA_ENROLMENT_REQUIRED", "Set up your authenticator app first."},
+	{errAddressNotAllowed, http.StatusForbidden, "ADDRESS_NOT_ALLOWED", "Staff tools cannot be used from this network."},
+	{auth.ErrStepUpRequired, http.StatusForbidden, "STEP_UP_REQUIRED", "Confirm with your authenticator code to continue."},
+	{auth.ErrFreshSignInRequired, http.StatusForbidden, "FRESH_SIGN_IN_REQUIRED", "Please sign in again to set up your authenticator."},
+	{auth.ErrTOTPNotEnrolled, http.StatusConflict, "MFA_NOT_ENROLLED", "Set up your authenticator app first."},
+	{auth.ErrTOTPNoEnrolment, http.StatusConflict, "MFA_SETUP_EXPIRED", "That setup has expired. Please start again."},
+	{auth.ErrTOTPInvalid, http.StatusBadRequest, "INVALID_CODE", "That code is incorrect or has already been used."},
+	{auth.ErrTOTPLocked, http.StatusTooManyRequests, "TOO_MANY_ATTEMPTS", "Too many incorrect codes. Please wait a few minutes."},
+	{auth.ErrNotStaff, http.StatusForbidden, "NOT_STAFF", "This number does not have staff access."},
 	{rides.ErrCategoryNotFound, http.StatusBadRequest, "CATEGORY_NOT_AVAILABLE", "That vehicle type is not available."},
 	{rides.ErrOutsideServiceArea, http.StatusBadRequest, "OUTSIDE_SERVICE_AREA", "Liddr is not available at that location."},
 	{rides.ErrRouteUnavailable, http.StatusServiceUnavailable, "ROUTE_UNAVAILABLE", "We could not price this trip. Please try again."},

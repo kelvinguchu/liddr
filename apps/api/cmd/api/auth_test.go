@@ -47,7 +47,14 @@ type response struct {
 	body   map[string]any
 }
 
+const headerStepUp = "X-Step-Up-Token"
+
 func send(t *testing.T, method, target, bearer string, payload any) response {
+	t.Helper()
+	return sendWithHeader(t, method, target, bearer, "", "", payload)
+}
+
+func sendWithHeader(t *testing.T, method, target, bearer, headerName, headerValue string, payload any) response {
 	t.Helper()
 	var body bytes.Buffer
 	if payload != nil {
@@ -62,6 +69,9 @@ func send(t *testing.T, method, target, bearer string, payload any) response {
 	req.Header.Set("Content-Type", "application/json")
 	if bearer != "" {
 		req.Header.Set("Authorization", "Bearer "+bearer)
+	}
+	if headerName != "" {
+		req.Header.Set(headerName, headerValue)
 	}
 	client := http.Client{Timeout: testTimeout, Transport: &http.Transport{DisableKeepAlives: true}}
 	resp, err := client.Do(req)

@@ -63,6 +63,7 @@ func envWithRoutes(databaseURL, smsURL, routesURL string) func(string) string {
 		"SHUTDOWN_DRAIN_DELAY":       "0s",
 		"SHUTDOWN_TIMEOUT":           "5s",
 		"AUTH_HMAC_KEY":              "integration-test-key-of-sufficient-length",
+		"DATA_ENCRYPTION_KEY":        "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
 		"GOOGLE_MAPS_API_KEY_SERVER": "test-maps-key",
 		"GOOGLE_ROUTES_BASE_URL":     routesURL,
 		"MPESA_CONSUMER_KEY":         "test-consumer-key",

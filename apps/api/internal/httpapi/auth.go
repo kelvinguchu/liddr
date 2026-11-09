@@ -61,7 +61,7 @@ func (a *API) RequestOtp(ctx context.Context, req RequestOtpRequestObject) (Requ
 	case errors.Is(err, auth.ErrInvalidPhone):
 		return RequestOtp400JSONResponse(errorBody(ctx, "INVALID_PHONE", "Enter a Kenyan mobile number, such as 0712345678.")), nil
 	case errors.Is(err, auth.ErrInvalidRole):
-		return RequestOtp400JSONResponse(errorBody(ctx, "INVALID_ROLE", "Choose rider or driver.")), nil
+		return RequestOtp400JSONResponse(errorBody(ctx, "INVALID_ROLE", "Choose a valid account type.")), nil
 	case errors.Is(err, auth.ErrDeliveryUnavailable):
 		a.deps.Logger.LogAttrs(ctx, slog.LevelError, "sign-in code delivery failed",
 			slog.String("request_id", requestID(ctx)), slog.Any("error", err))
@@ -83,6 +83,8 @@ func (a *API) VerifyOtp(ctx context.Context, req VerifyOtpRequestObject) (Verify
 		return VerifyOtp400JSONResponse(errorBody(ctx, "CODE_EXPIRED", "That code has expired. Request a new one.")), nil
 	case errors.Is(err, auth.ErrTooManyAttempts):
 		return VerifyOtp429JSONResponse(errorBody(ctx, "TOO_MANY_ATTEMPTS", "Too many incorrect codes. Request a new one.")), nil
+	case errors.Is(err, auth.ErrNotStaff):
+		return VerifyOtp403JSONResponse(errorBody(ctx, "NOT_STAFF", "This number does not have staff access.")), nil
 	case isAccountBlocked(err):
 		code, message := accountBlocked(err)
 		return VerifyOtp403JSONResponse(errorBody(ctx, code, message)), nil

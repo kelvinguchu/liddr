@@ -23,6 +23,7 @@ func validEnv(overrides map[string]string) map[string]string {
 	values := map[string]string{
 		"DATABASE_URL":               "postgres://user:hunter2@db",
 		"AUTH_HMAC_KEY":              testHMACKey,
+		"DATA_ENCRYPTION_KEY":        "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
 		"GOOGLE_MAPS_API_KEY_SERVER": "maps-key",
 		"MPESA_CONSUMER_KEY":         "consumer-key",
 		"MPESA_CONSUMER_SECRET":      "consumer-secret",
@@ -52,6 +53,7 @@ func TestLoadAppliesDefaults(t *testing.T) {
 		DrainDelay:      5 * time.Second,
 		ShutdownTimeout: 20 * time.Second,
 		AuthHMACKey:     testHMACKey,
+		DataKey:         Secret("\x00\x01\x02\x03\x04\x05\x06\a\b\t\n\v\f\r\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f"),
 		GoogleMapsKey:   "maps-key",
 		GoogleRoutesURL: "https://routes.googleapis.com",
 		Mpesa: Mpesa{
@@ -82,6 +84,9 @@ func TestLoadRejectsInvalidValues(t *testing.T) {
 		name, key, value, want string
 	}{
 		{"missing database url", "DATABASE_URL", "", "DATABASE_URL is required"},
+		{"missing data key", "DATA_ENCRYPTION_KEY", "", "DATA_ENCRYPTION_KEY is required"},
+		{"short data key", "DATA_ENCRYPTION_KEY", "c2hvcnQ=", "DATA_ENCRYPTION_KEY must be base64"},
+		{"bad ops range", "OPS_ALLOWED_CIDRS", "not-a-range", "OPS_ALLOWED_CIDRS must be"},
 		{"missing hmac key", "AUTH_HMAC_KEY", "", "AUTH_HMAC_KEY is required"},
 		{"short hmac key", "AUTH_HMAC_KEY", "too-short", "AUTH_HMAC_KEY must be at least"},
 		{"missing sms url", "HOSTPINNACLE_API_URL", "", "HOSTPINNACLE_API_URL is required"},

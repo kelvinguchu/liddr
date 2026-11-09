@@ -105,6 +105,10 @@ WHERE family_id = sqlc.arg(family_id) AND revoked_at IS NULL;
 
 -- name: AuthenticateAccessToken :one
 SELECT s.id AS session_id, s.family_id, s.user_id, u.account_status, u.phone,
+    EXISTS (
+        SELECT 1 FROM totp_credentials AS t
+        WHERE t.user_id = s.user_id AND t.confirmed_at IS NOT NULL
+    )::boolean AS mfa_enrolled,
     ARRAY(
         SELECT r.role FROM user_roles AS r
         WHERE r.user_id = s.user_id AND r.revoked_at IS NULL

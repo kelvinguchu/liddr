@@ -2,6 +2,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -28,7 +29,10 @@ func (Secret) GoString() string { return redacted }
 // LogValue redacts the value in structured logs.
 func (Secret) LogValue() slog.Value { return slog.StringValue(redacted) }
 
-const minHMACKeyBytes = 32
+const (
+	minHMACKeyBytes = 32
+	dataKeyBytes    = 32
+)
 
 // SMS holds HostPinnacle credentials.
 type SMS struct {
@@ -61,6 +65,8 @@ type Config struct {
 	ShutdownTimeout  time.Duration
 	TrustedProxyHops int
 	AuthHMACKey      Secret
+	DataKey          Secret
+	OpsAllowedNets   []netip.Prefix
 	SMS              SMS
 	GoogleMapsKey    Secret
 	GoogleRoutesURL  string
@@ -93,6 +99,7 @@ func Load(getenv func(string) string) (Config, error) {
 		Addr:            withDefault(getenv("ADDR"), ":8080"),
 		DatabaseURL:     Secret(required("DATABASE_URL")),
 		AuthHMACKey:     Secret(required("AUTH_HMAC_KEY")),
+		DataKey:         decodeDataKey(required("DATA_ENCRYPTION_KEY"), &errs),
 		GoogleMapsKey:   Secret(required("GOOGLE_MAPS_API_KEY_SERVER")),
 		GoogleRoutesURL: withDefault(getenv("GOOGLE_ROUTES_BASE_URL"), "https://routes.googleapis.com"),
 		SMS: SMS{
@@ -143,6 +150,18 @@ func Load(getenv func(string) string) (Config, error) {
 		errs = append(errs, fmt.Errorf("AUTH_HMAC_KEY must be at least %d bytes", minHMACKeyBytes))
 	}
 
+	for field := range strings.SplitSeq(getenv("OPS_ALLOWED_CIDRS"), ",") {
+		if field = strings.TrimSpace(field); field == "" {
+			continue
+		}
+		prefix, err := netip.ParsePrefix(field)
+		if err != nil {
+			errs = append(errs, errors.New("OPS_ALLOWED_CIDRS must be comma-separated CIDR ranges"))
+			continue
+		}
+		cfg.OpsAllowedNets = append(cfg.OpsAllowedNets, prefix.Masked())
+	}
+
 	hops, err := strconv.Atoi(withDefault(getenv("TRUSTED_PROXY_HOPS"), "0"))
 	if err != nil || hops < 0 {
 		errs = append(errs, errors.New("TRUSTED_PROXY_HOPS must be a non-negative integer"))
@@ -164,6 +183,19 @@ func Load(getenv func(string) string) (Config, error) {
 		return Config{}, err
 	}
 	return cfg, nil
+}
+
+// decodeDataKey expects standard base64 for exactly 32 random bytes.
+func decodeDataKey(encoded string, errs *[]error) Secret {
+	if encoded == "" {
+		return ""
+	}
+	key, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil || len(key) != dataKeyBytes {
+		*errs = append(*errs, fmt.Errorf("DATA_ENCRYPTION_KEY must be base64 for %d bytes", dataKeyBytes))
+		return ""
+	}
+	return Secret(key)
 }
 
 func mpesaBaseURL(environment string) string {

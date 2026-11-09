@@ -38,6 +38,9 @@ type Principal struct {
 	FamilyID  uuid.UUID
 	Phone     string
 	Roles     []Role
+
+	// MFAEnrolled reports whether the account has a confirmed authenticator.
+	MFAEnrolled bool
 }
 
 func toRoles(values []string) []Role {
@@ -106,6 +109,8 @@ func (s *Service) Authenticate(ctx context.Context, accessToken string) (Princip
 		FamilyID:  row.FamilyID,
 		Phone:     row.Phone,
 		Roles:     toRoles(row.Roles),
+
+		MFAEnrolled: row.MfaEnrolled,
 	}, nil
 }
 

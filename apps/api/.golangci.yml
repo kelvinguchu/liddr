@@ -29,6 +29,7 @@ linters:
             - "**/internal/maps/**"
             - "**/internal/payments/**"
             - "**/internal/rides/**"
+            - "**/internal/sealing/**"
             - "**/internal/sms/**"
             - "**/internal/store/**"
             - "**/internal/subscriptions/**"

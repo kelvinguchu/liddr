@@ -49,7 +49,7 @@ func (s *Service) RequestOTP(ctx context.Context, req OTPRequest) (Challenge, er
 	if err != nil {
 		return Challenge{}, err
 	}
-	if req.Role != RoleRider && req.Role != RoleDriver {
+	if req.Role != RoleRider && req.Role != RoleDriver && req.Role != RoleStaff {
 		return Challenge{}, ErrInvalidRole
 	}
 	code, err := newOTPCode()
@@ -178,12 +178,12 @@ func (s *Service) VerifyOTP(ctx context.Context, challengeID uuid.UUID, code str
 		if err := q.CloseChallenge(ctx, store.CloseChallengeParams{Now: new(now), ID: challenge.ID}); err != nil {
 			return fmt.Errorf("close challenge: %w", err)
 		}
-		user, err := q.UpsertUserByPhone(ctx, challenge.Phone)
+		user, err := resolveAccount(ctx, q, challenge.Phone, challenge.RequestedRole)
 		if err != nil {
-			return fmt.Errorf("upsert user: %w", err)
+			return err
 		}
-		entry := auditEntry{userID: new(user.ID), meta: meta, at: now}
-		if err := statusError(user.AccountStatus); err != nil {
+		entry := auditEntry{userID: new(user.id), meta: meta, at: now}
+		if err := statusError(user.status); err != nil {
 			entry.action = "auth.sign_in_blocked"
 			if auditErr := audit(ctx, q, entry); auditErr != nil {
 				return auditErr
@@ -191,16 +191,18 @@ func (s *Service) VerifyOTP(ctx context.Context, challengeID uuid.UUID, code str
 			return store.Reject(err)
 		}
 
-		err = q.GrantInitialRole(ctx, store.GrantInitialRoleParams{UserID: user.ID, Role: challenge.RequestedRole})
-		if err != nil {
-			return fmt.Errorf("grant role: %w", err)
+		if challenge.RequestedRole != string(RoleStaff) {
+			err = q.GrantInitialRole(ctx, store.GrantInitialRoleParams{UserID: user.id, Role: challenge.RequestedRole})
+			if err != nil {
+				return fmt.Errorf("grant role: %w", err)
+			}
 		}
-		tokens, err = s.issue(ctx, q, user.ID, uuid.New(), now)
+		tokens, err = s.issue(ctx, q, user.id, uuid.New(), now)
 		if err != nil {
 			return err
 		}
 		entry.action = "auth.signed_in"
-		if user.Created {
+		if user.created {
 			entry.action = "auth.signed_up"
 		}
 		return audit(ctx, q, entry)
@@ -209,6 +211,32 @@ func (s *Service) VerifyOTP(ctx context.Context, challengeID uuid.UUID, code str
 		return Tokens{}, err
 	}
 	return tokens, nil
+}
+
+type account struct {
+	id      uuid.UUID
+	status  string
+	created bool
+}
+
+// resolveAccount finds or creates the account a proven code signs in to. A
+// staff sign-in never creates one, because staff roles are granted by operators.
+func resolveAccount(ctx context.Context, q *store.Queries, phone, requestedRole string) (account, error) {
+	if requestedRole == string(RoleStaff) {
+		staff, err := q.GetStaffUserByPhone(ctx, phone)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return account{}, store.Reject(ErrNotStaff)
+		}
+		if err != nil {
+			return account{}, fmt.Errorf("load staff account: %w", err)
+		}
+		return account{id: staff.ID, status: staff.AccountStatus}, nil
+	}
+	user, err := q.UpsertUserByPhone(ctx, phone)
+	if err != nil {
+		return account{}, fmt.Errorf("upsert user: %w", err)
+	}
+	return account{id: user.ID, status: user.AccountStatus, created: user.Created}, nil
 }
 
 func recordWrongCode(ctx context.Context, q *store.Queries, id uuid.UUID, attempts int32, now time.Time) error {

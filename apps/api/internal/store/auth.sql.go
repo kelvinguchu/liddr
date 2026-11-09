@@ -15,6 +15,10 @@ import (
 
 const authenticateAccessToken = `-- name: AuthenticateAccessToken :one
 SELECT s.id AS session_id, s.family_id, s.user_id, u.account_status, u.phone,
+    EXISTS (
+        SELECT 1 FROM totp_credentials AS t
+        WHERE t.user_id = s.user_id AND t.confirmed_at IS NOT NULL
+    )::boolean AS mfa_enrolled,
     ARRAY(
         SELECT r.role FROM user_roles AS r
         WHERE r.user_id = s.user_id AND r.revoked_at IS NULL
@@ -38,6 +42,7 @@ type AuthenticateAccessTokenRow struct {
 	UserID        uuid.UUID
 	AccountStatus string
 	Phone         string
+	MfaEnrolled   bool
 	Roles         []string
 }
 
@@ -50,6 +55,7 @@ func (q *Queries) AuthenticateAccessToken(ctx context.Context, arg AuthenticateA
 		&i.UserID,
 		&i.AccountStatus,
 		&i.Phone,
+		&i.MfaEnrolled,
 		&i.Roles,
 	)
 	return i, err

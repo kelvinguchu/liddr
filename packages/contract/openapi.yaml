@@ -640,8 +640,75 @@ paths:
         default:
           $ref: "#/components/responses/Problem"
 
+  /v1/auth/mfa/totp/setup:
+    post:
+      operationId: beginTotpSetup
+      summary: Start enrolling an authenticator app
+      description: |
+        A first enrolment needs a sign-in from the last 15 minutes. Replacing an
+        authenticator needs a step-up token from the current one.
+      security:
+        - bearerAuth: [ops, admin, "mfa:exempt"]
+      parameters:
+        - $ref: "#/components/parameters/StepUpToken"
+      responses:
+        "201":
+          description: Show the secret to the user once.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TotpSetup"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/auth/mfa/totp/confirm:
+    post:
+      operationId: confirmTotpSetup
+      summary: Activate an authenticator with a code from it
+      security:
+        - bearerAuth: [ops, admin, "mfa:exempt"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TotpCode"
+      responses:
+        "204":
+          description: The authenticator is active.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/auth/step-up:
+    post:
+      operationId: verifyStepUp
+      summary: Exchange an authenticator code for a short-lived step-up token
+      security:
+        - bearerAuth: [ops, admin, "mfa:exempt"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TotpCode"
+      responses:
+        "200":
+          description: Send this token as X-Step-Up-Token on high-risk actions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StepUpGrant"
+        default:
+          $ref: "#/components/responses/Problem"
+
 components:
   parameters:
+    StepUpToken:
+      name: X-Step-Up-Token
+      in: header
+      required: false
+      schema:
+        type: string
     CallbackToken:
       name: token
       in: path
@@ -674,6 +741,9 @@ components:
 
   securitySchemes:
     # Operation scopes name the roles allowed in. No scopes means any account.
+    # Reaching a route through ops or admin alone also needs an enrolled
+    # authenticator. "mfa:exempt" lifts that for enrolment itself, and
+    # "mfa:step-up" additionally requires a fresh X-Step-Up-Token.
     bearerAuth:
       type: http
       scheme: bearer
@@ -954,9 +1024,10 @@ components:
           items:
             $ref: "#/components/schemas/Offer"
 
+    # staff signs in an existing ops or admin account and never grants a role.
     SignupRole:
       type: string
-      enum: [rider, driver]
+      enum: [rider, driver, staff]
 
     Role:
       type: string
@@ -1107,3 +1178,36 @@ components:
         request_id:
           type: string
           description: Quote this when contacting support.
+
+    TotpSetup:
+      type: object
+      additionalProperties: false
+      required: [secret, otpauth_uri, expires_at]
+      properties:
+        secret:
+          type: string
+        otpauth_uri:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+
+    TotpCode:
+      type: object
+      additionalProperties: false
+      required: [code]
+      properties:
+        code:
+          type: string
+          pattern: '^[0-9]{6}$'
+
+    StepUpGrant:
+      type: object
+      additionalProperties: false
+      required: [step_up_token, expires_in]
+      properties:
+        step_up_token:
+          type: string
+        expires_in:
+          type: integer
+          format: int32

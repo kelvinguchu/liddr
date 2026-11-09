@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/mail"
+	"net/netip"
 	"strings"
 	"time"
 
@@ -137,3 +138,52 @@ func (s *Service) EmailEnabled() bool { return s.email != nil }
 
 // GoogleEnabled reports whether Google sign-in is configured.
 func (s *Service) GoogleEnabled() bool { return s.google != nil }
+
+// GrantRole gives a phone number a role, creating the account if needed. It is
+// an operator command, so that no public route can ever create staff.
+func (s *Service) GrantRole(ctx context.Context, rawPhone string, role Role) error {
+	if role != RoleOps && role != RoleAdmin {
+		return ErrInvalidRole
+	}
+	phone, err := NormalizePhone(rawPhone)
+	if err != nil {
+		return err
+	}
+	now := s.now()
+	return store.InTx(ctx, s.pool, func(q *store.Queries) error {
+		user, err := q.UpsertUserByPhone(ctx, new(phone))
+		if err != nil {
+			return fmt.Errorf("upsert user: %w", err)
+		}
+		if err := q.GrantRole(ctx, store.GrantRoleParams{UserID: user.ID, Role: string(role)}); err != nil {
+			return fmt.Errorf("grant role: %w", err)
+		}
+		return audit(ctx, q, auditEntry{action: "auth.role_granted." + string(role), userID: new(user.ID), meta: RequestMeta{IP: netip.IPv4Unspecified(), RequestID: "operator-cli"}, at: now})
+	})
+}
+
+type account struct {
+	id      uuid.UUID
+	status  string
+	created bool
+}
+
+// resolveAccount finds or creates the account a proven code signs in to. A
+// staff sign-in never creates one, because staff roles are granted by operators.
+func resolveAccount(ctx context.Context, q *store.Queries, phone, requestedRole string) (account, error) {
+	if requestedRole == string(RoleStaff) {
+		staff, err := q.GetStaffUserByPhone(ctx, new(phone))
+		if errors.Is(err, pgx.ErrNoRows) {
+			return account{}, store.Reject(ErrNotStaff)
+		}
+		if err != nil {
+			return account{}, fmt.Errorf("load staff account: %w", err)
+		}
+		return account{id: staff.ID, status: staff.AccountStatus}, nil
+	}
+	user, err := q.UpsertUserByPhone(ctx, new(phone))
+	if err != nil {
+		return account{}, fmt.Errorf("upsert user: %w", err)
+	}
+	return account{id: user.ID, status: user.AccountStatus, created: user.Created}, nil
+}

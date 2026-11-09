@@ -140,29 +140,6 @@ func startServerWithEnv(t *testing.T, databaseURL, smsURL, routesURL string, ext
 	return "", nil
 }
 
-func get(t *testing.T, target string) (int, http.Header, []byte) {
-	t.Helper()
-	client := http.Client{Timeout: testTimeout, Transport: &http.Transport{DisableKeepAlives: true}}
-	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, target, nil)
-	if err != nil {
-		t.Fatalf("build request: %v", err)
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		t.Fatalf("GET %s: %v", target, err)
-	}
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			t.Errorf("close body: %v", err)
-		}
-	}()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("read body: %v", err)
-	}
-	return resp.StatusCode, resp.Header, body
-}
-
 func TestVehicleCategoriesEndToEnd(t *testing.T) {
 	databaseURL := testdb.URL(t)
 	if got := migrate(t, databaseURL); strings.Contains(got, `"count":0`) {

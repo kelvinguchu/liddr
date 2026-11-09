@@ -213,32 +213,6 @@ func (s *Service) VerifyOTP(ctx context.Context, challengeID uuid.UUID, code str
 	return tokens, nil
 }
 
-type account struct {
-	id      uuid.UUID
-	status  string
-	created bool
-}
-
-// resolveAccount finds or creates the account a proven code signs in to. A
-// staff sign-in never creates one, because staff roles are granted by operators.
-func resolveAccount(ctx context.Context, q *store.Queries, phone, requestedRole string) (account, error) {
-	if requestedRole == string(RoleStaff) {
-		staff, err := q.GetStaffUserByPhone(ctx, new(phone))
-		if errors.Is(err, pgx.ErrNoRows) {
-			return account{}, store.Reject(ErrNotStaff)
-		}
-		if err != nil {
-			return account{}, fmt.Errorf("load staff account: %w", err)
-		}
-		return account{id: staff.ID, status: staff.AccountStatus}, nil
-	}
-	user, err := q.UpsertUserByPhone(ctx, new(phone))
-	if err != nil {
-		return account{}, fmt.Errorf("upsert user: %w", err)
-	}
-	return account{id: user.ID, status: user.AccountStatus, created: user.Created}, nil
-}
-
 func recordWrongCode(ctx context.Context, q *store.Queries, id uuid.UUID, attempts int32, now time.Time) error {
 	err := q.RecordChallengeFailure(ctx, store.RecordChallengeFailureParams{MaxAttempts: maxOTPAttempts, Now: new(now), ID: id})
 	if err != nil {

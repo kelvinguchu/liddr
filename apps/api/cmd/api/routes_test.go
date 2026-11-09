@@ -17,6 +17,7 @@ type contractRoute struct {
 	public       bool
 	stepUp       bool
 	staffOnly    bool
+	roles        string
 }
 
 var pathParam = regexp.MustCompile(`\{[^}]+\}`)
@@ -49,6 +50,7 @@ func contractRoutes(t *testing.T) []contractRoute {
 		case strings.Contains(line, "bearerAuth:") && len(routes) > 0:
 			current := &routes[len(routes)-1]
 			current.stepUp = strings.Contains(line, "mfa:step-up")
+			current.roles = line
 			current.staffOnly = (strings.Contains(line, "[ops") || strings.Contains(line, "[admin")) && !strings.Contains(line, "mfa:exempt")
 		}
 	}
@@ -73,6 +75,7 @@ func TestEveryRouteDeniesByDefault(t *testing.T) {
 	grantStaff(t, databaseURL, "0700000001", "ops")
 	grantStaff(t, databaseURL, "0700000001", "admin")
 	rider, _ := signIn(t, base, stub, "0711111111", "rider")["access_token"].(string)
+	driver, _ := signIn(t, base, stub, "0722222222", "driver")["access_token"].(string)
 	unenrolled, _ := signIn(t, base, stub, "0700000001", "staff")["access_token"].(string)
 
 	routes := contractRoutes(t)
@@ -83,11 +86,20 @@ func TestEveryRouteDeniesByDefault(t *testing.T) {
 		if got := send(t, route.method, route.url(base), "", nil); got.status != http.StatusUnauthorized {
 			t.Errorf("%s %s without a token = %d, want 401", route.method, route.path, got.status)
 		}
+		if strings.Contains(route.roles, "[") && !strings.Contains(route.roles, "[]") {
+			if !strings.Contains(route.roles, "rider") {
+				if got := send(t, route.method, route.url(base), rider, nil); got.status != http.StatusForbidden || got.body["code"] != "FORBIDDEN" {
+					t.Errorf("%s %s as a rider = %d %v", route.method, route.path, got.status, got.body)
+				}
+			}
+			if !strings.Contains(route.roles, "driver") {
+				if got := send(t, route.method, route.url(base), driver, nil); got.status != http.StatusForbidden || got.body["code"] != "FORBIDDEN" {
+					t.Errorf("%s %s as a driver = %d %v", route.method, route.path, got.status, got.body)
+				}
+			}
+		}
 		if !route.staffOnly {
 			continue
-		}
-		if got := send(t, route.method, route.url(base), rider, nil); got.status != http.StatusForbidden {
-			t.Errorf("%s %s as a rider = %d, want 403", route.method, route.path, got.status)
 		}
 		if got := send(t, route.method, route.url(base), unenrolled, nil); got.status != http.StatusForbidden || got.body["code"] != "MFA_ENROLMENT_REQUIRED" {
 			t.Errorf("%s %s without an authenticator = %d %v", route.method, route.path, got.status, got.body)

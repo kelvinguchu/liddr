@@ -148,7 +148,7 @@ func sendWave(ctx context.Context, q *store.Queries, ride store.ClaimDueRideRow,
 		if inserted == 0 {
 			continue
 		}
-		if err := events.Publish(ctx, q, events.Event{Type: events.TypeOfferCreated, OfferID: new(offerID), RideID: new(ride.ID)}, c.driverID); err != nil {
+		if err := events.Notify(ctx, q, events.Event{Type: events.TypeOfferCreated, OfferID: new(offerID), RideID: new(ride.ID)}, c.driverID); err != nil {
 			return err
 		}
 		sent++

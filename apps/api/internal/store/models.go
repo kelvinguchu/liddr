@@ -77,6 +77,31 @@ type MpesaUnmatchedCallback struct {
 	ReceivedAt       time.Time
 }
 
+type Notification struct {
+	ID               uuid.UUID
+	UserID           uuid.UUID
+	EventType        string
+	RideID           *uuid.UUID
+	OfferID          *uuid.UUID
+	Status           *string
+	PushStatus       string
+	PushAttempts     int32
+	PushClaimedUntil *time.Time
+	AckedAt          *time.Time
+	CreatedAt        time.Time
+}
+
+type PushToken struct {
+	ID         uuid.UUID
+	UserID     uuid.UUID
+	FamilyID   uuid.UUID
+	Token      string
+	Platform   string
+	LastSeenAt time.Time
+	RevokedAt  *time.Time
+	CreatedAt  time.Time
+}
+
 type Ride struct {
 	ID                  uuid.UUID
 	RiderID             uuid.UUID

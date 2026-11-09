@@ -75,7 +75,7 @@ func Transition(ctx context.Context, q *store.Queries, change Change) error {
 	if participants.DriverID != nil {
 		to = append(to, *participants.DriverID)
 	}
-	return events.Publish(ctx, q, events.Event{Type: events.TypeRideStatus, RideID: new(change.RideID), Status: change.To}, to...)
+	return events.Notify(ctx, q, events.Event{Type: events.TypeRideStatus, RideID: new(change.RideID), Status: change.To}, to...)
 }
 
 // WithdrawOffers closes a ride's open offers and tells each driver.

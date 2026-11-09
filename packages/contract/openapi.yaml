@@ -885,6 +885,101 @@ paths:
         default:
           $ref: "#/components/responses/Problem"
 
+  /v1/notifications:
+    get:
+      operationId: listNotifications
+      summary: List the signed-in user's notifications, newest first
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - name: include_acked
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Notifications.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/notifications/summary:
+    get:
+      operationId: getNotificationSummary
+      summary: Count unread notifications
+      security:
+        - bearerAuth: [rider, driver]
+      responses:
+        "200":
+          description: The count.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationSummary"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/notifications/{notification_id}/ack:
+    post:
+      operationId: ackNotification
+      summary: Mark a notification read
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - name: notification_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Marked read.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/push-tokens:
+    put:
+      operationId: registerPushToken
+      summary: Register this device for push notifications
+      security:
+        - bearerAuth: [rider, driver]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushTokenRegistration"
+      responses:
+        "204":
+          description: Registered.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/push-tokens/revoke:
+    post:
+      operationId: revokePushToken
+      summary: Stop push notifications to this device
+      security:
+        - bearerAuth: [rider, driver]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushTokenRevocation"
+      responses:
+        "204":
+          description: Revoked, or already gone.
+        default:
+          $ref: "#/components/responses/Problem"
+
 components:
   parameters:
     Limit:
@@ -1633,3 +1728,68 @@ components:
         expires_at:
           type: string
           format: date-time
+
+    Notification:
+      type: object
+      additionalProperties: false
+      required: [id, event_type, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        event_type:
+          type: string
+        ride_id:
+          type: string
+          format: uuid
+        offer_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        acked_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+    NotificationList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Notification"
+
+    NotificationSummary:
+      type: object
+      additionalProperties: false
+      required: [unread]
+      properties:
+        unread:
+          type: integer
+          format: int64
+
+    PushTokenRegistration:
+      type: object
+      additionalProperties: false
+      required: [token, platform]
+      properties:
+        token:
+          type: string
+          maxLength: 4096
+        platform:
+          type: string
+          enum: [android, ios]
+
+    PushTokenRevocation:
+      type: object
+      additionalProperties: false
+      required: [token]
+      properties:
+        token:
+          type: string
+          maxLength: 4096

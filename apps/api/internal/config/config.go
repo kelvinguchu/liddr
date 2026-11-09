@@ -68,6 +68,7 @@ type Config struct {
 	DataKey          Secret
 	OpsAllowedNets   []netip.Prefix
 	Documents        Documents
+	Push             Push
 	SMS              SMS
 	GoogleMapsKey    Secret
 	GoogleRoutesURL  string
@@ -82,6 +83,15 @@ func LoadDatabaseURL(getenv func(string) string) (Secret, error) {
 		return "", errors.New("DATABASE_URL is required")
 	}
 	return url, nil
+}
+
+// Push configures Firebase. An empty ProjectID leaves notifications in the app
+// inbox, and the server logs that at startup.
+type Push struct {
+	ProjectID      string
+	ServiceAccount Secret
+	BaseURL        string
+	TokenURL       string
 }
 
 // Documents configures driver document storage. An empty Bucket means uploads
@@ -186,6 +196,16 @@ func Load(getenv func(string) string) (Config, error) {
 		if cfg.Documents.ClamAVAddr == "" {
 			errs = append(errs, errors.New("CLAMAV_ADDR is required with GCS_BUCKET"))
 		}
+	}
+
+	cfg.Push = Push{
+		ProjectID:      getenv("FCM_PROJECT_ID"),
+		ServiceAccount: Secret(getenv("FCM_SERVICE_ACCOUNT_JSON")),
+		BaseURL:        withDefault(getenv("FCM_BASE_URL"), "https://fcm.googleapis.com"),
+		TokenURL:       withDefault(getenv("GOOGLE_TOKEN_URL"), "https://oauth2.googleapis.com/token"),
+	}
+	if cfg.Push.ProjectID != "" && cfg.Push.ServiceAccount == "" {
+		errs = append(errs, errors.New("FCM_SERVICE_ACCOUNT_JSON is required with FCM_PROJECT_ID"))
 	}
 
 	hops, err := strconv.Atoi(withDefault(getenv("TRUSTED_PROXY_HOPS"), "0"))

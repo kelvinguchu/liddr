@@ -6,6 +6,7 @@ import (
 
 	"github.com/kelvinguchu/liddr/apps/api/internal/auth"
 	"github.com/kelvinguchu/liddr/apps/api/internal/dispatch"
+	"github.com/kelvinguchu/liddr/apps/api/internal/notifications"
 	"github.com/kelvinguchu/liddr/apps/api/internal/payments"
 	"github.com/kelvinguchu/liddr/apps/api/internal/rides"
 	"github.com/kelvinguchu/liddr/apps/api/internal/subscriptions"
@@ -81,6 +82,8 @@ var problems = []problem{
 	{verification.ErrSelfReview, http.StatusForbidden, "SELF_REVIEW", "You cannot review your own documents."},
 	{verification.ErrDocumentNotReady, http.StatusConflict, "DOCUMENT_NOT_READY", "This document cannot be reviewed yet."},
 	{verification.ErrDocumentsMissing, http.StatusConflict, "DOCUMENTS_INCOMPLETE", "Every required document must be validated first."},
+	{notifications.ErrNotFound, http.StatusNotFound, "NOT_FOUND", "That notification could not be found."},
+	{notifications.ErrInvalidToken, http.StatusBadRequest, "INVALID_PUSH_TOKEN", "That device token is not valid."},
 	{payments.ErrInvalidCallback, http.StatusBadRequest, "INVALID_CALLBACK", "The callback could not be read."},
 }
 

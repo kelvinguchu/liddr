@@ -48,6 +48,29 @@ type Publisher interface {
 	PublishEvent(ctx context.Context, arg store.PublishEventParams) error
 }
 
+// Recorder can also write to the durable inbox.
+type Recorder interface {
+	Publisher
+	InsertNotifications(ctx context.Context, arg store.InsertNotificationsParams) error
+}
+
+// Notify records event in each recipient's inbox, for push and for a client
+// that was offline, and then sends it live. Use it for anything a person must
+// not miss. Location and other rapidly superseded updates use Publish.
+func Notify(ctx context.Context, r Recorder, event Event, to ...uuid.UUID) error {
+	var status *string
+	if event.Status != "" {
+		status = &event.Status
+	}
+	err := r.InsertNotifications(ctx, store.InsertNotificationsParams{
+		EventType: event.Type, RideID: event.RideID, OfferID: event.OfferID, Status: status, Recipients: to,
+	})
+	if err != nil {
+		return fmt.Errorf("record notification: %w", err)
+	}
+	return Publish(ctx, r, event, to...)
+}
+
 // Publish sends event to recipients. Within a transaction it takes effect on
 // commit, and it disappears on rollback.
 func Publish(ctx context.Context, p Publisher, event Event, to ...uuid.UUID) error {

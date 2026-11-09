@@ -216,6 +216,10 @@ func revokeFamily(ctx context.Context, q *store.Queries, session store.GetSessio
 	if err != nil {
 		return fmt.Errorf("revoke session family: %w", err)
 	}
+	// A device that signed out must stop receiving this account's pushes.
+	if err := q.RevokeFamilyPushTokens(ctx, store.RevokeFamilyPushTokensParams{Now: new(now), FamilyID: session.FamilyID}); err != nil {
+		return fmt.Errorf("revoke push tokens: %w", err)
+	}
 	return audit(ctx, q, auditEntry{
 		action: "auth.session_revoked." + reason,
 		userID: new(session.UserID),

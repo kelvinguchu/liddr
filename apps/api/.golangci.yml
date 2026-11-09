@@ -27,6 +27,8 @@ linters:
             - "**/internal/events/**"
             - "**/internal/geo/**"
             - "**/internal/maps/**"
+            - "**/internal/notifications/**"
+            - "**/internal/push/**"
             - "**/internal/malware/**"
             - "**/internal/storage/**"
             - "**/internal/verification/**"

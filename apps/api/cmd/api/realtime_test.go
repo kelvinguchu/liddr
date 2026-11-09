@@ -135,6 +135,14 @@ func TestLiveUpdatesReachTheRightPeople(t *testing.T) {
 		t.Errorf("location event = %v", got)
 	}
 
+	inbox := send(t, http.MethodGet, baseURL+"/v1/notifications", driver, nil)
+	if list, _ := inbox.body["data"].([]any); inbox.status != http.StatusOK || len(list) == 0 {
+		t.Errorf("driver inbox = %d %v, want the offer", inbox.status, inbox.body)
+	}
+	if got := send(t, http.MethodGet, baseURL+"/v1/notifications", stranger, nil); len(got.body["data"].([]any)) != 0 {
+		t.Errorf("stranger inbox = %v", got.body)
+	}
+
 	// Nothing above concerned this account, so its socket must have nothing to read.
 	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 	defer cancel()

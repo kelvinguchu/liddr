@@ -124,6 +124,24 @@ func (e PrepareUploadRequestContentType) Valid() bool {
 	}
 }
 
+// Defines values for PushTokenRegistrationPlatform.
+const (
+	Android PushTokenRegistrationPlatform = "android"
+	Ios     PushTokenRegistrationPlatform = "ios"
+)
+
+// Valid indicates whether the value is a known member of the PushTokenRegistrationPlatform enum.
+func (e PushTokenRegistrationPlatform) Valid() bool {
+	switch e {
+	case Android:
+		return true
+	case Ios:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ReviewRequestDecision.
 const (
 	Approve             ReviewRequestDecision = "approve"
@@ -407,6 +425,27 @@ type MpesaAck struct {
 // MpesaCallback A Daraja callback body. Its shape is owned by Safaricom.
 type MpesaCallback map[string]interface{}
 
+// Notification defines model for Notification.
+type Notification struct {
+	AckedAt   *time.Time          `json:"acked_at,omitempty"`
+	CreatedAt time.Time           `json:"created_at"`
+	EventType string              `json:"event_type"`
+	Id        openapi_types.UUID  `json:"id"`
+	OfferId   *openapi_types.UUID `json:"offer_id,omitempty"`
+	RideId    *openapi_types.UUID `json:"ride_id,omitempty"`
+	Status    *string             `json:"status,omitempty"`
+}
+
+// NotificationList defines model for NotificationList.
+type NotificationList struct {
+	Data []Notification `json:"data"`
+}
+
+// NotificationSummary defines model for NotificationSummary.
+type NotificationSummary struct {
+	Unread int64 `json:"unread"`
+}
+
 // Offer defines model for Offer.
 type Offer struct {
 	DistanceToPickupM int32              `json:"distance_to_pickup_m"`
@@ -455,6 +494,20 @@ type PrepareUploadRequest struct {
 
 // PrepareUploadRequestContentType defines model for PrepareUploadRequest.ContentType.
 type PrepareUploadRequestContentType string
+
+// PushTokenRegistration defines model for PushTokenRegistration.
+type PushTokenRegistration struct {
+	Platform PushTokenRegistrationPlatform `json:"platform"`
+	Token    string                        `json:"token"`
+}
+
+// PushTokenRegistrationPlatform defines model for PushTokenRegistration.Platform.
+type PushTokenRegistrationPlatform string
+
+// PushTokenRevocation defines model for PushTokenRevocation.
+type PushTokenRevocation struct {
+	Token string `json:"token"`
+}
 
 // Quote defines model for Quote.
 type Quote struct {
@@ -742,6 +795,12 @@ type BeginTotpSetupParams struct {
 	XStepUpToken *StepUpToken `json:"X-Step-Up-Token,omitempty"`
 }
 
+// ListNotificationsParams defines parameters for ListNotifications.
+type ListNotificationsParams struct {
+	IncludeAcked *bool  `form:"include_acked,omitempty" json:"include_acked,omitempty"`
+	Limit        *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // ListVerificationApplicationsParams defines parameters for ListVerificationApplications.
 type ListVerificationApplicationsParams struct {
 	Status ListVerificationApplicationsParamsStatus `form:"status" json:"status"`
@@ -781,6 +840,12 @@ type ReviewVerificationApplicationJSONRequestBody = ReviewRequest
 
 // ReviewVerificationDocumentJSONRequestBody defines body for ReviewVerificationDocument for application/json ContentType.
 type ReviewVerificationDocumentJSONRequestBody = ReviewRequest
+
+// RegisterPushTokenJSONRequestBody defines body for RegisterPushToken for application/json ContentType.
+type RegisterPushTokenJSONRequestBody = PushTokenRegistration
+
+// RevokePushTokenJSONRequestBody defines body for RevokePushToken for application/json ContentType.
+type RevokePushTokenJSONRequestBody = PushTokenRevocation
 
 // BookRideJSONRequestBody defines body for BookRide for application/json ContentType.
 type BookRideJSONRequestBody = BookRideRequest
@@ -862,6 +927,15 @@ type ServerInterface interface {
 	// GetMe Return the signed-in account
 	// (GET /v1/me)
 	GetMe(w http.ResponseWriter, r *http.Request)
+	// ListNotifications List the signed-in user's notifications, newest first
+	// (GET /v1/notifications)
+	ListNotifications(w http.ResponseWriter, r *http.Request, params ListNotificationsParams)
+	// GetNotificationSummary Count unread notifications
+	// (GET /v1/notifications/summary)
+	GetNotificationSummary(w http.ResponseWriter, r *http.Request)
+	// AckNotification Mark a notification read
+	// (POST /v1/notifications/{notification_id}/ack)
+	AckNotification(w http.ResponseWriter, r *http.Request, notificationId openapi_types.UUID)
 	// AcceptOffer Accept an offer
 	// (POST /v1/offers/{offer_id}/accept)
 	AcceptOffer(w http.ResponseWriter, r *http.Request, offerId OfferId)
@@ -883,6 +957,12 @@ type ServerInterface interface {
 	// ReviewVerificationDocument Decide on one document
 	// (POST /v1/ops/verification/documents/{document_id}/review)
 	ReviewVerificationDocument(w http.ResponseWriter, r *http.Request, documentId DocumentId)
+	// RegisterPushToken Register this device for push notifications
+	// (PUT /v1/push-tokens)
+	RegisterPushToken(w http.ResponseWriter, r *http.Request)
+	// RevokePushToken Stop push notifications to this device
+	// (POST /v1/push-tokens/revoke)
+	RevokePushToken(w http.ResponseWriter, r *http.Request)
 	// BookRide Book a quoted trip. Repeating the call returns the same ride.
 	// (POST /v1/rides)
 	BookRide(w http.ResponseWriter, r *http.Request)
@@ -1265,6 +1345,110 @@ func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request)
 	handler.ServeHTTP(w, r)
 }
 
+// ListNotifications operation middleware
+func (siw *ServerInterfaceWrapper) ListNotifications(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider", "driver"})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListNotificationsParams
+
+	// ------------- Optional query parameter "include_acked" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "include_acked", r.URL.Query(), &params.IncludeAcked, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "include_acked"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "include_acked", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListNotifications(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetNotificationSummary operation middleware
+func (siw *ServerInterfaceWrapper) GetNotificationSummary(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider", "driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetNotificationSummary(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AckNotification operation middleware
+func (siw *ServerInterfaceWrapper) AckNotification(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "notification_id" -------------
+	var notificationId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "notification_id", r.PathValue("notification_id"), &notificationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "notification_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider", "driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AckNotification(w, r, notificationId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // AcceptOffer operation middleware
 func (siw *ServerInterfaceWrapper) AcceptOffer(w http.ResponseWriter, r *http.Request) {
 
@@ -1513,6 +1697,46 @@ func (siw *ServerInterfaceWrapper) ReviewVerificationDocument(w http.ResponseWri
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ReviewVerificationDocument(w, r, documentId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RegisterPushToken operation middleware
+func (siw *ServerInterfaceWrapper) RegisterPushToken(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider", "driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RegisterPushToken(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevokePushToken operation middleware
+func (siw *ServerInterfaceWrapper) RevokePushToken(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider", "driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokePushToken(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2181,6 +2405,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/ops/verification/applications/{application_id}/review", wrapper.ReviewVerificationApplication)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/ops/verification/documents/{document_id}/review", wrapper.ReviewVerificationDocument)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/ops/verification/documents/{document_id}/download", wrapper.DownloadVerificationDocument)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/notifications", wrapper.ListNotifications)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/notifications/summary", wrapper.GetNotificationSummary)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/notifications/{notification_id}/ack", wrapper.AckNotification)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/v1/push-tokens", wrapper.RegisterPushToken)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/push-tokens/revoke", wrapper.RevokePushToken)
 
 	return m
 }
@@ -2789,6 +3018,116 @@ func (response GetMe200JSONResponse) VisitGetMeResponse(w http.ResponseWriter) e
 	return err
 }
 
+type ListNotificationsRequestObject struct {
+	Params ListNotificationsParams
+}
+
+type ListNotificationsResponseObject interface {
+	VisitListNotificationsResponse(w http.ResponseWriter) error
+}
+
+type ListNotifications200JSONResponse NotificationList
+
+func (response ListNotifications200JSONResponse) VisitListNotificationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListNotificationsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListNotificationsdefaultJSONResponse) VisitListNotificationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNotificationSummaryRequestObject struct {
+}
+
+type GetNotificationSummaryResponseObject interface {
+	VisitGetNotificationSummaryResponse(w http.ResponseWriter) error
+}
+
+type GetNotificationSummary200JSONResponse NotificationSummary
+
+func (response GetNotificationSummary200JSONResponse) VisitGetNotificationSummaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetNotificationSummarydefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetNotificationSummarydefaultJSONResponse) VisitGetNotificationSummaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AckNotificationRequestObject struct {
+	NotificationId openapi_types.UUID `json:"notification_id"`
+}
+
+type AckNotificationResponseObject interface {
+	VisitAckNotificationResponse(w http.ResponseWriter) error
+}
+
+type AckNotification204Response struct {
+}
+
+func (response AckNotification204Response) VisitAckNotificationResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type AckNotificationdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response AckNotificationdefaultJSONResponse) VisitAckNotificationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type AcceptOfferRequestObject struct {
 	OfferId OfferId `json:"offer_id"`
 }
@@ -3035,6 +3374,72 @@ type ReviewVerificationDocumentdefaultJSONResponse struct {
 }
 
 func (response ReviewVerificationDocumentdefaultJSONResponse) VisitReviewVerificationDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegisterPushTokenRequestObject struct {
+	Body *RegisterPushTokenJSONRequestBody
+}
+
+type RegisterPushTokenResponseObject interface {
+	VisitRegisterPushTokenResponse(w http.ResponseWriter) error
+}
+
+type RegisterPushToken204Response struct {
+}
+
+func (response RegisterPushToken204Response) VisitRegisterPushTokenResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RegisterPushTokendefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response RegisterPushTokendefaultJSONResponse) VisitRegisterPushTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokePushTokenRequestObject struct {
+	Body *RevokePushTokenJSONRequestBody
+}
+
+type RevokePushTokenResponseObject interface {
+	VisitRevokePushTokenResponse(w http.ResponseWriter) error
+}
+
+type RevokePushToken204Response struct {
+}
+
+func (response RevokePushToken204Response) VisitRevokePushTokenResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RevokePushTokendefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response RevokePushTokendefaultJSONResponse) VisitRevokePushTokenResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -3873,6 +4278,15 @@ type StrictServerInterface interface {
 	// GetMe Return the signed-in account
 	// (GET /v1/me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
+	// ListNotifications List the signed-in user's notifications, newest first
+	// (GET /v1/notifications)
+	ListNotifications(ctx context.Context, request ListNotificationsRequestObject) (ListNotificationsResponseObject, error)
+	// GetNotificationSummary Count unread notifications
+	// (GET /v1/notifications/summary)
+	GetNotificationSummary(ctx context.Context, request GetNotificationSummaryRequestObject) (GetNotificationSummaryResponseObject, error)
+	// AckNotification Mark a notification read
+	// (POST /v1/notifications/{notification_id}/ack)
+	AckNotification(ctx context.Context, request AckNotificationRequestObject) (AckNotificationResponseObject, error)
 	// AcceptOffer Accept an offer
 	// (POST /v1/offers/{offer_id}/accept)
 	AcceptOffer(ctx context.Context, request AcceptOfferRequestObject) (AcceptOfferResponseObject, error)
@@ -3894,6 +4308,12 @@ type StrictServerInterface interface {
 	// ReviewVerificationDocument Decide on one document
 	// (POST /v1/ops/verification/documents/{document_id}/review)
 	ReviewVerificationDocument(ctx context.Context, request ReviewVerificationDocumentRequestObject) (ReviewVerificationDocumentResponseObject, error)
+	// RegisterPushToken Register this device for push notifications
+	// (PUT /v1/push-tokens)
+	RegisterPushToken(ctx context.Context, request RegisterPushTokenRequestObject) (RegisterPushTokenResponseObject, error)
+	// RevokePushToken Stop push notifications to this device
+	// (POST /v1/push-tokens/revoke)
+	RevokePushToken(ctx context.Context, request RevokePushTokenRequestObject) (RevokePushTokenResponseObject, error)
 	// BookRide Book a quoted trip. Repeating the call returns the same ride.
 	// (POST /v1/rides)
 	BookRide(ctx context.Context, request BookRideRequestObject) (BookRideResponseObject, error)
@@ -4437,6 +4857,82 @@ func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ListNotifications operation middleware
+func (sh *strictHandler) ListNotifications(w http.ResponseWriter, r *http.Request, params ListNotificationsParams) {
+	var request ListNotificationsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListNotifications(ctx, request.(ListNotificationsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListNotifications")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListNotificationsResponseObject); ok {
+		if err := validResponse.VisitListNotificationsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetNotificationSummary operation middleware
+func (sh *strictHandler) GetNotificationSummary(w http.ResponseWriter, r *http.Request) {
+	var request GetNotificationSummaryRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetNotificationSummary(ctx, request.(GetNotificationSummaryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetNotificationSummary")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetNotificationSummaryResponseObject); ok {
+		if err := validResponse.VisitGetNotificationSummaryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AckNotification operation middleware
+func (sh *strictHandler) AckNotification(w http.ResponseWriter, r *http.Request, notificationId openapi_types.UUID) {
+	var request AckNotificationRequestObject
+
+	request.NotificationId = notificationId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AckNotification(ctx, request.(AckNotificationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AckNotification")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AckNotificationResponseObject); ok {
+		if err := validResponse.VisitAckNotificationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // AcceptOffer operation middleware
 func (sh *strictHandler) AcceptOffer(w http.ResponseWriter, r *http.Request, offerId OfferId) {
 	var request AcceptOfferRequestObject
@@ -4626,6 +5122,68 @@ func (sh *strictHandler) ReviewVerificationDocument(w http.ResponseWriter, r *ht
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ReviewVerificationDocumentResponseObject); ok {
 		if err := validResponse.VisitReviewVerificationDocumentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RegisterPushToken operation middleware
+func (sh *strictHandler) RegisterPushToken(w http.ResponseWriter, r *http.Request) {
+	var request RegisterPushTokenRequestObject
+
+	var body RegisterPushTokenJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RegisterPushToken(ctx, request.(RegisterPushTokenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RegisterPushToken")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RegisterPushTokenResponseObject); ok {
+		if err := validResponse.VisitRegisterPushTokenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokePushToken operation middleware
+func (sh *strictHandler) RevokePushToken(w http.ResponseWriter, r *http.Request) {
+	var request RevokePushTokenRequestObject
+
+	var body RevokePushTokenJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokePushToken(ctx, request.(RevokePushTokenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokePushToken")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokePushTokenResponseObject); ok {
+		if err := validResponse.VisitRevokePushTokenResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

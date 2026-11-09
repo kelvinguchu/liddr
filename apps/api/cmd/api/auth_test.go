@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/kelvinguchu/liddr/apps/api/internal/testdb"
 )
@@ -88,6 +91,20 @@ func sendWithHeader(t *testing.T, method, target, bearer, headerName, headerValu
 	return parsed
 }
 
+// assertDeviceSignedOut proves a signed-out phone stops receiving pushes.
+func assertDeviceSignedOut(t *testing.T, databaseURL string) {
+	t.Helper()
+	db, err := pgx.Connect(t.Context(), databaseURL)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer func() { _ = db.Close(context.WithoutCancel(t.Context())) }() // Only an assertion used it.
+	var active int
+	if err := db.QueryRow(t.Context(), `SELECT count(*) FROM push_tokens WHERE revoked_at IS NULL`).Scan(&active); err != nil || active != 0 {
+		t.Errorf("devices still registered after logout = %d, %v", active, err)
+	}
+}
+
 func signIn(t *testing.T, baseURL string, stub *smsStub, phone, role string) map[string]any {
 	t.Helper()
 	requested := send(t, http.MethodPost, baseURL+"/v1/auth/otp/request", "", map[string]string{"phone": phone, "role": role})
@@ -134,6 +151,10 @@ func TestSignInLifecycleEndToEnd(t *testing.T) {
 
 	newAccess, _ := rotated.body["access_token"].(string)
 	newRefresh, _ := rotated.body["refresh_token"].(string)
+	device := map[string]string{"token": "device-registration-token", "platform": "android"}
+	if got := send(t, http.MethodPut, baseURL+"/v1/push-tokens", newAccess, device); got.status != http.StatusNoContent {
+		t.Fatalf("register device = %d %v", got.status, got.body)
+	}
 	logout := send(t, http.MethodPost, baseURL+"/v1/auth/logout", "", map[string]string{"refresh_token": newRefresh})
 	if logout.status != http.StatusNoContent {
 		t.Fatalf("logout = %d %v", logout.status, logout.body)
@@ -141,6 +162,8 @@ func TestSignInLifecycleEndToEnd(t *testing.T) {
 	if got := send(t, http.MethodGet, baseURL+"/v1/me", newAccess, nil); got.status != http.StatusUnauthorized {
 		t.Errorf("access token after logout = %d, want 401", got.status)
 	}
+
+	assertDeviceSignedOut(t, databaseURL)
 
 	logs := output.String()
 	for _, secret := range []string{access, refresh, newAccess, newRefresh, stub.lastCode(), "254712345678"} {

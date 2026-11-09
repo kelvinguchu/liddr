@@ -55,6 +55,7 @@ func TestLoadAppliesDefaults(t *testing.T) {
 		AuthHMACKey:     testHMACKey,
 		DataKey:         Secret("\x00\x01\x02\x03\x04\x05\x06\a\b\t\n\v\f\r\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f"),
 		Documents:       Documents{BaseURL: "https://storage.googleapis.com"},
+		Push:            Push{BaseURL: "https://fcm.googleapis.com", TokenURL: "https://oauth2.googleapis.com/token"},
 		GoogleMapsKey:   "maps-key",
 		GoogleRoutesURL: "https://routes.googleapis.com",
 		Mpesa: Mpesa{
@@ -90,6 +91,7 @@ func TestLoadRejectsInvalidValues(t *testing.T) {
 		{"bad ops range", "OPS_ALLOWED_CIDRS", "not-a-range", "OPS_ALLOWED_CIDRS must be"},
 		{"bucket without account", "GCS_BUCKET", "bucket", "GCS_SERVICE_ACCOUNT_JSON is required"},
 		{"bucket without scanner", "GCS_BUCKET", "bucket", "CLAMAV_ADDR is required"},
+		{"push without account", "FCM_PROJECT_ID", "liddr", "FCM_SERVICE_ACCOUNT_JSON is required"},
 		{"missing hmac key", "AUTH_HMAC_KEY", "", "AUTH_HMAC_KEY is required"},
 		{"short hmac key", "AUTH_HMAC_KEY", "too-short", "AUTH_HMAC_KEY must be at least"},
 		{"missing sms url", "HOSTPINNACLE_API_URL", "", "HOSTPINNACLE_API_URL is required"},

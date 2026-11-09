@@ -96,6 +96,10 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	inbox, err := newNotifications(cfg, pool, logger)
+	if err != nil {
+		return err
+	}
 	dispatcher := dispatch.NewService(dispatch.Config{Pool: pool, Now: time.Now})
 	billing := newSubscriptions(cfg, pool, logger)
 	hub := realtime.NewHub(logger)
@@ -112,6 +116,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		Dispatch:         dispatcher,
 		Subscriptions:    billing,
 		Verification:     documents,
+		Notifications:    inbox,
 		Realtime:         hub,
 		RealtimeBase:     ctx,
 		RealtimeOrigins:  cfg.RealtimeOrigins,
@@ -144,6 +149,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	workers.Go(func() { billing.Run(workerCtx, logger) })
 	workers.Go(func() { hub.Listen(workerCtx, pool) })
 	workers.Go(func() { documents.Run(workerCtx) })
+	workers.Go(func() { inbox.Run(workerCtx) })
 	defer workers.Wait()
 	defer stopWorkers()
 

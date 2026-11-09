@@ -160,5 +160,5 @@ func recordReview(ctx context.Context, q *store.Queries, e reviewEntry) error {
 }
 
 func notify(ctx context.Context, q *store.Queries, driverID uuid.UUID, status string) error {
-	return events.Publish(ctx, q, events.Event{Type: events.TypeVerificationUpdated, Status: status}, driverID)
+	return events.Notify(ctx, q, events.Event{Type: events.TypeVerificationUpdated, Status: status}, driverID)
 }

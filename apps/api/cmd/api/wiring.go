@@ -11,7 +11,9 @@ import (
 	"github.com/kelvinguchu/liddr/apps/api/internal/auth"
 	"github.com/kelvinguchu/liddr/apps/api/internal/config"
 	"github.com/kelvinguchu/liddr/apps/api/internal/malware"
+	"github.com/kelvinguchu/liddr/apps/api/internal/notifications"
 	"github.com/kelvinguchu/liddr/apps/api/internal/payments"
+	"github.com/kelvinguchu/liddr/apps/api/internal/push"
 	"github.com/kelvinguchu/liddr/apps/api/internal/sealing"
 	"github.com/kelvinguchu/liddr/apps/api/internal/sms"
 	"github.com/kelvinguchu/liddr/apps/api/internal/storage"
@@ -74,6 +76,24 @@ func newVerification(cfg config.Config, pool *pgxpool.Pool, logger *slog.Logger)
 		service.Scanner = malware.New(cfg.Documents.ClamAVAddr)
 	}
 	return verification.NewService(service), nil
+}
+
+func newNotifications(cfg config.Config, pool *pgxpool.Pool, logger *slog.Logger) (*notifications.Service, error) {
+	service := notifications.Config{Pool: pool, Now: time.Now, Logger: logger}
+	if cfg.Push.ProjectID != "" {
+		client, err := push.New(push.Config{
+			BaseURL:            cfg.Push.BaseURL,
+			TokenURL:           cfg.Push.TokenURL,
+			ProjectID:          cfg.Push.ProjectID,
+			ServiceAccountJSON: cfg.Push.ServiceAccount.Reveal(),
+			Now:                time.Now,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("configure push: %w", err)
+		}
+		service.Push = client
+	}
+	return notifications.NewService(service), nil
 }
 
 func newGateway(cfg config.Config) *payments.Client {

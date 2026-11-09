@@ -35,6 +35,7 @@ func toAPIRide(r rides.Ride) Ride {
 		RequestedAt: r.RequestedAt,
 		DriverId:    r.DriverID,
 	}
+	out.Driver, out.Rider = toDriverCard(r.Driver), toRiderCard(r.Rider)
 	if r.DriverLocation != nil {
 		out.DriverLocation = new(fromPoint(*r.DriverLocation))
 	}

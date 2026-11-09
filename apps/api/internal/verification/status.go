@@ -87,6 +87,7 @@ type QueueItem struct {
 	DriverID     uuid.UUID
 	DriverStatus string
 	PlateNumber  *string
+	FullName     *string
 	PhoneMasked  string
 }
 
@@ -110,6 +111,7 @@ func (s *Service) ListApplications(ctx context.Context, status string, limit, of
 			DriverID:     row.DriverID,
 			DriverStatus: row.DriverStatus,
 			PlateNumber:  row.PlateNumber,
+			FullName:     row.DisplayName,
 			PhoneMasked:  maskPhone(row.Phone),
 		}
 	}
@@ -147,6 +149,7 @@ func (s *Service) GetApplication(ctx context.Context, id uuid.UUID) (Application
 		DriverID:     row.DriverID,
 		DriverStatus: row.DriverStatus,
 		PlateNumber:  row.PlateNumber,
+		FullName:     row.DisplayName,
 		PhoneMasked:  maskPhone(row.Phone),
 		Documents:    make([]ReviewDocument, len(live)),
 	}
@@ -171,6 +174,9 @@ func (s *Service) DownloadURL(ctx context.Context, documentID uuid.UUID, actor A
 	}
 	if doc.ScanStatus != scanClean {
 		return "", time.Time{}, ErrDocumentNotReady
+	}
+	if doc.PurgedAt != nil {
+		return "", time.Time{}, ErrNotFound
 	}
 	url, err := s.storage.SignDownload(doc.StorageKey, downloadTTL)
 	if err != nil {

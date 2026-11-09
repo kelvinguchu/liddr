@@ -123,7 +123,8 @@ WHERE id = sqlc.arg(id) AND status = 'searching';
 
 -- Pickup is shown so a driver can decide. Dropoff is shown only after accepting.
 -- name: ListOpenOffersForDriver :many
-SELECT o.id, o.ride_id, o.distance_m, o.expires_at, r.pickup_lat, r.pickup_lng, COALESCE((SELECT sum(m.fare_kes)::integer FROM shared_members AS m WHERE m.ride_id = r.id AND m.status NOT IN ('cancelled', 'no_show')), r.fare_kes)::integer AS fare_kes
+SELECT o.id, o.ride_id, o.distance_m, o.expires_at, r.pickup_lat, r.pickup_lng, COALESCE((SELECT sum(m.fare_kes)::integer FROM shared_members AS m WHERE m.ride_id = r.id AND m.status NOT IN ('cancelled', 'no_show')), r.fare_kes)::integer AS fare_kes, r.product_type, u.rating_centi, u.rating_count
 FROM ride_offers AS o
 JOIN rides AS r ON r.id = o.ride_id
+JOIN users AS u ON u.id = r.rider_id
 WHERE o.driver_id = sqlc.arg(driver_id) AND o.status = 'offered' AND o.expires_at > sqlc.arg(now);

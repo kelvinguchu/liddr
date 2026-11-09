@@ -13,6 +13,7 @@ import (
 	"github.com/kelvinguchu/liddr/apps/api/internal/geo"
 	"github.com/kelvinguchu/liddr/apps/api/internal/maps"
 	"github.com/kelvinguchu/liddr/apps/api/internal/moderation"
+	"github.com/kelvinguchu/liddr/apps/api/internal/storage"
 	"github.com/kelvinguchu/liddr/apps/api/internal/store"
 )
 
@@ -67,7 +68,9 @@ type Config struct {
 	Routes RouteFinder
 	// Moderation applies suspensions for repeated cancellations.
 	Moderation *moderation.Service
-	Now        func() time.Time
+	// Storage signs driver photo links. Without it, drivers have no photo.
+	Storage *storage.Client
+	Now     func() time.Time
 }
 
 // Service implements quoting, booking and the trip lifecycle.
@@ -77,11 +80,12 @@ type Service struct {
 	routes     RouteFinder
 	now        func() time.Time
 	moderation *moderation.Service
+	storage    *storage.Client
 }
 
 // NewService returns a Service using cfg.
 func NewService(cfg Config) *Service {
-	return &Service{pool: cfg.Pool, queries: store.New(cfg.Pool), routes: cfg.Routes, moderation: cfg.Moderation, now: cfg.Now}
+	return &Service{pool: cfg.Pool, queries: store.New(cfg.Pool), routes: cfg.Routes, moderation: cfg.Moderation, storage: cfg.Storage, now: cfg.Now}
 }
 
 // Ride is a ride as shown to one of its participants.
@@ -95,6 +99,8 @@ type Ride struct {
 	DriverID       *uuid.UUID
 	DriverLocation *geo.Point
 	PaymentMode    *string
+	Driver         *DriverCard
+	Rider          *RiderCard
 }
 
 func toRide(row store.Ride) Ride {
@@ -148,6 +154,9 @@ func (s *Service) Get(ctx context.Context, rideID, actorID uuid.UUID) (Ride, err
 		case !errors.Is(err, pgx.ErrNoRows):
 			return Ride{}, fmt.Errorf("load driver location: %w", err)
 		}
+	}
+	if err := s.attachCard(ctx, row, &ride, sees, isDriver); err != nil {
+		return Ride{}, err
 	}
 	return ride, nil
 }

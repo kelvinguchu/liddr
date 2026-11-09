@@ -95,12 +95,18 @@ func TestDriverVerificationEndToEnd(t *testing.T) {
 		}
 	}
 
-	if got := send(t, http.MethodPost, base+"/v1/verification/applications", driver, map[string]string{"plate_number": "nonsense"}); got.status != http.StatusBadRequest {
+	if got := send(t, http.MethodPost, base+"/v1/verification/applications", driver, map[string]any{"plate_number": "nonsense", "full_name": "Asha Njeri", "photo_consent": true}); got.status != http.StatusBadRequest {
 		t.Errorf("bad plate = %d %v", got.status, got.body)
 	}
-	application := send(t, http.MethodPost, base+"/v1/verification/applications", driver, map[string]string{"plate_number": "kmfb 123a"})
+	if got := send(t, http.MethodPost, base+"/v1/verification/applications", driver, map[string]any{"plate_number": "kmfb 123a", "full_name": "Asha Njeri", "photo_consent": false}); got.status != http.StatusUnprocessableEntity || got.body["code"] != "PHOTO_CONSENT_REQUIRED" {
+		t.Errorf("no consent = %d %v", got.status, got.body)
+	}
+	application := send(t, http.MethodPost, base+"/v1/verification/applications", driver, map[string]any{"plate_number": "kmfb 123a", "full_name": "Asha Njeri", "photo_consent": true})
 	if application.status != http.StatusCreated {
 		t.Fatalf("start = %d %v", application.status, application.body)
+	}
+	if me := send(t, http.MethodGet, base+"/v1/me", driver, nil); me.body["display_name"] != "Asha Njeri" {
+		t.Errorf("name after applying = %v", me.body["display_name"])
 	}
 
 	// A file promised but never sent, and another driver's upload, are refused.
@@ -205,7 +211,7 @@ func TestUnsafeFilesNeverReachReview(t *testing.T) {
 	if got := send(t, http.MethodPut, base+"/v1/drivers/me", driver, map[string]string{"vehicle_category": "motorbike"}); got.status != http.StatusOK {
 		t.Fatalf("set category = %d", got.status)
 	}
-	if got := send(t, http.MethodPost, base+"/v1/verification/applications", driver, map[string]string{"plate_number": "KMFB123A"}); got.status != http.StatusCreated {
+	if got := send(t, http.MethodPost, base+"/v1/verification/applications", driver, map[string]any{"plate_number": "KMFB123A", "full_name": "Asha Njeri", "photo_consent": true}); got.status != http.StatusCreated {
 		t.Fatalf("start = %d", got.status)
 	}
 

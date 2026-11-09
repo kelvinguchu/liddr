@@ -40,7 +40,7 @@ func (s *Service) Run(ctx context.Context) {
 		case <-scan.C:
 			s.drainScans(ctx)
 		case <-expiry.C:
-			if err := s.ExpireDocuments(ctx); err != nil && ctx.Err() == nil {
+			if err := errors.Join(s.ExpireDocuments(ctx), s.PurgeDocuments(ctx)); err != nil && ctx.Err() == nil {
 				s.logger.LogAttrs(ctx, slog.LevelError, "document expiry failed", slog.Any("error", err))
 			}
 		}

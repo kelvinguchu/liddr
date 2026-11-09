@@ -33,7 +33,7 @@ func (s *Service) Run(ctx context.Context, logger *slog.Logger) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if err := errors.Join(s.Reconcile(ctx), s.ExpireLapsed(ctx)); err != nil && !errors.Is(err, context.Canceled) {
+			if err := errors.Join(s.Reconcile(ctx), s.ExpireLapsed(ctx), s.RemindRenewals(ctx)); err != nil && !errors.Is(err, context.Canceled) {
 				logger.LogAttrs(ctx, slog.LevelError, "subscription cycle failed", slog.Any("error", err))
 			}
 		}

@@ -123,5 +123,9 @@ func (a *API) GetMe(ctx context.Context, _ GetMeRequestObject) (GetMeResponseObj
 	if !ok {
 		return nil, errNoPrincipal
 	}
-	return GetMe200JSONResponse{Id: p.UserID, Phone: p.Phone, Roles: toRoles(p.Roles)}, nil
+	name, err := a.deps.Auth.DisplayName(ctx, p.UserID)
+	if err != nil {
+		return nil, err
+	}
+	return GetMe200JSONResponse{Id: p.UserID, Phone: p.Phone, Roles: toRoles(p.Roles), DisplayName: name}, nil
 }

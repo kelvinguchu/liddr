@@ -326,9 +326,10 @@ func (q *Queries) ListDriverCandidates(ctx context.Context, arg ListDriverCandid
 }
 
 const listOpenOffersForDriver = `-- name: ListOpenOffersForDriver :many
-SELECT o.id, o.ride_id, o.distance_m, o.expires_at, r.pickup_lat, r.pickup_lng, COALESCE((SELECT sum(m.fare_kes)::integer FROM shared_members AS m WHERE m.ride_id = r.id AND m.status NOT IN ('cancelled', 'no_show')), r.fare_kes)::integer AS fare_kes
+SELECT o.id, o.ride_id, o.distance_m, o.expires_at, r.pickup_lat, r.pickup_lng, COALESCE((SELECT sum(m.fare_kes)::integer FROM shared_members AS m WHERE m.ride_id = r.id AND m.status NOT IN ('cancelled', 'no_show')), r.fare_kes)::integer AS fare_kes, r.product_type, u.rating_centi, u.rating_count
 FROM ride_offers AS o
 JOIN rides AS r ON r.id = o.ride_id
+JOIN users AS u ON u.id = r.rider_id
 WHERE o.driver_id = $1 AND o.status = 'offered' AND o.expires_at > $2
 `
 
@@ -338,13 +339,16 @@ type ListOpenOffersForDriverParams struct {
 }
 
 type ListOpenOffersForDriverRow struct {
-	ID        uuid.UUID
-	RideID    uuid.UUID
-	DistanceM int32
-	ExpiresAt time.Time
-	PickupLat float64
-	PickupLng float64
-	FareKes   int32
+	ID          uuid.UUID
+	RideID      uuid.UUID
+	DistanceM   int32
+	ExpiresAt   time.Time
+	PickupLat   float64
+	PickupLng   float64
+	FareKes     int32
+	ProductType string
+	RatingCenti *int32
+	RatingCount int32
 }
 
 // Pickup is shown so a driver can decide. Dropoff is shown only after accepting.
@@ -365,6 +369,9 @@ func (q *Queries) ListOpenOffersForDriver(ctx context.Context, arg ListOpenOffer
 			&i.PickupLat,
 			&i.PickupLng,
 			&i.FareKes,
+			&i.ProductType,
+			&i.RatingCenti,
+			&i.RatingCount,
 		); err != nil {
 			return nil, err
 		}

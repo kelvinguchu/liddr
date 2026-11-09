@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -116,6 +117,22 @@ func TestSendDeliveryEndToEnd(t *testing.T) {
 	offer := waitForOffer(t, base, driver)
 	if got := send(t, http.MethodPost, fmt.Sprintf("%s/v1/offers/%s/accept", base, offer["id"]), driver, nil); got.status != http.StatusOK {
 		t.Fatalf("accept = %d %v", got.status, got.body)
+	}
+	// The rider sees the driver's approved selfie, through the running server.
+	if _, err := db.Exec(t.Context(), `WITH a AS (
+		INSERT INTO verification_applications (id, driver_id, status, created_at, updated_at)
+		SELECT gen_random_uuid(), user_id, 'approved', now(), now() FROM drivers RETURNING id, driver_id)
+		INSERT INTO verification_documents (id, application_id, driver_id, document_type, version, status, storage_key, content_type, size_bytes, scan_status, created_at, updated_at)
+		SELECT gen_random_uuid(), a.id, a.driver_id, 'driver_selfie_liveness', 1, 'validated', 'selfies/driver.jpg', 'image/jpeg', 1, 'clean', now(), now() FROM a`); err != nil {
+		t.Fatalf("seed selfie: %v", err)
+	}
+	if _, err := db.Exec(t.Context(), `UPDATE drivers SET photo_consent_at = now()`); err != nil {
+		t.Fatalf("record consent: %v", err)
+	}
+	rideView := send(t, http.MethodGet, fmt.Sprintf("%s/v1/rides/%s", base, offer["ride_id"]), sender, nil)
+	card, _ := rideView.body["driver"].(map[string]any)
+	if photo, _ := card["photo_url"].(string); !strings.Contains(photo, "selfies/driver.jpg") {
+		t.Errorf("ride view = %d, driver card %v", rideView.status, card)
 	}
 	if got := send(t, http.MethodPost, ridePath+"/arrived", driver, nil); got.status != http.StatusOK {
 		t.Fatalf("arrived = %d %v", got.status, got.body)

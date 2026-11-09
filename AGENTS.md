@@ -3,7 +3,7 @@
 Ride-hailing and delivery platform for Kenya: Go API, Postgres, Redis, WebSockets, background jobs, M-Pesa, and an Android app.
 
 Layout: `go.work` at the root, the Go API in `apps/api`, the Android app in `apps/android`, and the old Elixir backend in `legacy/api`.
-Product rules: `docs/aboutapp.md` and the policy docs in `docs/`. Status: the API domains in `legacy/api` are ported to Go. Android still needs updating to the new contract. Treat `legacy/api` as a business-rule reference, not as design or proof of correctness.
+Product rules: `docs/aboutapp.md` and the policy docs in `docs/`. Status: the API domains in `legacy/api` are ported to Go. The Android app is launch and sign-in screens only and is not connected to the API yet. Treat `legacy/api` as a business-rule reference, not as design or proof of correctness.
 
 ## Priorities
 

@@ -801,7 +801,7 @@ Kenya enacted the Data Protection Act in 2019. Operating a platform that collect
 •	Users have the right to access, correct, and delete their data — provide in-app data management tools
 •	Data breach notification — if a breach occurs, ODPC must be notified within 72 hours
 •	Location data is sensitive — only collected while app is in active use, not in the background when no ride is active
-•	Biometric data (selfies, face scans) must be stored encrypted and deleted after verification is no longer needed
+•	Biometric data (selfies, face scans) must be stored in private storage and deleted when no longer needed. A driver's approved selfie is also their photo on the rider's trip screen, with the driver's explicit consent recorded when they apply, and riders only ever receive a link that expires after 5 minutes
 
 20.2 NTSA Regulatory Compliance
 •	Boda boda commercial operations require PSV licensing under NTSA regulations
@@ -821,7 +821,8 @@ Historical GPS traces	12 months	Auto-deleted after 12 months — needed for disp
 Ride records	5 years	Legal requirement for financial records
 Payment records	7 years	KRA compliance requirement
 Verification documents (ID, licence)	Duration of account + 1 year	Deleted 1 year after account closure
-Biometric data (face scans)	30 days post-verification	Deleted once verification decision is final
+Driver selfie in use as driver's photo	While the account is open	Deleted 30 days after account closure
+Other selfies (replaced, rejected, or from a rejected application)	30 days	Deleted 30 days after the decision
 Dispute records	3 years	Needed for audit trail and escalation history
 
 
@@ -939,6 +940,7 @@ Passenger below 3.0 sustained	Account review — possible suspension	After ops r
 
 26.7 Rating Display on Driver Profile
 The passenger sees the following on the driver's profile card during the booking confirmation screen:
+•	Driver photo — their approved verification selfie, while the trip is under way
 •	Star rating (1 decimal place — e.g. 4.7) — shown only if above minimum threshold
 •	Total number of completed rides — builds confidence in experienced drivers
 •	New Driver badge — if below threshold

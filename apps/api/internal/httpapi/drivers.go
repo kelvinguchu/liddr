@@ -83,6 +83,7 @@ func (a *API) ListDriverOffers(ctx context.Context, _ ListDriverOffersRequestObj
 			DistanceToPickupM: offer.DistanceToPickupM,
 			FareKes:           offer.FareKES,
 			ExpiresAt:         offer.ExpiresAt,
+			RiderRating:       offer.RiderRating,
 		}
 	}
 	return ListDriverOffers200JSONResponse{Data: data}, nil

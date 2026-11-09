@@ -84,6 +84,7 @@ type Driver struct {
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 	PlateNumber        *string
+	PhotoConsentAt     *time.Time
 }
 
 type DriverLocation struct {
@@ -407,6 +408,7 @@ type Subscription struct {
 	ActivatedAt       *time.Time
 	ExpiredAt         *time.Time
 	CreatedAt         time.Time
+	RemindedAt        *time.Time
 }
 
 type SubscriptionPayment struct {
@@ -451,6 +453,8 @@ type User struct {
 	RatingCount            int32
 	BookingRestrictedUntil *time.Time
 	Email                  *string
+	DisplayName            *string
+	DeletedAt              *time.Time
 }
 
 type UserEnforcement struct {
@@ -526,6 +530,7 @@ type VerificationDocument struct {
 	ReviewedBy       *uuid.UUID
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
+	PurgedAt         *time.Time
 }
 
 type VerificationRequirement struct {

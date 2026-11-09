@@ -264,7 +264,7 @@ func (q *Queries) GetPaymentForUpdate(ctx context.Context, id uuid.UUID) (GetPay
 }
 
 const getSubscriptionByIDForUpdate = `-- name: GetSubscriptionByIDForUpdate :one
-SELECT id, driver_id, vehicle_category_id, week_start, week_end, amount_kes, status, reference, activated_at, expired_at, created_at
+SELECT id, driver_id, vehicle_category_id, week_start, week_end, amount_kes, status, reference, activated_at, expired_at, created_at, reminded_at
 FROM subscriptions WHERE id = $1 FOR UPDATE
 `
 
@@ -283,12 +283,13 @@ func (q *Queries) GetSubscriptionByIDForUpdate(ctx context.Context, id uuid.UUID
 		&i.ActivatedAt,
 		&i.ExpiredAt,
 		&i.CreatedAt,
+		&i.RemindedAt,
 	)
 	return i, err
 }
 
 const getSubscriptionByReference = `-- name: GetSubscriptionByReference :one
-SELECT id, driver_id, vehicle_category_id, week_start, week_end, amount_kes, status, reference, activated_at, expired_at, created_at
+SELECT id, driver_id, vehicle_category_id, week_start, week_end, amount_kes, status, reference, activated_at, expired_at, created_at, reminded_at
 FROM subscriptions WHERE reference = $1
 `
 
@@ -307,12 +308,13 @@ func (q *Queries) GetSubscriptionByReference(ctx context.Context, reference stri
 		&i.ActivatedAt,
 		&i.ExpiredAt,
 		&i.CreatedAt,
+		&i.RemindedAt,
 	)
 	return i, err
 }
 
 const getSubscriptionForWeek = `-- name: GetSubscriptionForWeek :one
-SELECT id, driver_id, vehicle_category_id, week_start, week_end, amount_kes, status, reference, activated_at, expired_at, created_at
+SELECT id, driver_id, vehicle_category_id, week_start, week_end, amount_kes, status, reference, activated_at, expired_at, created_at, reminded_at
 FROM subscriptions
 WHERE driver_id = $1 AND week_start = $2
 FOR UPDATE
@@ -338,6 +340,7 @@ func (q *Queries) GetSubscriptionForWeek(ctx context.Context, arg GetSubscriptio
 		&i.ActivatedAt,
 		&i.ExpiredAt,
 		&i.CreatedAt,
+		&i.RemindedAt,
 	)
 	return i, err
 }

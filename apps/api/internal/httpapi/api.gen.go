@@ -1002,6 +1002,28 @@ type DisputeSubmission struct {
 // DisputeSubmissionDisputeType defines model for DisputeSubmission.DisputeType.
 type DisputeSubmissionDisputeType string
 
+// DriverCard defines model for DriverCard.
+type DriverCard struct {
+	CompletedRides int32   `json:"completed_rides"`
+	Name           *string `json:"name,omitempty"`
+
+	// PhotoUrl The driver's approved selfie. The link works for five minutes, so fetch it fresh from the ride.
+	PhotoUrl    *string `json:"photo_url,omitempty"`
+	PlateNumber *string `json:"plate_number,omitempty"`
+
+	// Rating Absent until the driver has ten rated rides, when the client shows them as new.
+	Rating          *float64 `json:"rating,omitempty"`
+	VehicleCategory string   `json:"vehicle_category"`
+}
+
+// DriverEarnings defines model for DriverEarnings.
+type DriverEarnings struct {
+	// LastSevenDays One entry per Nairobi day with at least one completed trip, newest first.
+	LastSevenDays []EarningsDay  `json:"last_seven_days"`
+	ThisWeek      EarningsPeriod `json:"this_week"`
+	Today         EarningsPeriod `json:"today"`
+}
+
 // DriverProfile defines model for DriverProfile.
 type DriverProfile struct {
 	IsOnline           bool                            `json:"is_online"`
@@ -1022,6 +1044,19 @@ type DriverSubscriptionDetail struct {
 	Payments  []SubscriptionPayment `json:"payments"`
 	Reference string                `json:"reference"`
 	Status    string                `json:"status"`
+}
+
+// EarningsDay defines model for EarningsDay.
+type EarningsDay struct {
+	Date     openapi_types.Date `json:"date"`
+	TotalKes int32              `json:"total_kes"`
+	Trips    int32              `json:"trips"`
+}
+
+// EarningsPeriod defines model for EarningsPeriod.
+type EarningsPeriod struct {
+	TotalKes int32 `json:"total_kes"`
+	Trips    int32 `json:"trips"`
 }
 
 // EmailOtpRequest defines model for EmailOtpRequest.
@@ -1149,9 +1184,10 @@ type MarkPaidRequestChannel string
 
 // Me defines model for Me.
 type Me struct {
-	Id    openapi_types.UUID `json:"id"`
-	Phone string             `json:"phone"`
-	Roles []Role             `json:"roles"`
+	DisplayName *string            `json:"display_name,omitempty"`
+	Id          openapi_types.UUID `json:"id"`
+	Phone       string             `json:"phone"`
+	Roles       []Role             `json:"roles"`
 }
 
 // MessageDraft defines model for MessageDraft.
@@ -1231,6 +1267,9 @@ type Offer struct {
 	Id                openapi_types.UUID `json:"id"`
 	Pickup            Coordinates        `json:"pickup"`
 	RideId            openapi_types.UUID `json:"ride_id"`
+
+	// RiderRating Absent for shared rides and until the rider has ten rated rides.
+	RiderRating *float64 `json:"rider_rating,omitempty"`
 }
 
 // OfferList defines model for OfferList.
@@ -1524,6 +1563,8 @@ type ReviewableDocument struct {
 
 // Ride defines model for Ride.
 type Ride struct {
+	// Driver Shown to the rider while the driver is on the way or on the trip.
+	Driver   *DriverCard         `json:"driver,omitempty"`
 	DriverId *openapi_types.UUID `json:"driver_id,omitempty"`
 
 	// DriverLocation Present only while the driver is on the way or on the trip.
@@ -1534,7 +1575,10 @@ type Ride struct {
 	PaymentMode    *PaymentMode       `json:"payment_mode,omitempty"`
 	Pickup         Coordinates        `json:"pickup"`
 	RequestedAt    time.Time          `json:"requested_at"`
-	Status         RideStatus         `json:"status"`
+
+	// Rider Shown to the driver of a solo ride while it is under way.
+	Rider  *RiderCard `json:"rider,omitempty"`
+	Status RideStatus `json:"status"`
 }
 
 // RideDeliveries defines model for RideDeliveries.
@@ -1598,6 +1642,14 @@ type RideTimelineEntry struct {
 	OccurredAt time.Time `json:"occurred_at"`
 	Reason     *string   `json:"reason,omitempty"`
 	ToStatus   string    `json:"to_status"`
+}
+
+// RiderCard defines model for RiderCard.
+type RiderCard struct {
+	Name *string `json:"name,omitempty"`
+
+	// Rating Absent until the rider has ten rated rides.
+	Rating *float64 `json:"rating,omitempty"`
 }
 
 // Role defines model for Role.
@@ -1665,6 +1717,14 @@ type SignupRole string
 
 // StartVerificationRequest defines model for StartVerificationRequest.
 type StartVerificationRequest struct {
+	// FullName The name on the driver's national ID. Riders see it, and reviewers check it against the ID.
+	//
+	// Example: Wanjiru Kamau
+	FullName string `json:"full_name"`
+
+	// PhotoConsent Must be true. The driver agrees that riders on their trips may see their selfie as their photo.
+	PhotoConsent bool `json:"photo_consent"`
+
 	// PlateNumber Example: KMFB 123A
 	PlateNumber string `json:"plate_number"`
 }
@@ -1738,6 +1798,12 @@ type TriageRequest struct {
 // TriageRequestStatus defines model for TriageRequest.Status.
 type TriageRequestStatus string
 
+// UpdateMeRequest defines model for UpdateMeRequest.
+type UpdateMeRequest struct {
+	// DisplayName Example: Wanjiru Kamau
+	DisplayName string `json:"display_name"`
+}
+
 // VehicleCategory defines model for VehicleCategory.
 type VehicleCategory struct {
 	// Capacity Passenger seats. Zero for package delivery.
@@ -1794,6 +1860,7 @@ type VerificationQueueItem struct {
 	Application  VerificationApplication `json:"application"`
 	DriverId     openapi_types.UUID      `json:"driver_id"`
 	DriverStatus string                  `json:"driver_status"`
+	FullName     *string                 `json:"full_name,omitempty"`
 	PhoneMasked  string                  `json:"phone_masked"`
 	PlateNumber  *string                 `json:"plate_number,omitempty"`
 }
@@ -2002,6 +2069,9 @@ type SetDriverCategoryJSONRequestBody = SetDriverCategoryRequest
 // UpdateDriverLocationJSONRequestBody defines body for UpdateDriverLocation for application/json ContentType.
 type UpdateDriverLocationJSONRequestBody = Coordinates
 
+// UpdateMeJSONRequestBody defines body for UpdateMe for application/json ContentType.
+type UpdateMeJSONRequestBody = UpdateMeRequest
+
 // MarkCompensationPaidJSONRequestBody defines body for MarkCompensationPaid for application/json ContentType.
 type MarkCompensationPaidJSONRequestBody = MarkPaidRequest
 
@@ -2157,6 +2227,9 @@ type ServerInterface interface {
 	// SetDriverCategory Choose a vehicle category. Locked once the driver is approved.
 	// (PUT /v1/drivers/me)
 	SetDriverCategory(w http.ResponseWriter, r *http.Request)
+	// GetDriverEarnings Summarize the driver's completed trips for today, this week and the last seven days
+	// (GET /v1/drivers/me/earnings)
+	GetDriverEarnings(w http.ResponseWriter, r *http.Request)
 	// UpdateDriverLocation Report the driver's position. Excess pings are dropped silently.
 	// (POST /v1/drivers/me/location)
 	UpdateDriverLocation(w http.ResponseWriter, r *http.Request)
@@ -2169,9 +2242,15 @@ type ServerInterface interface {
 	// GoOnline Start receiving offers
 	// (POST /v1/drivers/me/online)
 	GoOnline(w http.ResponseWriter, r *http.Request)
+	// DeleteMe Delete the signed-in account
+	// (DELETE /v1/me)
+	DeleteMe(w http.ResponseWriter, r *http.Request)
 	// GetMe Return the signed-in account
 	// (GET /v1/me)
 	GetMe(w http.ResponseWriter, r *http.Request)
+	// UpdateMe Set the signed-in account's name
+	// (PATCH /v1/me)
+	UpdateMe(w http.ResponseWriter, r *http.Request)
 	// ListNotifications List the signed-in user's notifications, newest first
 	// (GET /v1/notifications)
 	ListNotifications(w http.ResponseWriter, r *http.Request, params ListNotificationsParams)
@@ -2847,6 +2926,26 @@ func (siw *ServerInterfaceWrapper) SetDriverCategory(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
+// GetDriverEarnings operation middleware
+func (siw *ServerInterfaceWrapper) GetDriverEarnings(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDriverEarnings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // UpdateDriverLocation operation middleware
 func (siw *ServerInterfaceWrapper) UpdateDriverLocation(w http.ResponseWriter, r *http.Request) {
 
@@ -2927,6 +3026,26 @@ func (siw *ServerInterfaceWrapper) GoOnline(w http.ResponseWriter, r *http.Reque
 	handler.ServeHTTP(w, r)
 }
 
+// DeleteMe operation middleware
+func (siw *ServerInterfaceWrapper) DeleteMe(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider", "driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetMe operation middleware
 func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request) {
 
@@ -2938,6 +3057,26 @@ func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateMe operation middleware
+func (siw *ServerInterfaceWrapper) UpdateMe(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider", "driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateMe(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -6086,7 +6225,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/auth/otp/verify", wrapper.VerifyOtp)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/auth/refresh", wrapper.RefreshSession)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/auth/logout", wrapper.Logout)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/me", wrapper.DeleteMe)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/me", wrapper.GetMe)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/v1/me", wrapper.UpdateMe)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/drivers/me/earnings", wrapper.GetDriverEarnings)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides/quotes", wrapper.CreateQuote)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides", wrapper.BookRide)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/rides/{ride_id}", wrapper.GetRide)
@@ -6917,6 +7059,44 @@ func (response SetDriverCategorydefaultJSONResponse) VisitSetDriverCategoryRespo
 	return err
 }
 
+type GetDriverEarningsRequestObject struct {
+}
+
+type GetDriverEarningsResponseObject interface {
+	VisitGetDriverEarningsResponse(w http.ResponseWriter) error
+}
+
+type GetDriverEarnings200JSONResponse DriverEarnings
+
+func (response GetDriverEarnings200JSONResponse) VisitGetDriverEarningsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDriverEarningsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetDriverEarningsdefaultJSONResponse) VisitGetDriverEarningsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type UpdateDriverLocationRequestObject struct {
 	Body *UpdateDriverLocationJSONRequestBody
 }
@@ -7052,6 +7232,38 @@ func (response GoOnlinedefaultJSONResponse) VisitGoOnlineResponse(w http.Respons
 	return err
 }
 
+type DeleteMeRequestObject struct {
+}
+
+type DeleteMeResponseObject interface {
+	VisitDeleteMeResponse(w http.ResponseWriter) error
+}
+
+type DeleteMe204Response struct {
+}
+
+func (response DeleteMe204Response) VisitDeleteMeResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteMedefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response DeleteMedefaultJSONResponse) VisitDeleteMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetMeRequestObject struct {
 }
 
@@ -7069,6 +7281,45 @@ func (response GetMe200JSONResponse) VisitGetMeResponse(w http.ResponseWriter) e
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMeRequestObject struct {
+	Body *UpdateMeJSONRequestBody
+}
+
+type UpdateMeResponseObject interface {
+	VisitUpdateMeResponse(w http.ResponseWriter) error
+}
+
+type UpdateMe200JSONResponse Me
+
+func (response UpdateMe200JSONResponse) VisitUpdateMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMedefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response UpdateMedefaultJSONResponse) VisitUpdateMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -10534,6 +10785,9 @@ type StrictServerInterface interface {
 	// SetDriverCategory Choose a vehicle category. Locked once the driver is approved.
 	// (PUT /v1/drivers/me)
 	SetDriverCategory(ctx context.Context, request SetDriverCategoryRequestObject) (SetDriverCategoryResponseObject, error)
+	// GetDriverEarnings Summarize the driver's completed trips for today, this week and the last seven days
+	// (GET /v1/drivers/me/earnings)
+	GetDriverEarnings(ctx context.Context, request GetDriverEarningsRequestObject) (GetDriverEarningsResponseObject, error)
 	// UpdateDriverLocation Report the driver's position. Excess pings are dropped silently.
 	// (POST /v1/drivers/me/location)
 	UpdateDriverLocation(ctx context.Context, request UpdateDriverLocationRequestObject) (UpdateDriverLocationResponseObject, error)
@@ -10546,9 +10800,15 @@ type StrictServerInterface interface {
 	// GoOnline Start receiving offers
 	// (POST /v1/drivers/me/online)
 	GoOnline(ctx context.Context, request GoOnlineRequestObject) (GoOnlineResponseObject, error)
+	// DeleteMe Delete the signed-in account
+	// (DELETE /v1/me)
+	DeleteMe(ctx context.Context, request DeleteMeRequestObject) (DeleteMeResponseObject, error)
 	// GetMe Return the signed-in account
 	// (GET /v1/me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
+	// UpdateMe Set the signed-in account's name
+	// (PATCH /v1/me)
+	UpdateMe(ctx context.Context, request UpdateMeRequestObject) (UpdateMeResponseObject, error)
 	// ListNotifications List the signed-in user's notifications, newest first
 	// (GET /v1/notifications)
 	ListNotifications(ctx context.Context, request ListNotificationsRequestObject) (ListNotificationsResponseObject, error)
@@ -11378,6 +11638,30 @@ func (sh *strictHandler) SetDriverCategory(w http.ResponseWriter, r *http.Reques
 	}
 }
 
+// GetDriverEarnings operation middleware
+func (sh *strictHandler) GetDriverEarnings(w http.ResponseWriter, r *http.Request) {
+	var request GetDriverEarningsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDriverEarnings(ctx, request.(GetDriverEarningsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDriverEarnings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDriverEarningsResponseObject); ok {
+		if err := validResponse.VisitGetDriverEarningsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // UpdateDriverLocation operation middleware
 func (sh *strictHandler) UpdateDriverLocation(w http.ResponseWriter, r *http.Request) {
 	var request UpdateDriverLocationRequestObject
@@ -11481,6 +11765,30 @@ func (sh *strictHandler) GoOnline(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// DeleteMe operation middleware
+func (sh *strictHandler) DeleteMe(w http.ResponseWriter, r *http.Request) {
+	var request DeleteMeRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteMe(ctx, request.(DeleteMeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteMe")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteMeResponseObject); ok {
+		if err := validResponse.VisitDeleteMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetMe operation middleware
 func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	var request GetMeRequestObject
@@ -11498,6 +11806,37 @@ func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMeResponseObject); ok {
 		if err := validResponse.VisitGetMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateMe operation middleware
+func (sh *strictHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
+	var request UpdateMeRequestObject
+
+	var body UpdateMeJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateMe(ctx, request.(UpdateMeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateMe")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateMeResponseObject); ok {
+		if err := validResponse.VisitUpdateMeResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

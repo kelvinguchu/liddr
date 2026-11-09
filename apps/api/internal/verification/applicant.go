@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/kelvinguchu/liddr/apps/api/internal/auth"
 	"github.com/kelvinguchu/liddr/apps/api/internal/store"
 )
 
@@ -36,11 +37,25 @@ func NormalizePlate(raw string) (string, error) {
 	return plate, nil
 }
 
+// Applicant is what a driver declares when applying.
+type Applicant struct {
+	Plate        string
+	FullName     string
+	PhotoConsent bool
+}
+
 // StartApplication opens an application, or returns the one already open.
-func (s *Service) StartApplication(ctx context.Context, driverID uuid.UUID, rawPlate string) (Application, error) {
-	plate, err := NormalizePlate(rawPlate)
+func (s *Service) StartApplication(ctx context.Context, driverID uuid.UUID, applicant Applicant) (Application, error) {
+	plate, err := NormalizePlate(applicant.Plate)
 	if err != nil {
 		return Application{}, err
+	}
+	name, err := auth.NormalizeName(applicant.FullName)
+	if err != nil {
+		return Application{}, err
+	}
+	if !applicant.PhotoConsent {
+		return Application{}, ErrPhotoConsentRequired
 	}
 	now := s.now()
 	var out Application
@@ -70,6 +85,12 @@ func (s *Service) StartApplication(ctx context.Context, driverID uuid.UUID, rawP
 		}
 		if err := q.SetDriverPlate(ctx, store.SetDriverPlateParams{PlateNumber: new(plate), Now: now, UserID: driverID}); err != nil {
 			return fmt.Errorf("set plate: %w", err)
+		}
+		if err := q.SetApplicantName(ctx, store.SetApplicantNameParams{DisplayName: new(name), Now: now, ID: driverID}); err != nil {
+			return fmt.Errorf("set name: %w", err)
+		}
+		if err := q.SetPhotoConsent(ctx, store.SetPhotoConsentParams{Now: new(now), UserID: driverID}); err != nil {
+			return fmt.Errorf("record photo consent: %w", err)
 		}
 		row, err := q.InsertApplication(ctx, store.InsertApplicationParams{ID: uuid.New(), DriverID: driverID, Now: now})
 		if err != nil {

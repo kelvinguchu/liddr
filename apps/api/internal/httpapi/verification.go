@@ -42,7 +42,7 @@ func (a *API) StartVerification(ctx context.Context, req StartVerificationReques
 	if !ok {
 		return nil, errNoPrincipal
 	}
-	application, err := a.deps.Verification.StartApplication(ctx, p.UserID, req.Body.PlateNumber)
+	application, err := a.deps.Verification.StartApplication(ctx, p.UserID, verification.Applicant{Plate: req.Body.PlateNumber, FullName: req.Body.FullName, PhotoConsent: req.Body.PhotoConsent})
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +114,7 @@ func (a *API) GetVerificationStatus(ctx context.Context, _ GetVerificationStatus
 func toQueueItem(item verification.QueueItem) VerificationQueueItem {
 	return VerificationQueueItem{
 		Application: toApplication(item.Application), DriverId: item.DriverID,
-		DriverStatus: item.DriverStatus, PlateNumber: item.PlateNumber, PhoneMasked: item.PhoneMasked,
+		DriverStatus: item.DriverStatus, PlateNumber: item.PlateNumber, FullName: item.FullName, PhoneMasked: item.PhoneMasked,
 	}
 }
 

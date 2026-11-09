@@ -190,7 +190,7 @@ func (q *Queries) ExpireDocuments(ctx context.Context, arg ExpireDocumentsParams
 
 const getApplication = `-- name: GetApplication :one
 SELECT a.id, a.driver_id, a.status, a.decided_at, a.decision_reason, a.created_at,
-    d.verification_status AS driver_status, d.plate_number, COALESCE(u.phone, '')::text AS phone
+    d.verification_status AS driver_status, d.plate_number, u.display_name, COALESCE(u.phone, '')::text AS phone
 FROM verification_applications AS a
 JOIN drivers AS d ON d.user_id = a.driver_id
 JOIN users AS u ON u.id = a.driver_id
@@ -206,6 +206,7 @@ type GetApplicationRow struct {
 	CreatedAt      time.Time
 	DriverStatus   string
 	PlateNumber    *string
+	DisplayName    *string
 	Phone          string
 }
 
@@ -221,13 +222,14 @@ func (q *Queries) GetApplication(ctx context.Context, id uuid.UUID) (GetApplicat
 		&i.CreatedAt,
 		&i.DriverStatus,
 		&i.PlateNumber,
+		&i.DisplayName,
 		&i.Phone,
 	)
 	return i, err
 }
 
 const getDocument = `-- name: GetDocument :one
-SELECT id, application_id, driver_id, document_type, status, storage_key, scan_status
+SELECT id, application_id, driver_id, document_type, status, storage_key, scan_status, purged_at
 FROM verification_documents
 WHERE id = $1
 `
@@ -240,6 +242,7 @@ type GetDocumentRow struct {
 	Status        string
 	StorageKey    string
 	ScanStatus    string
+	PurgedAt      *time.Time
 }
 
 func (q *Queries) GetDocument(ctx context.Context, id uuid.UUID) (GetDocumentRow, error) {
@@ -253,6 +256,7 @@ func (q *Queries) GetDocument(ctx context.Context, id uuid.UUID) (GetDocumentRow
 		&i.Status,
 		&i.StorageKey,
 		&i.ScanStatus,
+		&i.PurgedAt,
 	)
 	return i, err
 }
@@ -639,7 +643,7 @@ func (q *Queries) LastDocumentVersion(ctx context.Context, arg LastDocumentVersi
 
 const listApplications = `-- name: ListApplications :many
 SELECT a.id, a.driver_id, a.status, a.decided_at, a.decision_reason, a.created_at,
-    d.verification_status AS driver_status, d.plate_number, COALESCE(u.phone, '')::text AS phone
+    d.verification_status AS driver_status, d.plate_number, u.display_name, COALESCE(u.phone, '')::text AS phone
 FROM verification_applications AS a
 JOIN drivers AS d ON d.user_id = a.driver_id
 JOIN users AS u ON u.id = a.driver_id
@@ -663,6 +667,7 @@ type ListApplicationsRow struct {
 	CreatedAt      time.Time
 	DriverStatus   string
 	PlateNumber    *string
+	DisplayName    *string
 	Phone          string
 }
 
@@ -684,6 +689,7 @@ func (q *Queries) ListApplications(ctx context.Context, arg ListApplicationsPara
 			&i.CreatedAt,
 			&i.DriverStatus,
 			&i.PlateNumber,
+			&i.DisplayName,
 			&i.Phone,
 		); err != nil {
 			return nil, err

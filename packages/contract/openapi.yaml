@@ -198,6 +198,56 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Me"
+    patch:
+      operationId: updateMe
+      summary: Set the signed-in account's name
+      description: A driver's name is locked once verification is approved, because it was checked against their ID.
+      security:
+        - bearerAuth: [rider, driver]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMeRequest"
+      responses:
+        "200":
+          description: The updated account.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        default:
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: deleteMe
+      summary: Delete the signed-in account
+      description: >-
+        Needs a sign-in from the last 15 minutes. Personal details are removed at once.
+        Ride and payment records stay, without them, for as long as the law requires.
+      security:
+        - bearerAuth: [rider, driver]
+      responses:
+        "204":
+          description: The account was deleted.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/drivers/me/earnings:
+    get:
+      operationId: getDriverEarnings
+      summary: Summarize the driver's completed trips for today, this week and the last seven days
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "200":
+          description: The driver's earnings. Drivers keep the whole fare.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DriverEarnings"
+        default:
+          $ref: "#/components/responses/Problem"
 
   /v1/rides/quotes:
     post:
@@ -2527,6 +2577,47 @@ components:
           description: Present only while the driver is on the way or on the trip.
         payment_mode:
           $ref: "#/components/schemas/PaymentMode"
+        driver:
+          allOf:
+            - $ref: "#/components/schemas/DriverCard"
+          description: Shown to the rider while the driver is on the way or on the trip.
+        rider:
+          allOf:
+            - $ref: "#/components/schemas/RiderCard"
+          description: Shown to the driver of a solo ride while it is under way.
+
+    DriverCard:
+      type: object
+      additionalProperties: false
+      required: [vehicle_category, completed_rides]
+      properties:
+        name:
+          type: string
+        plate_number:
+          type: string
+        photo_url:
+          type: string
+          description: The driver's approved selfie. The link works for five minutes, so fetch it fresh from the ride.
+        vehicle_category:
+          type: string
+        completed_rides:
+          type: integer
+          format: int32
+        rating:
+          type: number
+          format: double
+          description: Absent until the driver has ten rated rides, when the client shows them as new.
+
+    RiderCard:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        rating:
+          type: number
+          format: double
+          description: Absent until the rider has ten rated rides.
 
     CancelRideRequest:
       type: object
@@ -2592,6 +2683,10 @@ components:
         expires_at:
           type: string
           format: date-time
+        rider_rating:
+          type: number
+          format: double
+          description: Absent for shared rides and until the rider has ten rated rides.
 
     OfferList:
       type: object
@@ -2700,6 +2795,59 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Role"
+        display_name:
+          type: string
+
+    UpdateMeRequest:
+      type: object
+      additionalProperties: false
+      required: [display_name]
+      properties:
+        display_name:
+          type: string
+          example: Wanjiru Kamau
+
+    EarningsPeriod:
+      type: object
+      additionalProperties: false
+      required: [trips, total_kes]
+      properties:
+        trips:
+          type: integer
+          format: int32
+        total_kes:
+          type: integer
+          format: int32
+
+    EarningsDay:
+      type: object
+      additionalProperties: false
+      required: [date, trips, total_kes]
+      properties:
+        date:
+          type: string
+          format: date
+        trips:
+          type: integer
+          format: int32
+        total_kes:
+          type: integer
+          format: int32
+
+    DriverEarnings:
+      type: object
+      additionalProperties: false
+      required: [today, this_week, last_seven_days]
+      properties:
+        today:
+          $ref: "#/components/schemas/EarningsPeriod"
+        this_week:
+          $ref: "#/components/schemas/EarningsPeriod"
+        last_seven_days:
+          type: array
+          description: One entry per Nairobi day with at least one completed trip, newest first.
+          items:
+            $ref: "#/components/schemas/EarningsDay"
 
     Health:
       type: object
@@ -2794,11 +2942,18 @@ components:
     StartVerificationRequest:
       type: object
       additionalProperties: false
-      required: [plate_number]
+      required: [plate_number, full_name, photo_consent]
       properties:
         plate_number:
           type: string
           example: KMFB 123A
+        full_name:
+          type: string
+          description: The name on the driver's national ID. Riders see it, and reviewers check it against the ID.
+          example: Wanjiru Kamau
+        photo_consent:
+          type: boolean
+          description: Must be true. The driver agrees that riders on their trips may see their selfie as their photo.
 
     PrepareUploadRequest:
       type: object
@@ -2932,6 +3087,8 @@ components:
           type: string
           format: uuid
         driver_status:
+          type: string
+        full_name:
           type: string
         plate_number:
           type: string

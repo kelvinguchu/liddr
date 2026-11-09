@@ -23,6 +23,7 @@ type Offer struct {
 	DistanceToPickupM int32
 	FareKES           int32
 	ExpiresAt         time.Time
+	RiderRating       *float64
 }
 
 // ListOffers returns the driver's open offers.
@@ -40,6 +41,9 @@ func (s *Service) ListOffers(ctx context.Context, driverID uuid.UUID) ([]Offer, 
 			DistanceToPickupM: row.DistanceM,
 			FareKES:           row.FareKes,
 			ExpiresAt:         row.ExpiresAt,
+		}
+		if row.ProductType != "shared" {
+			offers[i].RiderRating = rides.PublicRating(row.RatingCenti, row.RatingCount)
 		}
 	}
 	return offers, nil

@@ -195,7 +195,7 @@ func (c *Client) do(ctx context.Context, method, key string) (*http.Response, er
 		return nil, errors.Join(ErrUnavailable, err)
 	}
 	switch resp.StatusCode {
-	case http.StatusOK:
+	case http.StatusOK, http.StatusNoContent:
 		return resp, nil
 	case http.StatusNotFound:
 		_ = resp.Body.Close() // Only the status mattered.
@@ -204,6 +204,15 @@ func (c *Client) do(ctx context.Context, method, key string) (*http.Response, er
 		_ = resp.Body.Close() // Only the status mattered.
 		return nil, fmt.Errorf("%w: status %d", ErrUnavailable, resp.StatusCode)
 	}
+}
+
+// Delete removes an object. ErrNotFound means it is already gone.
+func (c *Client) Delete(ctx context.Context, key string) error {
+	resp, err := c.do(ctx, http.MethodDelete, key)
+	if err != nil {
+		return err
+	}
+	return resp.Body.Close()
 }
 
 // Stat reads an object's size and type without downloading it.

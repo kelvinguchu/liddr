@@ -14,7 +14,9 @@ import (
 	"github.com/kelvinguchu/liddr/apps/api/internal/notifications"
 	"github.com/kelvinguchu/liddr/apps/api/internal/payments"
 	"github.com/kelvinguchu/liddr/apps/api/internal/push"
+	"github.com/kelvinguchu/liddr/apps/api/internal/rides"
 	"github.com/kelvinguchu/liddr/apps/api/internal/sealing"
+	deliveries "github.com/kelvinguchu/liddr/apps/api/internal/send"
 	"github.com/kelvinguchu/liddr/apps/api/internal/sms"
 	"github.com/kelvinguchu/liddr/apps/api/internal/storage"
 	"github.com/kelvinguchu/liddr/apps/api/internal/store"
@@ -60,22 +62,38 @@ func grantRole(ctx context.Context, cfg config.Config, phone, role string, logge
 	return nil
 }
 
-func newVerification(cfg config.Config, pool *pgxpool.Pool, logger *slog.Logger) (*verification.Service, error) {
-	service := verification.Config{Pool: pool, Now: time.Now, Logger: logger}
-	if cfg.Documents.Bucket != "" {
-		client, err := storage.New(storage.Config{
-			BaseURL:            cfg.Documents.BaseURL,
-			Bucket:             cfg.Documents.Bucket,
-			ServiceAccountJSON: cfg.Documents.ServiceAccount.Reveal(),
-			Now:                time.Now,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("configure document storage: %w", err)
-		}
-		service.Storage = client
-		service.Scanner = malware.New(cfg.Documents.ClamAVAddr)
+// documentClients builds the storage and scanner clients, or nils when the
+// deployment has no document storage.
+func documentClients(cfg config.Config) (*storage.Client, *malware.Client, error) {
+	if cfg.Documents.Bucket == "" {
+		return nil, nil, nil
 	}
-	return verification.NewService(service), nil
+	client, err := storage.New(storage.Config{
+		BaseURL:            cfg.Documents.BaseURL,
+		Bucket:             cfg.Documents.Bucket,
+		ServiceAccountJSON: cfg.Documents.ServiceAccount.Reveal(),
+		Now:                time.Now,
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("configure document storage: %w", err)
+	}
+	return client, malware.New(cfg.Documents.ClamAVAddr), nil
+}
+
+func newVerification(cfg config.Config, pool *pgxpool.Pool, logger *slog.Logger) (*verification.Service, error) {
+	files, scanner, err := documentClients(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return verification.NewService(verification.Config{Pool: pool, Storage: files, Scanner: scanner, Now: time.Now, Logger: logger}), nil
+}
+
+func newSend(cfg config.Config, pool *pgxpool.Pool, bookings *rides.Service) (*deliveries.Service, error) {
+	files, scanner, err := documentClients(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return deliveries.NewService(deliveries.Config{Pool: pool, Rides: bookings, Storage: files, Scanner: scanner, Now: time.Now}), nil
 }
 
 func newNotifications(cfg config.Config, pool *pgxpool.Pool, logger *slog.Logger) (*notifications.Service, error) {

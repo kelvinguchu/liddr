@@ -22,6 +22,18 @@ const (
 // The quote also makes the call idempotent: repeating it returns the same ride,
 // so a client retrying on a poor connection cannot book twice.
 func (s *Service) Book(ctx context.Context, riderID, quoteID uuid.UUID) (Ride, error) {
+	return s.book(ctx, riderID, quoteID, nil)
+}
+
+// DeliveryRecorder stores a delivery's details alongside its new ride.
+type DeliveryRecorder func(ctx context.Context, q *store.Queries, rideID uuid.UUID, now time.Time) error
+
+// BookDelivery books a Send trip, writing the delivery in the same transaction.
+func (s *Service) BookDelivery(ctx context.Context, riderID, quoteID uuid.UUID, record DeliveryRecorder) (Ride, error) {
+	return s.book(ctx, riderID, quoteID, record)
+}
+
+func (s *Service) book(ctx context.Context, riderID, quoteID uuid.UUID, record DeliveryRecorder) (Ride, error) {
 	var rideID uuid.UUID
 	err := store.InTx(ctx, s.pool, func(q *store.Queries) error {
 		// Serializes this rider's bookings so that the limits below are exact.
@@ -43,6 +55,14 @@ func (s *Service) Book(ctx context.Context, riderID, quoteID uuid.UUID) (Ride, e
 		}
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return fmt.Errorf("find ride for quote: %w", err)
+		}
+
+		isSend, err := q.IsSendQuote(ctx, quoteID)
+		if err != nil {
+			return fmt.Errorf("check category: %w", err)
+		}
+		if isSend != (record != nil) {
+			return ErrWrongBookingType
 		}
 
 		now := s.now()
@@ -82,6 +102,9 @@ func (s *Service) Book(ctx context.Context, riderID, quoteID uuid.UUID) (Ride, e
 		})
 		if err != nil {
 			return fmt.Errorf("record ride event: %w", err)
+		}
+		if record != nil {
+			return record(ctx, q, rideID, now)
 		}
 		return nil
 	})

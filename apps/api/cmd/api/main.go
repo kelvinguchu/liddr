@@ -20,6 +20,7 @@ import (
 	"github.com/kelvinguchu/liddr/apps/api/internal/disputes"
 	"github.com/kelvinguchu/liddr/apps/api/internal/httpapi"
 	"github.com/kelvinguchu/liddr/apps/api/internal/maps"
+	"github.com/kelvinguchu/liddr/apps/api/internal/messages"
 	"github.com/kelvinguchu/liddr/apps/api/internal/moderation"
 	"github.com/kelvinguchu/liddr/apps/api/internal/ratings"
 	"github.com/kelvinguchu/liddr/apps/api/internal/realtime"
@@ -104,19 +105,24 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		return err
 	}
 	moderator := moderation.NewService(moderation.Config{Pool: pool, Now: time.Now})
+	bookings := rides.NewService(rides.Config{
+		Pool:   pool,
+		Routes: maps.NewClient(cfg.GoogleRoutesURL, cfg.GoogleMapsKey.Reveal()),
+		Now:    time.Now,
+	})
+	delivery, err := newSend(cfg, pool, bookings)
+	if err != nil {
+		return err
+	}
 	dispatcher := dispatch.NewService(dispatch.Config{Pool: pool, Now: time.Now})
 	billing := newSubscriptions(cfg, pool, logger)
 	hub := realtime.NewHub(logger)
 	api := httpapi.New(httpapi.Deps{
-		Logger:     logger,
-		Database:   pool,
-		Categories: rides.NewCatalog(store.New(pool)),
-		Auth:       authService,
-		Rides: rides.NewService(rides.Config{
-			Pool:   pool,
-			Routes: maps.NewClient(cfg.GoogleRoutesURL, cfg.GoogleMapsKey.Reveal()),
-			Now:    time.Now,
-		}),
+		Logger:           logger,
+		Database:         pool,
+		Categories:       rides.NewCatalog(store.New(pool)),
+		Auth:             authService,
+		Rides:            bookings,
 		Dispatch:         dispatcher,
 		Subscriptions:    billing,
 		Verification:     documents,
@@ -124,6 +130,8 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		Moderation:       moderator,
 		Ratings:          ratings.NewService(ratings.Config{Pool: pool, Moderation: moderator, Now: time.Now}),
 		Disputes:         disputes.NewService(disputes.Config{Pool: pool, Moderation: moderator, Now: time.Now}),
+		Messages:         messages.NewService(messages.Config{Pool: pool, Moderation: moderator, Now: time.Now}),
+		Send:             delivery,
 		Realtime:         hub,
 		RealtimeBase:     ctx,
 		RealtimeOrigins:  cfg.RealtimeOrigins,

@@ -1418,6 +1418,290 @@ paths:
         default:
           $ref: "#/components/responses/Problem"
 
+  /v1/rides/messages/quick-actions:
+    get:
+      operationId: listQuickActions
+      summary: List canned chat messages
+      security:
+        - bearerAuth: [rider, driver]
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuickActionList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/messages:
+    get:
+      operationId: listRideMessages
+      summary: Read a ride's chat
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+        - {name: after_seq, in: query, required: false, schema: {type: integer, format: int64, minimum: 0}}
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageThread"
+        default:
+          $ref: "#/components/responses/Problem"
+
+    post:
+      operationId: sendRideMessage
+      summary: Send a chat message
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageDraft"
+      responses:
+        "201":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RideMessage"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/messages/{message_id}/read:
+    post:
+      operationId: markRideMessageRead
+      summary: Mark a message read
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+        - {name: message_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/messages/{message_id}/hide:
+    post:
+      operationId: hideRideMessage
+      summary: Hide a message from your own view
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+        - {name: message_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/messages/{message_id}/report:
+    post:
+      operationId: reportRideMessage
+      summary: Report a message
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+        - {name: message_id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageReport"
+      responses:
+        "201":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FiledMessageReport"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/send/requests:
+    post:
+      operationId: bookDelivery
+      summary: Book a delivery from a Send quote
+      security:
+        - bearerAuth: [rider]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeliveryRequest"
+      responses:
+        "201":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ride"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/send/rides/{ride_id}:
+    get:
+      operationId: getDelivery
+      summary: Load a delivery for its sender, driver or recipient
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Delivery"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/send/rides/{ride_id}/proof-uploads:
+    post:
+      operationId: prepareProofUpload
+      summary: Get a signed URL for a proof photo
+      security:
+        - bearerAuth: [driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProofUploadRequest"
+      responses:
+        "201":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProofUpload"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/send/rides/{ride_id}/pickup-proof:
+    post:
+      operationId: recordPickupProof
+      summary: Attach the collection photo
+      security:
+        - bearerAuth: [driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProofSubmission"
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/send/rides/{ride_id}/dropoff-proof:
+    post:
+      operationId: recordDropoffProof
+      summary: Attach the delivery photo
+      security:
+        - bearerAuth: [driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProofSubmission"
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/send/rides/{ride_id}/recipient-confirm:
+    post:
+      operationId: confirmDeliveryReceipt
+      summary: Confirm receipt as the recipient
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/send/rides/{ride_id}/proofs/{proof_kind}/download:
+    post:
+      operationId: downloadDeliveryProof
+      summary: Get a five-minute link to a proof photo
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+        - {name: proof_kind, in: path, required: true, schema: {type: string, enum: [pickup, dropoff]}}
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignedDownload"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/send/prohibited-items:
+    get:
+      operationId: listProhibitedItems
+      summary: List item screening rules
+      security:
+        - bearerAuth: [ops, admin]
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProhibitedItemList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+    put:
+      operationId: saveProhibitedItem
+      summary: Add or change a screening rule
+      security:
+        - bearerAuth: [admin, "mfa:step-up"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProhibitedItem"
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
 components:
   parameters:
     ReportId:
@@ -2350,6 +2634,7 @@ components:
         reason_code: {type: string, maxLength: 100}
         reason_text: {type: string, maxLength: 1000}
         ends_at: {type: string, format: date-time}
+        scope: {type: string, enum: [platform, communication]}
     Enforcement:
       type: object
       additionalProperties: false
@@ -2526,3 +2811,137 @@ components:
       properties:
         channel: {type: string, enum: [manual_ops, mpesa_reversal, wallet_credit, bank_transfer]}
         reference: {type: string, maxLength: 200}
+
+    QuickAction:
+      type: object
+      additionalProperties: false
+      required: [code, english, swahili]
+      properties:
+        code: {type: string}
+        english: {type: string}
+        swahili: {type: string}
+    QuickActionList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/QuickAction"}
+    RideMessage:
+      type: object
+      additionalProperties: false
+      required: [seq, id, sender_id, sender_role, message_type, body, created_at]
+      properties:
+        seq: {type: integer, format: int64}
+        id: {type: string, format: uuid}
+        sender_id: {type: string, format: uuid}
+        sender_role: {type: string}
+        message_type: {type: string}
+        quick_action_code: {type: string}
+        body: {type: string}
+        read_at: {type: string, format: date-time}
+        created_at: {type: string, format: date-time}
+    MessageThread:
+      type: object
+      additionalProperties: false
+      required: [data, next_seq, unread]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/RideMessage"}
+        next_seq: {type: integer, format: int64}
+        unread: {type: integer, format: int64}
+    MessageDraft:
+      type: object
+      additionalProperties: false
+      properties:
+        body: {type: string, maxLength: 1000}
+        quick_action_code: {type: string}
+    MessageReport:
+      type: object
+      additionalProperties: false
+      properties:
+        category: {type: string}
+    FiledMessageReport:
+      type: object
+      additionalProperties: false
+      required: [report_id]
+      properties:
+        report_id: {type: string, format: uuid}
+    DeliveryRequest:
+      type: object
+      additionalProperties: false
+      required: [quote_id, sender_name, recipient_name, recipient_phone, item_description, item_size, payer, payment_timing]
+      properties:
+        quote_id: {type: string, format: uuid}
+        sender_name: {type: string, maxLength: 100}
+        recipient_name: {type: string, maxLength: 100}
+        recipient_phone: {type: string}
+        item_description: {type: string, maxLength: 500}
+        item_size: {type: string, enum: [small, medium, large]}
+        payer: {type: string, enum: [sender, recipient]}
+        payment_timing: {type: string, enum: [before, after]}
+        item_value_kes: {type: integer, format: int32, minimum: 0}
+        special_instructions: {type: string, maxLength: 500}
+        liability_acknowledged: {type: boolean}
+    Delivery:
+      type: object
+      additionalProperties: false
+      required: [ride_id, sender_name, recipient_name, item_description, item_size, payer, payment_timing, status]
+      properties:
+        ride_id: {type: string, format: uuid}
+        sender_name: {type: string}
+        recipient_name: {type: string}
+        recipient_phone: {type: string}
+        item_description: {type: string}
+        item_size: {type: string}
+        payer: {type: string}
+        payment_timing: {type: string}
+        special_instructions: {type: string}
+        status: {type: string}
+        pickup_proof_at: {type: string, format: date-time}
+        dropoff_proof_at: {type: string, format: date-time}
+        confirmed_at: {type: string, format: date-time}
+    ProofUploadRequest:
+      type: object
+      additionalProperties: false
+      required: [proof_kind, content_type, size_bytes]
+      properties:
+        proof_kind: {type: string, enum: [pickup, dropoff]}
+        content_type: {type: string, enum: [image/jpeg, image/png]}
+        size_bytes: {type: integer, format: int64, minimum: 1, maximum: 10485760}
+    ProofUpload:
+      type: object
+      additionalProperties: false
+      required: [upload_id, upload_url, headers, expires_at]
+      properties:
+        upload_id: {type: string, format: uuid}
+        upload_url: {type: string}
+        headers:
+          type: object
+          additionalProperties: {type: string}
+        expires_at: {type: string, format: date-time}
+    ProofSubmission:
+      type: object
+      additionalProperties: false
+      required: [upload_id]
+      properties:
+        upload_id: {type: string, format: uuid}
+    ProhibitedItem:
+      type: object
+      additionalProperties: false
+      required: [keyword, severity, message, active]
+      properties:
+        keyword: {type: string, maxLength: 100}
+        severity: {type: string, enum: [block, warn]}
+        message: {type: string, maxLength: 300}
+        active: {type: boolean}
+    ProhibitedItemList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/ProhibitedItem"}

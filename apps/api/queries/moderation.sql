@@ -16,18 +16,19 @@ SELECT count(*) FROM reports WHERE reporter_id = sqlc.arg(reporter_id) AND creat
 -- name: InsertReport :one
 INSERT INTO reports (
     id, reporter_id, reported_id, category, status, severity, source, incident_type, ride_id,
-    signal_key, dispute_type, requested_resolution, description, created_at, updated_at
+    signal_key, dispute_type, requested_resolution, description, message_id, created_at, updated_at
 ) VALUES (
     sqlc.arg(id), sqlc.arg(reporter_id), sqlc.arg(reported_id), sqlc.arg(category), 'submitted', sqlc.arg(severity),
     sqlc.arg(source), sqlc.arg(incident_type), sqlc.arg(ride_id), sqlc.arg(signal_key), sqlc.arg(dispute_type),
-    sqlc.arg(requested_resolution), sqlc.arg(description), sqlc.arg(now), sqlc.arg(now)
+    sqlc.arg(requested_resolution), sqlc.arg(description), sqlc.arg(message_id), sqlc.arg(now), sqlc.arg(now)
 )
-ON CONFLICT (reporter_id, ride_id, category) WHERE dispute_type IS NULL AND ride_id IS NOT NULL DO NOTHING
+ON CONFLICT (reporter_id, ride_id, category) WHERE dispute_type IS NULL AND ride_id IS NOT NULL AND message_id IS NULL DO NOTHING
 RETURNING id, status, created_at;
 
 -- name: GetExistingRideReport :one
 SELECT id, status, created_at FROM reports
-WHERE reporter_id = sqlc.arg(reporter_id) AND ride_id = sqlc.arg(ride_id) AND category = sqlc.arg(category) AND dispute_type IS NULL;
+WHERE reporter_id = sqlc.arg(reporter_id) AND ride_id = sqlc.arg(ride_id) AND category = sqlc.arg(category)
+    AND dispute_type IS NULL AND message_id IS NULL;
 
 -- name: SignalReportExists :one
 SELECT EXISTS (
@@ -75,8 +76,8 @@ VALUES (sqlc.arg(report_id), sqlc.arg(reviewer_id), sqlc.arg(decision), sqlc.arg
     sqlc.arg(reason_code), sqlc.arg(notes), sqlc.arg(now));
 
 -- name: InsertEnforcement :one
-INSERT INTO user_enforcements (id, user_id, report_id, actor_id, action, status, reason_code, reason_text, starts_at, ends_at, created_at)
-VALUES (sqlc.arg(id), sqlc.arg(user_id), sqlc.arg(report_id), sqlc.arg(actor_id), sqlc.arg(action), 'active',
+INSERT INTO user_enforcements (id, user_id, report_id, actor_id, action, status, scope, reason_code, reason_text, starts_at, ends_at, created_at)
+VALUES (sqlc.arg(id), sqlc.arg(user_id), sqlc.arg(report_id), sqlc.arg(actor_id), sqlc.arg(action), 'active', sqlc.arg(scope),
     sqlc.arg(reason_code), sqlc.arg(reason_text), sqlc.arg(now), sqlc.arg(ends_at), sqlc.arg(now))
 RETURNING id, user_id, report_id, action, status, reason_code, starts_at, ends_at, lifted_at, created_at;
 
@@ -89,7 +90,7 @@ SET status = sqlc.arg(status), lifted_at = sqlc.arg(now), lifted_by = sqlc.arg(l
 WHERE id = sqlc.arg(id);
 
 -- name: ListActiveEnforcementActions :many
-SELECT action FROM user_enforcements WHERE user_id = sqlc.arg(user_id) AND status = 'active';
+SELECT action FROM user_enforcements WHERE user_id = sqlc.arg(user_id) AND status = 'active' AND scope = 'platform';
 
 -- name: ListEnforcements :many
 SELECT id, user_id, report_id, action, status, reason_code, starts_at, ends_at, lifted_at, created_at

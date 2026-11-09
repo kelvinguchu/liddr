@@ -27,6 +27,8 @@ linters:
             - "**/internal/events/**"
             - "**/internal/geo/**"
             - "**/internal/maps/**"
+            - "**/internal/messages/**"
+            - "**/internal/send/**"
             - "**/internal/moderation/**"
             - "**/internal/ratings/**"
             - "**/internal/disputes/**"

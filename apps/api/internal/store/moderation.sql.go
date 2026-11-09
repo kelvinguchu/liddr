@@ -127,7 +127,8 @@ func (q *Queries) GetEnforcementForUpdate(ctx context.Context, id uuid.UUID) (Ge
 
 const getExistingRideReport = `-- name: GetExistingRideReport :one
 SELECT id, status, created_at FROM reports
-WHERE reporter_id = $1 AND ride_id = $2 AND category = $3 AND dispute_type IS NULL
+WHERE reporter_id = $1 AND ride_id = $2 AND category = $3
+    AND dispute_type IS NULL AND message_id IS NULL
 `
 
 type GetExistingRideReportParams struct {
@@ -319,9 +320,9 @@ func (q *Queries) GetUserPhone(ctx context.Context, id uuid.UUID) (string, error
 }
 
 const insertEnforcement = `-- name: InsertEnforcement :one
-INSERT INTO user_enforcements (id, user_id, report_id, actor_id, action, status, reason_code, reason_text, starts_at, ends_at, created_at)
-VALUES ($1, $2, $3, $4, $5, 'active',
-    $6, $7, $8, $9, $8)
+INSERT INTO user_enforcements (id, user_id, report_id, actor_id, action, status, scope, reason_code, reason_text, starts_at, ends_at, created_at)
+VALUES ($1, $2, $3, $4, $5, 'active', $6,
+    $7, $8, $9, $10, $9)
 RETURNING id, user_id, report_id, action, status, reason_code, starts_at, ends_at, lifted_at, created_at
 `
 
@@ -331,6 +332,7 @@ type InsertEnforcementParams struct {
 	ReportID   *uuid.UUID
 	ActorID    *uuid.UUID
 	Action     string
+	Scope      string
 	ReasonCode string
 	ReasonText *string
 	Now        time.Time
@@ -357,6 +359,7 @@ func (q *Queries) InsertEnforcement(ctx context.Context, arg InsertEnforcementPa
 		arg.ReportID,
 		arg.ActorID,
 		arg.Action,
+		arg.Scope,
 		arg.ReasonCode,
 		arg.ReasonText,
 		arg.Now,
@@ -381,13 +384,13 @@ func (q *Queries) InsertEnforcement(ctx context.Context, arg InsertEnforcementPa
 const insertReport = `-- name: InsertReport :one
 INSERT INTO reports (
     id, reporter_id, reported_id, category, status, severity, source, incident_type, ride_id,
-    signal_key, dispute_type, requested_resolution, description, created_at, updated_at
+    signal_key, dispute_type, requested_resolution, description, message_id, created_at, updated_at
 ) VALUES (
     $1, $2, $3, $4, 'submitted', $5,
     $6, $7, $8, $9, $10,
-    $11, $12, $13, $13
+    $11, $12, $13, $14, $14
 )
-ON CONFLICT (reporter_id, ride_id, category) WHERE dispute_type IS NULL AND ride_id IS NOT NULL DO NOTHING
+ON CONFLICT (reporter_id, ride_id, category) WHERE dispute_type IS NULL AND ride_id IS NOT NULL AND message_id IS NULL DO NOTHING
 RETURNING id, status, created_at
 `
 
@@ -404,6 +407,7 @@ type InsertReportParams struct {
 	DisputeType         *string
 	RequestedResolution *string
 	Description         string
+	MessageID           *uuid.UUID
 	Now                 time.Time
 }
 
@@ -427,6 +431,7 @@ func (q *Queries) InsertReport(ctx context.Context, arg InsertReportParams) (Ins
 		arg.DisputeType,
 		arg.RequestedResolution,
 		arg.Description,
+		arg.MessageID,
 		arg.Now,
 	)
 	var i InsertReportRow
@@ -466,7 +471,7 @@ func (q *Queries) InsertReportReview(ctx context.Context, arg InsertReportReview
 }
 
 const listActiveEnforcementActions = `-- name: ListActiveEnforcementActions :many
-SELECT action FROM user_enforcements WHERE user_id = $1 AND status = 'active'
+SELECT action FROM user_enforcements WHERE user_id = $1 AND status = 'active' AND scope = 'platform'
 `
 
 func (q *Queries) ListActiveEnforcementActions(ctx context.Context, userID uuid.UUID) ([]string, error) {

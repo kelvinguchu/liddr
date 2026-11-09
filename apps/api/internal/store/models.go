@@ -109,6 +109,14 @@ type Notification struct {
 	CreatedAt        time.Time
 }
 
+type ProhibitedItem struct {
+	Keyword   string
+	Severity  string
+	Message   string
+	Active    bool
+	UpdatedAt time.Time
+}
+
 type PushToken struct {
 	ID         uuid.UUID
 	UserID     uuid.UUID
@@ -151,6 +159,7 @@ type Report struct {
 	ResolutionSummary   *string
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
+	MessageID           *uuid.UUID
 }
 
 type ReportCategory struct {
@@ -213,6 +222,22 @@ type RideEvent struct {
 	OccurredAt  time.Time
 }
 
+type RideMessage struct {
+	Seq                  int64
+	ID                   uuid.UUID
+	RideID               uuid.UUID
+	SenderID             uuid.UUID
+	RecipientID          uuid.UUID
+	SenderRole           string
+	MessageType          string
+	QuickActionCode      *string
+	Body                 string
+	ReadAt               *time.Time
+	HiddenForSenderAt    *time.Time
+	HiddenForRecipientAt *time.Time
+	CreatedAt            time.Time
+}
+
 type RideOffer struct {
 	ID          uuid.UUID
 	RideID      uuid.UUID
@@ -258,6 +283,42 @@ type RideRating struct {
 	NullifiedBy         *uuid.UUID
 	NullificationReason *string
 	SubmittedAt         time.Time
+}
+
+type SendDelivery struct {
+	RideID                uuid.UUID
+	SenderName            string
+	SenderPhone           string
+	RecipientName         string
+	RecipientPhone        string
+	ItemDescription       string
+	ItemSize              string
+	Payer                 string
+	PaymentTiming         string
+	ItemValueKes          *int32
+	SpecialInstructions   *string
+	LiabilityAcknowledged bool
+	PickupProofKey        *string
+	PickupProofAt         *time.Time
+	DropoffProofKey       *string
+	DropoffProofAt        *time.Time
+	RecipientConfirmedAt  *time.Time
+	DeliveryStatus        string
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
+}
+
+type SendProofUpload struct {
+	ID          uuid.UUID
+	RideID      uuid.UUID
+	DriverID    uuid.UUID
+	ProofKind   string
+	StorageKey  string
+	ContentType string
+	SizeBytes   int64
+	ExpiresAt   time.Time
+	ConsumedAt  *time.Time
+	CreatedAt   time.Time
 }
 
 type Subscription struct {
@@ -330,6 +391,7 @@ type UserEnforcement struct {
 	LiftedAt   *time.Time
 	LiftedBy   *uuid.UUID
 	CreatedAt  time.Time
+	Scope      string
 }
 
 type UserRole struct {

@@ -25,6 +25,9 @@ const (
 	TypeResync         = "resync"
 
 	TypeVerificationUpdated = "verification.updated"
+	TypeRideMessage         = "ride.message"
+	TypeRideMessageRead     = "ride.message_read"
+	TypeSendUpdated         = "send.updated"
 )
 
 // Event is what a client receives.

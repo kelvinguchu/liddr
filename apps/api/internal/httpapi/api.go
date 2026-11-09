@@ -16,11 +16,13 @@ import (
 	"github.com/kelvinguchu/liddr/apps/api/internal/auth"
 	"github.com/kelvinguchu/liddr/apps/api/internal/dispatch"
 	"github.com/kelvinguchu/liddr/apps/api/internal/disputes"
+	"github.com/kelvinguchu/liddr/apps/api/internal/messages"
 	"github.com/kelvinguchu/liddr/apps/api/internal/moderation"
 	"github.com/kelvinguchu/liddr/apps/api/internal/notifications"
 	"github.com/kelvinguchu/liddr/apps/api/internal/ratings"
 	"github.com/kelvinguchu/liddr/apps/api/internal/realtime"
 	"github.com/kelvinguchu/liddr/apps/api/internal/rides"
+	"github.com/kelvinguchu/liddr/apps/api/internal/send"
 	"github.com/kelvinguchu/liddr/apps/api/internal/subscriptions"
 	"github.com/kelvinguchu/liddr/apps/api/internal/verification"
 )
@@ -47,6 +49,8 @@ type Deps struct {
 	Moderation    *moderation.Service
 	Ratings       *ratings.Service
 	Disputes      *disputes.Service
+	Messages      *messages.Service
+	Send          *send.Service
 
 	// Realtime and RealtimeOrigins serve live updates. RealtimeBase bounds each
 	// socket's life, because a socket outlives the HTTP request that opened it.

@@ -7,11 +7,13 @@ import (
 	"github.com/kelvinguchu/liddr/apps/api/internal/auth"
 	"github.com/kelvinguchu/liddr/apps/api/internal/dispatch"
 	"github.com/kelvinguchu/liddr/apps/api/internal/disputes"
+	"github.com/kelvinguchu/liddr/apps/api/internal/messages"
 	"github.com/kelvinguchu/liddr/apps/api/internal/moderation"
 	"github.com/kelvinguchu/liddr/apps/api/internal/notifications"
 	"github.com/kelvinguchu/liddr/apps/api/internal/payments"
 	"github.com/kelvinguchu/liddr/apps/api/internal/ratings"
 	"github.com/kelvinguchu/liddr/apps/api/internal/rides"
+	"github.com/kelvinguchu/liddr/apps/api/internal/send"
 	"github.com/kelvinguchu/liddr/apps/api/internal/subscriptions"
 	"github.com/kelvinguchu/liddr/apps/api/internal/verification"
 )
@@ -122,6 +124,34 @@ var problems = []problem{
 	{disputes.ErrInvalidChannel, http.StatusBadRequest, "INVALID_CHANNEL", "Choose a valid payment channel."},
 	{disputes.ErrReferenceNeeded, http.StatusBadRequest, "REFERENCE_REQUIRED", "Enter the payment reference."},
 	{disputes.ErrSelfAction, http.StatusForbidden, "CONFLICT_OF_INTEREST", "You cannot settle your own case."},
+	{rides.ErrWrongBookingType, http.StatusBadRequest, "WRONG_BOOKING_TYPE", "That price cannot be booked this way."},
+	{rides.ErrPickupProofRequired, http.StatusConflict, "PICKUP_PROOF_REQUIRED", "Photograph the package before you start."},
+	{rides.ErrDropoffProofRequired, http.StatusConflict, "DROPOFF_PROOF_REQUIRED", "Photograph the delivered package first."},
+	{rides.ErrRecipientPending, http.StatusConflict, "RECIPIENT_PENDING", "Waiting for the recipient. You can finish after ten minutes."},
+	{rides.ErrPackageCollected, http.StatusConflict, "PACKAGE_COLLECTED", "The package has already been collected."},
+	{messages.ErrNotFound, http.StatusNotFound, "NOT_FOUND", "That could not be found."},
+	{messages.ErrNoDriver, http.StatusConflict, "NO_DRIVER_YET", "Chat opens once a driver accepts."},
+	{messages.ErrClosed, http.StatusConflict, "CHAT_CLOSED", "This ride has ended, so chat is closed."},
+	{messages.ErrInvalidBody, http.StatusBadRequest, "INVALID_MESSAGE", "Messages can be up to 1,000 characters."},
+	{messages.ErrInvalidAction, http.StatusBadRequest, "INVALID_QUICK_ACTION", "That quick message is not available."},
+	{messages.ErrRestricted, http.StatusForbidden, "MESSAGES_RESTRICTED", "You cannot send messages right now."},
+	{messages.ErrRateLimited, http.StatusTooManyRequests, "RATE_LIMITED", "You are sending messages too quickly."},
+	{messages.ErrNotRecipient, http.StatusForbidden, "FORBIDDEN", "That message was not sent to you."},
+	{messages.ErrOwnMessage, http.StatusBadRequest, "OWN_MESSAGE", "You cannot report your own message."},
+	{send.ErrUnavailable, http.StatusServiceUnavailable, "UPLOADS_UNAVAILABLE", "Photo uploads are not available right now."},
+	{send.ErrInvalidDetails, http.StatusBadRequest, "INVALID_DELIVERY", "Check the delivery details and try again."},
+	{send.ErrInvalidPhone, http.StatusBadRequest, "INVALID_PHONE", "Enter a Kenyan mobile number, such as 0712345678."},
+	{send.ErrInvalidPayment, http.StatusBadRequest, "INVALID_PAYMENT_OPTION", "A recipient can only pay on delivery."},
+	{send.ErrAckRequired, http.StatusConflict, "LIABILITY_ACK_REQUIRED", "Please confirm you accept responsibility for this item."},
+	{send.ErrNotFound, http.StatusNotFound, "NOT_FOUND", "That delivery could not be found."},
+	{send.ErrInvalidProof, http.StatusBadRequest, "INVALID_PROOF", "Use a JPEG or PNG photo under 10 MB."},
+	{send.ErrWrongState, http.StatusConflict, "INVALID_DELIVERY_STATE", "That is not possible at this stage of the delivery."},
+	{send.ErrUploadExpired, http.StatusConflict, "UPLOAD_EXPIRED", "That upload has expired. Please upload the photo again."},
+	{send.ErrUploadMissing, http.StatusConflict, "UPLOAD_NOT_FOUND", "We did not receive that photo. Please upload it again."},
+	{send.ErrNotRecipient, http.StatusForbidden, "FORBIDDEN", "This delivery is not addressed to you."},
+	{send.ErrPickupProofFirst, http.StatusConflict, "PICKUP_PROOF_REQUIRED", "Photograph the package at collection first."},
+	{send.ErrAlreadyConfirmed, http.StatusConflict, "ALREADY_CONFIRMED", "The recipient has already confirmed."},
+	{send.ErrRateLimited, http.StatusTooManyRequests, "RATE_LIMITED", "Too many uploads. Please wait and try again."},
 	{payments.ErrInvalidCallback, http.StatusBadRequest, "INVALID_CALLBACK", "The callback could not be read."},
 }
 

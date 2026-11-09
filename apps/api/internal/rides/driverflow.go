@@ -30,6 +30,8 @@ type driverStep struct {
 	done   []string
 	fields func(now time.Time, distanceM *int32) store.SetRideStatusParams
 	fence  func(ride store.Ride) (geo.Point, int32, error)
+	// guard refuses the step for reasons beyond the state machine.
+	guard func(ctx context.Context, q *store.Queries, ride store.Ride, now time.Time) error
 }
 
 // MarkArriving records that the driver is heading to pickup.
@@ -60,9 +62,10 @@ func (s *Service) MarkArrived(ctx context.Context, rideID, driverID uuid.UUID) (
 // StartTrip begins the trip.
 func (s *Service) StartTrip(ctx context.Context, rideID, driverID uuid.UUID) (Ride, error) {
 	return s.applyDriverStep(ctx, rideID, driverID, driverStep{
-		from: []string{StatusArrived},
-		to:   StatusInProgress,
-		done: []string{StatusInProgress},
+		from:  []string{StatusArrived},
+		to:    StatusInProgress,
+		done:  []string{StatusInProgress},
+		guard: startGate,
 		fields: func(now time.Time, _ *int32) store.SetRideStatusParams {
 			return store.SetRideStatusParams{StartedAt: new(now)}
 		},
@@ -76,9 +79,10 @@ func (s *Service) CompleteTrip(ctx context.Context, rideID, driverID uuid.UUID, 
 		return Ride{}, ErrInvalidPaymentMode
 	}
 	return s.applyDriverStep(ctx, rideID, driverID, driverStep{
-		from: []string{StatusInProgress},
-		to:   StatusCompleted,
-		done: []string{StatusCompleted},
+		from:  []string{StatusInProgress},
+		to:    StatusCompleted,
+		done:  []string{StatusCompleted},
+		guard: completeGate,
 		fields: func(now time.Time, distanceM *int32) store.SetRideStatusParams {
 			return store.SetRideStatusParams{CompletedAt: new(now), PaymentMode: new(paymentMode), CompletionDistanceM: distanceM}
 		},
@@ -106,6 +110,11 @@ func (s *Service) applyDriverStep(ctx context.Context, rideID, driverID uuid.UUI
 		}
 
 		now := s.now()
+		if step.guard != nil {
+			if err := step.guard(ctx, q, ride, now); err != nil {
+				return err
+			}
+		}
 		var distanceM *int32
 		if step.fence != nil {
 			target, radiusM, farErr := step.fence(ride)

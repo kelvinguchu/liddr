@@ -24,6 +24,10 @@ const (
 	enforcementLifted = "lifted"
 	enforcementEnded  = "expired"
 
+	// Enforcement scopes.
+	ScopePlatform      = "platform"
+	ScopeCommunication = "communication"
+
 	maxSuspension = 365 * 24 * time.Hour
 	sweepInterval = time.Minute
 	sweepBatch    = 200
@@ -38,6 +42,8 @@ type Penalty struct {
 	ReasonCode string
 	ReasonText *string
 	EndsAt     *time.Time
+	// Scope is platform when empty. A communication penalty only stops messages.
+	Scope string
 }
 
 // Enforcement is a recorded penalty.
@@ -64,9 +70,19 @@ func (s *Service) Apply(ctx context.Context, p Penalty) (Enforcement, error) {
 	return out, err
 }
 
+// ApplyInTx records a penalty inside the caller's transaction. A nil Actor
+// means the system decided.
+func (s *Service) ApplyInTx(ctx context.Context, q *store.Queries, p Penalty) (Enforcement, error) {
+	return s.applyInTx(ctx, q, p)
+}
+
 func (s *Service) applyInTx(ctx context.Context, q *store.Queries, p Penalty) (Enforcement, error) {
 	if p.UserID == p.Actor {
 		return Enforcement{}, ErrConflictOfInterest
+	}
+	var actor *uuid.UUID
+	if p.Actor != uuid.Nil {
+		actor = new(p.Actor)
 	}
 	if !slices.Contains([]string{actionWarning, actionRestriction, actionSuspension, actionBan}, p.Action) {
 		return Enforcement{}, ErrInvalidDecision
@@ -79,11 +95,17 @@ func (s *Service) applyInTx(ctx context.Context, q *store.Queries, p Penalty) (E
 		}
 		ends = p.EndsAt
 	}
+	if p.Scope == "" {
+		p.Scope = ScopePlatform
+	}
+	if p.Scope != ScopePlatform && p.Scope != ScopeCommunication {
+		return Enforcement{}, ErrInvalidDecision
+	}
 	if err := lockUser(ctx, q, p.UserID); err != nil {
 		return Enforcement{}, err
 	}
 	row, err := q.InsertEnforcement(ctx, store.InsertEnforcementParams{
-		ID: uuid.New(), UserID: p.UserID, ReportID: p.ReportID, ActorID: new(p.Actor), Action: p.Action,
+		ID: uuid.New(), UserID: p.UserID, ReportID: p.ReportID, ActorID: actor, Action: p.Action, Scope: p.Scope,
 		ReasonCode: p.ReasonCode, ReasonText: p.ReasonText, Now: now, EndsAt: ends,
 	})
 	if err != nil {

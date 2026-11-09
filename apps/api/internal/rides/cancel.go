@@ -62,6 +62,11 @@ func (s *Service) Cancel(ctx context.Context, rideID, actorID uuid.UUID, reason 
 		if !slices.Contains(reasons, reason) {
 			return ErrInvalidReason
 		}
+		if side == "rider" {
+			if err := checkSenderCancel(ctx, q, ride); err != nil {
+				return err
+			}
+		}
 		return cancelLocked(ctx, q, ride, actorID, side, reason, s.now())
 	})
 	if err != nil {
@@ -83,6 +88,9 @@ func (s *Service) MarkNoShow(ctx context.Context, rideID, driverID uuid.UUID) (R
 		}
 		if ride.Status != StatusArrived || ride.ArrivedAt == nil {
 			return ErrInvalidTransition
+		}
+		if err := checkSenderCancel(ctx, q, ride); err != nil {
+			return err
 		}
 		now := s.now()
 		if now.Sub(*ride.ArrivedAt) < noShowWait {

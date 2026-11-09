@@ -111,6 +111,7 @@ type Submission struct {
 
 	DisputeType         *string
 	RequestedResolution *string
+	MessageID           *uuid.UUID
 }
 
 // Filed identifies a report that now exists.
@@ -198,7 +199,7 @@ func (s *Service) SubmitInTx(ctx context.Context, q *store.Queries, sub Submissi
 	row, err := q.InsertReport(ctx, store.InsertReportParams{
 		ID: uuid.New(), ReporterID: new(sub.ReporterID), ReportedID: reported, Category: category.Slug,
 		Severity: category.DefaultSeverity, Source: sourceInApp, IncidentType: incident, RideID: new(ride.ID),
-		DisputeType: sub.DisputeType, RequestedResolution: sub.RequestedResolution, Description: description, Now: now,
+		DisputeType: sub.DisputeType, RequestedResolution: sub.RequestedResolution, Description: description, MessageID: sub.MessageID, Now: now,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		// The same person already reported this ride for this reason. A repeat is

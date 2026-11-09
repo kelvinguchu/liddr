@@ -32,6 +32,12 @@ var (
 	ErrTooFarFromPickup   = errors.New("driver is too far from pickup")
 	ErrTooFarFromDropoff  = errors.New("driver is too far from dropoff")
 	ErrNoShowTooEarly     = errors.New("waiting period has not ended")
+
+	ErrWrongBookingType     = errors.New("quote cannot be booked this way")
+	ErrPickupProofRequired  = errors.New("package photo is required before starting")
+	ErrDropoffProofRequired = errors.New("delivery photo is required before completing")
+	ErrRecipientPending     = errors.New("waiting for the recipient to confirm")
+	ErrPackageCollected     = errors.New("package has already been collected")
 )
 
 // RouteFinder computes a driving route.

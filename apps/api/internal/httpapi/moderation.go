@@ -114,12 +114,19 @@ func (a *API) ApplyEnforcement(ctx context.Context, req ApplyEnforcementRequestO
 		return nil, err
 	}
 	out, err := a.deps.Moderation.Apply(ctx, moderation.Penalty{
-		UserID: req.Body.UserId, Actor: actor.UserID, Action: string(req.Body.Action), ReasonCode: req.Body.ReasonCode, ReasonText: req.Body.ReasonText, EndsAt: req.Body.EndsAt,
+		UserID: req.Body.UserId, Actor: actor.UserID, Action: string(req.Body.Action), ReasonCode: req.Body.ReasonCode, ReasonText: req.Body.ReasonText, EndsAt: req.Body.EndsAt, Scope: scopeOf(req.Body.Scope),
 	})
 	if err != nil {
 		return nil, err
 	}
 	return ApplyEnforcement201JSONResponse(toEnforcement(out)), nil
+}
+
+func scopeOf(scope *EnforcementRequestScope) string {
+	if scope == nil {
+		return ""
+	}
+	return string(*scope)
 }
 
 // LiftEnforcement ends a penalty.

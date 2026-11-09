@@ -150,7 +150,11 @@ func startVerificationWorld(t *testing.T, databaseURL string, stub *smsStub) ver
 	store := &fakeBucket{objects: map[string]fakeObject{}}
 	bucket := httptest.NewServer(store)
 	t.Cleanup(bucket.Close)
-	baseURL, _ := startServerWithEnv(t, databaseURL, provider.URL, "http://127.0.0.1:1", map[string]string{
+	google := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"routes":[{"distanceMeters":5000,"duration":"900s","polyline":{"encodedPolyline":"x"}}]}`))
+	}))
+	t.Cleanup(google.Close)
+	baseURL, _ := startServerWithEnv(t, databaseURL, provider.URL, google.URL, map[string]string{
 		"GCS_BUCKET":               "test-bucket",
 		"GCS_BASE_URL":             bucket.URL,
 		"GCS_SERVICE_ACCOUNT_JSON": serviceAccountJSON(t),

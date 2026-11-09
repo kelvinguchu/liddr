@@ -67,6 +67,7 @@ type Config struct {
 	AuthHMACKey      Secret
 	DataKey          Secret
 	OpsAllowedNets   []netip.Prefix
+	Documents        Documents
 	SMS              SMS
 	GoogleMapsKey    Secret
 	GoogleRoutesURL  string
@@ -81,6 +82,16 @@ func LoadDatabaseURL(getenv func(string) string) (Secret, error) {
 		return "", errors.New("DATABASE_URL is required")
 	}
 	return url, nil
+}
+
+// Documents configures driver document storage. An empty Bucket means uploads
+// are unavailable: the server starts, and upload routes report that they cannot
+// serve. Once a bucket is set, the scanner and credentials are mandatory.
+type Documents struct {
+	Bucket         string
+	BaseURL        string
+	ServiceAccount Secret
+	ClamAVAddr     string
 }
 
 // Load validates the environment and reports every problem at once. Errors
@@ -160,6 +171,21 @@ func Load(getenv func(string) string) (Config, error) {
 			continue
 		}
 		cfg.OpsAllowedNets = append(cfg.OpsAllowedNets, prefix.Masked())
+	}
+
+	cfg.Documents = Documents{
+		Bucket:         getenv("GCS_BUCKET"),
+		BaseURL:        withDefault(getenv("GCS_BASE_URL"), "https://storage.googleapis.com"),
+		ServiceAccount: Secret(getenv("GCS_SERVICE_ACCOUNT_JSON")),
+		ClamAVAddr:     getenv("CLAMAV_ADDR"),
+	}
+	if cfg.Documents.Bucket != "" {
+		if cfg.Documents.ServiceAccount == "" {
+			errs = append(errs, errors.New("GCS_SERVICE_ACCOUNT_JSON is required with GCS_BUCKET"))
+		}
+		if cfg.Documents.ClamAVAddr == "" {
+			errs = append(errs, errors.New("CLAMAV_ADDR is required with GCS_BUCKET"))
+		}
 	}
 
 	hops, err := strconv.Atoi(withDefault(getenv("TRUSTED_PROXY_HOPS"), "0"))

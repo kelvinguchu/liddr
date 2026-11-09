@@ -701,8 +701,226 @@ paths:
         default:
           $ref: "#/components/responses/Problem"
 
+  /v1/verification/applications:
+    post:
+      operationId: startVerification
+      summary: Open a verification application, or return the open one
+      security:
+        - bearerAuth: [driver]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartVerificationRequest"
+      responses:
+        "201":
+          description: The open application.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerificationApplication"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/verification/uploads:
+    post:
+      operationId: prepareVerificationUpload
+      summary: Get a signed URL to upload one document
+      security:
+        - bearerAuth: [driver]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PrepareUploadRequest"
+      responses:
+        "201":
+          description: PUT the file to upload_url with exactly these headers.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerificationUpload"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/verification/documents:
+    post:
+      operationId: submitVerificationDocument
+      summary: Submit an uploaded file for checking
+      security:
+        - bearerAuth: [driver]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitDocumentRequest"
+      responses:
+        "201":
+          description: The document, now waiting for its safety scan.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerificationDocument"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/verification/status:
+    get:
+      operationId: getVerificationStatus
+      summary: Report the driver's verification progress
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "200":
+          description: Current progress.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerificationStatus"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/verification/applications:
+    get:
+      operationId: listVerificationApplications
+      summary: List applications in one status, oldest first
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - name: status
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [pending, under_review, approved, rejected, resubmission_required, suspended]
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: One page of the queue.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerificationQueue"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/verification/applications/{application_id}:
+    get:
+      operationId: getVerificationApplication
+      summary: Load an application with the driver's current documents
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - $ref: "#/components/parameters/ApplicationId"
+      responses:
+        "200":
+          description: The application.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerificationApplicationDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/verification/applications/{application_id}/review:
+    post:
+      operationId: reviewVerificationApplication
+      summary: Make the final decision on an application
+      security:
+        - bearerAuth: [ops, admin, "mfa:step-up"]
+      parameters:
+        - $ref: "#/components/parameters/ApplicationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewRequest"
+      responses:
+        "204":
+          description: The decision was recorded.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/verification/documents/{document_id}/review:
+    post:
+      operationId: reviewVerificationDocument
+      summary: Decide on one document
+      security:
+        - bearerAuth: [ops, admin, "mfa:step-up"]
+      parameters:
+        - $ref: "#/components/parameters/DocumentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewRequest"
+      responses:
+        "204":
+          description: The decision was recorded.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/verification/documents/{document_id}/download:
+    post:
+      operationId: downloadVerificationDocument
+      summary: Get a five-minute link to a document's file
+      description: A POST because every request is written to the audit trail.
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - $ref: "#/components/parameters/DocumentId"
+      responses:
+        "200":
+          description: A signed link.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignedDownload"
+        default:
+          $ref: "#/components/responses/Problem"
+
 components:
   parameters:
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+        maximum: 200
+        default: 50
+    Offset:
+      name: offset
+      in: query
+      required: false
+      schema:
+        type: integer
+        format: int32
+        minimum: 0
+        maximum: 100000
+        default: 0
+    ApplicationId:
+      name: application_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    DocumentId:
+      name: document_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     StepUpToken:
       name: X-Step-Up-Token
       in: header
@@ -1211,3 +1429,207 @@ components:
         expires_in:
           type: integer
           format: int32
+
+    StartVerificationRequest:
+      type: object
+      additionalProperties: false
+      required: [plate_number]
+      properties:
+        plate_number:
+          type: string
+          example: KMFB 123A
+
+    PrepareUploadRequest:
+      type: object
+      additionalProperties: false
+      required: [document_type, content_type, size_bytes]
+      properties:
+        document_type:
+          type: string
+        content_type:
+          type: string
+          enum: [image/jpeg, image/png, application/pdf]
+        size_bytes:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 10485760
+
+    VerificationUpload:
+      type: object
+      additionalProperties: false
+      required: [upload_id, upload_url, headers, expires_at]
+      properties:
+        upload_id:
+          type: string
+          format: uuid
+        upload_url:
+          type: string
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        expires_at:
+          type: string
+          format: date-time
+
+    SubmitDocumentRequest:
+      type: object
+      additionalProperties: false
+      required: [upload_id]
+      properties:
+        upload_id:
+          type: string
+          format: uuid
+        expires_on:
+          type: string
+          format: date
+
+    VerificationApplication:
+      type: object
+      additionalProperties: false
+      required: [id, status, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        decided_at:
+          type: string
+          format: date-time
+        decision_reason:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    VerificationDocument:
+      type: object
+      additionalProperties: false
+      required: [id, document_type, version, status, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        document_type:
+          type: string
+        version:
+          type: integer
+          format: int32
+        status:
+          type: string
+        expires_on:
+          type: string
+          format: date
+        rejection_reason:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    VerificationRequirement:
+      type: object
+      additionalProperties: false
+      required: [document_type, label, required, requires_expiry]
+      properties:
+        document_type:
+          type: string
+        label:
+          type: string
+        required:
+          type: boolean
+        requires_expiry:
+          type: boolean
+        document:
+          $ref: "#/components/schemas/VerificationDocument"
+
+    VerificationStatus:
+      type: object
+      additionalProperties: false
+      required: [driver_status, requirements]
+      properties:
+        driver_status:
+          type: string
+        plate_number:
+          type: string
+        application:
+          $ref: "#/components/schemas/VerificationApplication"
+        requirements:
+          type: array
+          items:
+            $ref: "#/components/schemas/VerificationRequirement"
+
+    VerificationQueueItem:
+      type: object
+      additionalProperties: false
+      required: [application, driver_id, driver_status, phone_masked]
+      properties:
+        application:
+          $ref: "#/components/schemas/VerificationApplication"
+        driver_id:
+          type: string
+          format: uuid
+        driver_status:
+          type: string
+        plate_number:
+          type: string
+        phone_masked:
+          type: string
+
+    VerificationQueue:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/VerificationQueueItem"
+
+    ReviewableDocument:
+      type: object
+      additionalProperties: false
+      required: [document, content_type, scan_status]
+      properties:
+        document:
+          $ref: "#/components/schemas/VerificationDocument"
+        content_type:
+          type: string
+        scan_status:
+          type: string
+
+    VerificationApplicationDetail:
+      type: object
+      additionalProperties: false
+      required: [summary, documents]
+      properties:
+        summary:
+          $ref: "#/components/schemas/VerificationQueueItem"
+        documents:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewableDocument"
+
+    ReviewRequest:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [approve, reject, request_resubmission, suspend]
+        reason:
+          type: string
+          maxLength: 500
+
+    SignedDownload:
+      type: object
+      additionalProperties: false
+      required: [url, expires_at]
+      properties:
+        url:
+          type: string
+        expires_at:
+          type: string
+          format: date-time

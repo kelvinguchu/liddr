@@ -15,7 +15,7 @@ INSERT INTO drivers (user_id, vehicle_category_id)
 VALUES (sqlc.arg(user_id), sqlc.arg(vehicle_category_id))
 ON CONFLICT (user_id) DO UPDATE
 SET vehicle_category_id = EXCLUDED.vehicle_category_id, updated_at = now()
-WHERE drivers.verification_status <> 'approved';
+WHERE drivers.verification_status IN ('pending', 'rejected');
 
 -- name: SetDriverOnline :exec
 UPDATE drivers SET is_online = sqlc.arg(is_online), updated_at = now() WHERE user_id = sqlc.arg(user_id);

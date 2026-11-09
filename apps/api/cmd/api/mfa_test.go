@@ -19,6 +19,13 @@ func grantStaff(t *testing.T, databaseURL, phone, role string) {
 	}
 }
 
+func newSMSServer(t *testing.T, stub *smsStub) string {
+	t.Helper()
+	server := httptest.NewServer(stub)
+	t.Cleanup(server.Close)
+	return server.URL
+}
+
 func totpAt(t *testing.T, secret string, at time.Time) string {
 	t.Helper()
 	code, err := auth.TOTPCode(secret, at)
@@ -33,16 +40,22 @@ func totpAt(t *testing.T, secret string, at time.Time) string {
 func enrolStaff(t *testing.T, baseURL string, stub *smsStub, phone string) (token, secret string) {
 	t.Helper()
 	token, _ = signIn(t, baseURL, stub, phone, "staff")["access_token"].(string)
+	return token, enrol(t, baseURL, token)
+}
+
+// enrol activates an authenticator on a session and returns its secret.
+func enrol(t *testing.T, baseURL, token string) string {
+	t.Helper()
 	setup := send(t, http.MethodPost, baseURL+"/v1/auth/mfa/totp/setup", token, nil)
 	if setup.status != http.StatusCreated {
 		t.Fatalf("setup = %d %v", setup.status, setup.body)
 	}
-	secret, _ = setup.body["secret"].(string)
+	secret, _ := setup.body["secret"].(string)
 	confirm := send(t, http.MethodPost, baseURL+"/v1/auth/mfa/totp/confirm", token, map[string]string{"code": totpAt(t, secret, time.Now())})
 	if confirm.status != http.StatusNoContent {
 		t.Fatalf("confirm = %d %v", confirm.status, confirm.body)
 	}
-	return token, secret
+	return secret
 }
 
 // stepUp spends the code one period ahead, which is accepted as clock drift and

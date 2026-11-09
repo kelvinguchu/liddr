@@ -23,6 +23,8 @@ const (
 	TypeOfferClosed    = "offer.closed"
 	TypeDriverLocation = "driver.location"
 	TypeResync         = "resync"
+
+	TypeVerificationUpdated = "verification.updated"
 )
 
 // Event is what a client receives.

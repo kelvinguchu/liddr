@@ -99,10 +99,21 @@ func startServer(t *testing.T, databaseURL, smsURL string) (string, *capture) {
 
 func startServerWithRoutes(t *testing.T, databaseURL, smsURL, routesURL string) (string, *capture) {
 	t.Helper()
+	return startServerWithEnv(t, databaseURL, smsURL, routesURL, nil)
+}
+
+func startServerWithEnv(t *testing.T, databaseURL, smsURL, routesURL string, extra map[string]string) (string, *capture) {
+	t.Helper()
 	ctx, cancel := context.WithCancel(t.Context())
 	output := &capture{addr: make(chan string, 1)}
 	done := make(chan error, 1)
-	env := envWithRoutes(databaseURL, smsURL, routesURL)
+	base := envWithRoutes(databaseURL, smsURL, routesURL)
+	env := func(key string) string {
+		if value, ok := extra[key]; ok {
+			return value
+		}
+		return base(key)
+	}
 	go func() { done <- run(ctx, []string{"api", "serve"}, env, output, io.Discard) }()
 
 	t.Cleanup(func() {

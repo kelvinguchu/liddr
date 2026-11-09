@@ -9,6 +9,7 @@ import (
 	"github.com/kelvinguchu/liddr/apps/api/internal/payments"
 	"github.com/kelvinguchu/liddr/apps/api/internal/rides"
 	"github.com/kelvinguchu/liddr/apps/api/internal/subscriptions"
+	"github.com/kelvinguchu/liddr/apps/api/internal/verification"
 )
 
 // problem is how a domain error appears to a client.
@@ -62,6 +63,24 @@ var problems = []problem{
 	{subscriptions.ErrRateLimited, http.StatusTooManyRequests, "RATE_LIMITED", "Too many attempts. Please wait and try again."},
 	{subscriptions.ErrPaymentRefused, http.StatusBadGateway, "PAYMENT_REFUSED", "M-Pesa could not start this payment. Please try again."},
 	{subscriptions.ErrCallbackRefused, http.StatusUnauthorized, "UNAUTHORIZED", "Not authorized."},
+	{verification.ErrUnavailable, http.StatusServiceUnavailable, "UPLOADS_UNAVAILABLE", "Document uploads are not available right now."},
+	{verification.ErrProfileMissing, http.StatusNotFound, "DRIVER_PROFILE_MISSING", "Finish setting up your driver profile first."},
+	{verification.ErrInvalidPlate, http.StatusBadRequest, "INVALID_PLATE", "Enter a valid Kenyan number plate."},
+	{verification.ErrApplicationBlocked, http.StatusForbidden, "VERIFICATION_BLOCKED", "Your account is suspended. Please contact support."},
+	{verification.ErrNoOpenApplication, http.StatusConflict, "NO_OPEN_APPLICATION", "Start your application first."},
+	{verification.ErrApplicationClosed, http.StatusConflict, "APPLICATION_CLOSED", "This application has already been decided."},
+	{verification.ErrNotFound, http.StatusNotFound, "NOT_FOUND", "That could not be found."},
+	{verification.ErrInvalidDocument, http.StatusBadRequest, "INVALID_DOCUMENT_TYPE", "That document is not needed."},
+	{verification.ErrInvalidFile, http.StatusBadRequest, "INVALID_FILE", "Use a JPEG, PNG or PDF under 10 MB."},
+	{verification.ErrExpiryRequired, http.StatusBadRequest, "EXPIRY_REQUIRED", "Enter this document's expiry date. It must be in the future."},
+	{verification.ErrUploadExpired, http.StatusConflict, "UPLOAD_EXPIRED", "That upload has expired. Please upload the file again."},
+	{verification.ErrUploadMissing, http.StatusConflict, "UPLOAD_NOT_FOUND", "We did not receive that file. Please upload it again."},
+	{verification.ErrRateLimited, http.StatusTooManyRequests, "RATE_LIMITED", "Too many uploads. Please wait and try again."},
+	{verification.ErrInvalidDecision, http.StatusBadRequest, "INVALID_DECISION", "That decision is not available here."},
+	{verification.ErrReasonRequired, http.StatusBadRequest, "REASON_REQUIRED", "Give a reason of up to 500 characters."},
+	{verification.ErrSelfReview, http.StatusForbidden, "SELF_REVIEW", "You cannot review your own documents."},
+	{verification.ErrDocumentNotReady, http.StatusConflict, "DOCUMENT_NOT_READY", "This document cannot be reviewed yet."},
+	{verification.ErrDocumentsMissing, http.StatusConflict, "DOCUMENTS_INCOMPLETE", "Every required document must be validated first."},
 	{payments.ErrInvalidCallback, http.StatusBadRequest, "INVALID_CALLBACK", "The callback could not be read."},
 }
 

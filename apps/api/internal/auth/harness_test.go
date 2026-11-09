@@ -1,6 +1,7 @@
 package auth_test
 
 import (
+	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -14,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kelvinguchu/liddr/apps/api/internal/auth"
+	"github.com/kelvinguchu/liddr/apps/api/internal/sealing"
 	"github.com/kelvinguchu/liddr/apps/api/internal/sms"
 	"github.com/kelvinguchu/liddr/apps/api/internal/testdb"
 )
@@ -85,11 +87,16 @@ func newHarness(t *testing.T) *harness {
 	server := httptest.NewServer(stub)
 	t.Cleanup(server.Close)
 	c := &clock{now: time.Date(2026, 11, 9, 8, 0, 0, 0, time.UTC)}
+	box, err := sealing.New(bytes.Repeat([]byte{1}, sealing.KeyBytes))
+	if err != nil {
+		t.Fatalf("sealing: %v", err)
+	}
 	return &harness{
 		svc: auth.NewService(auth.Config{
 			Pool:    pool,
 			SMS:     sms.NewClient(sms.Config{URL: server.URL}),
 			HMACKey: []byte("test-key-of-sufficient-length-for-hmac"),
+			Box:     box,
 			Now:     c.Now,
 		}),
 		pool:     pool,

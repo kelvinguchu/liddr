@@ -15,20 +15,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-
-	"github.com/kelvinguchu/liddr/apps/api/internal/auth"
 	"github.com/kelvinguchu/liddr/apps/api/internal/config"
 	"github.com/kelvinguchu/liddr/apps/api/internal/dispatch"
 	"github.com/kelvinguchu/liddr/apps/api/internal/httpapi"
 	"github.com/kelvinguchu/liddr/apps/api/internal/maps"
-	"github.com/kelvinguchu/liddr/apps/api/internal/payments"
 	"github.com/kelvinguchu/liddr/apps/api/internal/realtime"
 	"github.com/kelvinguchu/liddr/apps/api/internal/rides"
-	"github.com/kelvinguchu/liddr/apps/api/internal/sealing"
-	"github.com/kelvinguchu/liddr/apps/api/internal/sms"
 	"github.com/kelvinguchu/liddr/apps/api/internal/store"
-	"github.com/kelvinguchu/liddr/apps/api/internal/subscriptions"
 )
 
 const usage = "usage: api <serve|migrate|register-c2b-urls|grant-role PHONE ROLE>"
@@ -88,77 +81,6 @@ func validCommand(args []string) bool {
 	}
 }
 
-func newAuth(cfg config.Config, pool *pgxpool.Pool) (*auth.Service, error) {
-	box, err := sealing.New([]byte(cfg.DataKey.Reveal()))
-	if err != nil {
-		return nil, err
-	}
-	return auth.NewService(auth.Config{
-		Pool: pool,
-		SMS: sms.NewClient(sms.Config{
-			URL:      cfg.SMS.URL,
-			APIKey:   cfg.SMS.APIKey.Reveal(),
-			UserID:   cfg.SMS.UserID,
-			Password: cfg.SMS.Password.Reveal(),
-			SenderID: cfg.SMS.SenderID,
-		}),
-		HMACKey: []byte(cfg.AuthHMACKey.Reveal()),
-		Box:     box,
-		Now:     time.Now,
-	}), nil
-}
-
-// grantRole creates staff. It is a command so no public route can ever do it.
-func grantRole(ctx context.Context, cfg config.Config, phone, role string, logger *slog.Logger) error {
-	pool, err := store.OpenPool(ctx, cfg.DatabaseURL.Reveal(), cfg.DBMaxConns)
-	if err != nil {
-		return err
-	}
-	defer pool.Close()
-	service, err := newAuth(cfg, pool)
-	if err != nil {
-		return err
-	}
-	if err := service.GrantRole(ctx, phone, auth.Role(role)); err != nil {
-		return fmt.Errorf("grant role: %w", err)
-	}
-	logger.LogAttrs(ctx, slog.LevelInfo, "role granted", slog.String("role", role))
-	return nil
-}
-
-func newGateway(cfg config.Config) *payments.Client {
-	return payments.NewClient(payments.Config{
-		BaseURL:         cfg.Mpesa.BaseURL,
-		ConsumerKey:     cfg.Mpesa.ConsumerKey.Reveal(),
-		ConsumerSecret:  cfg.Mpesa.ConsumerSecret.Reveal(),
-		Shortcode:       cfg.Mpesa.Shortcode,
-		Passkey:         cfg.Mpesa.Passkey.Reveal(),
-		TransactionType: cfg.Mpesa.TransactionType,
-	}, time.Now)
-}
-
-func newSubscriptions(cfg config.Config, pool *pgxpool.Pool, logger *slog.Logger) *subscriptions.Service {
-	return subscriptions.NewService(subscriptions.Config{
-		Pool:            pool,
-		Gateway:         newGateway(cfg),
-		Now:             time.Now,
-		Logger:          logger,
-		CallbackBaseURL: cfg.Mpesa.CallbackBaseURL,
-		CallbackToken:   cfg.Mpesa.CallbackToken.Reveal(),
-		Shortcode:       cfg.Mpesa.Shortcode,
-	})
-}
-
-// registerC2BURLs is a one-off setup step, so it has no HTTP surface to protect.
-func registerC2BURLs(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
-	validation, confirmation := newSubscriptions(cfg, nil, logger).C2BURLs()
-	if err := newGateway(cfg).RegisterC2BURLs(ctx, validation, confirmation); err != nil {
-		return err
-	}
-	logger.LogAttrs(ctx, slog.LevelInfo, "c2b urls registered")
-	return nil
-}
-
 func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	pool, err := store.OpenPool(ctx, cfg.DatabaseURL.Reveal(), cfg.DBMaxConns)
 	if err != nil {
@@ -167,6 +89,10 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	defer pool.Close()
 
 	authService, err := newAuth(cfg, pool)
+	if err != nil {
+		return err
+	}
+	documents, err := newVerification(cfg, pool, logger)
 	if err != nil {
 		return err
 	}
@@ -185,6 +111,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		}),
 		Dispatch:         dispatcher,
 		Subscriptions:    billing,
+		Verification:     documents,
 		Realtime:         hub,
 		RealtimeBase:     ctx,
 		RealtimeOrigins:  cfg.RealtimeOrigins,
@@ -216,6 +143,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	workers.Go(func() { dispatcher.Run(workerCtx, logger) })
 	workers.Go(func() { billing.Run(workerCtx, logger) })
 	workers.Go(func() { hub.Listen(workerCtx, pool) })
+	workers.Go(func() { documents.Run(workerCtx) })
 	defer workers.Wait()
 	defer stopWorkers()
 

@@ -436,7 +436,7 @@ INSERT INTO drivers (user_id, vehicle_category_id)
 VALUES ($1, $2)
 ON CONFLICT (user_id) DO UPDATE
 SET vehicle_category_id = EXCLUDED.vehicle_category_id, updated_at = now()
-WHERE drivers.verification_status <> 'approved'
+WHERE drivers.verification_status IN ('pending', 'rejected')
 `
 
 type UpsertDriverCategoryParams struct {

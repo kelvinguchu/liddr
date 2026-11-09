@@ -18,6 +18,7 @@ import (
 	"github.com/kelvinguchu/liddr/apps/api/internal/realtime"
 	"github.com/kelvinguchu/liddr/apps/api/internal/rides"
 	"github.com/kelvinguchu/liddr/apps/api/internal/subscriptions"
+	"github.com/kelvinguchu/liddr/apps/api/internal/verification"
 )
 
 const readinessTimeout = 2 * time.Second
@@ -37,6 +38,7 @@ type Deps struct {
 	Dispatch   *dispatch.Service
 
 	Subscriptions *subscriptions.Service
+	Verification  *verification.Service
 
 	// Realtime and RealtimeOrigins serve live updates. RealtimeBase bounds each
 	// socket's life, because a socket outlives the HTTP request that opened it.

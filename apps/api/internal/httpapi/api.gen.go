@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -96,6 +97,51 @@ func (e PaymentMode) Valid() bool {
 	case CashDirect:
 		return true
 	case MpesaDirect:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PrepareUploadRequestContentType.
+const (
+	Applicationpdf PrepareUploadRequestContentType = "application/pdf"
+	Imagejpeg      PrepareUploadRequestContentType = "image/jpeg"
+	Imagepng       PrepareUploadRequestContentType = "image/png"
+)
+
+// Valid indicates whether the value is a known member of the PrepareUploadRequestContentType enum.
+func (e PrepareUploadRequestContentType) Valid() bool {
+	switch e {
+	case Applicationpdf:
+		return true
+	case Imagejpeg:
+		return true
+	case Imagepng:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReviewRequestDecision.
+const (
+	Approve             ReviewRequestDecision = "approve"
+	Reject              ReviewRequestDecision = "reject"
+	RequestResubmission ReviewRequestDecision = "request_resubmission"
+	Suspend             ReviewRequestDecision = "suspend"
+)
+
+// Valid indicates whether the value is a known member of the ReviewRequestDecision enum.
+func (e ReviewRequestDecision) Valid() bool {
+	switch e {
+	case Approve:
+		return true
+	case Reject:
+		return true
+	case RequestResubmission:
+		return true
+	case Suspend:
 		return true
 	default:
 		return false
@@ -255,6 +301,36 @@ func (e SubscriptionPaymentStatus) Valid() bool {
 	}
 }
 
+// Defines values for ListVerificationApplicationsParamsStatus.
+const (
+	ListVerificationApplicationsParamsStatusApproved             ListVerificationApplicationsParamsStatus = "approved"
+	ListVerificationApplicationsParamsStatusPending              ListVerificationApplicationsParamsStatus = "pending"
+	ListVerificationApplicationsParamsStatusRejected             ListVerificationApplicationsParamsStatus = "rejected"
+	ListVerificationApplicationsParamsStatusResubmissionRequired ListVerificationApplicationsParamsStatus = "resubmission_required"
+	ListVerificationApplicationsParamsStatusSuspended            ListVerificationApplicationsParamsStatus = "suspended"
+	ListVerificationApplicationsParamsStatusUnderReview          ListVerificationApplicationsParamsStatus = "under_review"
+)
+
+// Valid indicates whether the value is a known member of the ListVerificationApplicationsParamsStatus enum.
+func (e ListVerificationApplicationsParamsStatus) Valid() bool {
+	switch e {
+	case ListVerificationApplicationsParamsStatusApproved:
+		return true
+	case ListVerificationApplicationsParamsStatusPending:
+		return true
+	case ListVerificationApplicationsParamsStatusRejected:
+		return true
+	case ListVerificationApplicationsParamsStatusResubmissionRequired:
+		return true
+	case ListVerificationApplicationsParamsStatusSuspended:
+		return true
+	case ListVerificationApplicationsParamsStatusUnderReview:
+		return true
+	default:
+		return false
+	}
+}
+
 // BookRideRequest defines model for BookRideRequest.
 type BookRideRequest struct {
 	QuoteId openapi_types.UUID `json:"quote_id"`
@@ -370,6 +446,16 @@ type OtpVerification struct {
 // PaymentMode defines model for PaymentMode.
 type PaymentMode string
 
+// PrepareUploadRequest defines model for PrepareUploadRequest.
+type PrepareUploadRequest struct {
+	ContentType  PrepareUploadRequestContentType `json:"content_type"`
+	DocumentType string                          `json:"document_type"`
+	SizeBytes    int64                           `json:"size_bytes"`
+}
+
+// PrepareUploadRequestContentType defines model for PrepareUploadRequest.ContentType.
+type PrepareUploadRequestContentType string
+
 // Quote defines model for Quote.
 type Quote struct {
 	// BaseFareKes The price before the discount.
@@ -402,6 +488,22 @@ type QuoteRequest struct {
 // RefreshRequest defines model for RefreshRequest.
 type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token"`
+}
+
+// ReviewRequest defines model for ReviewRequest.
+type ReviewRequest struct {
+	Decision ReviewRequestDecision `json:"decision"`
+	Reason   *string               `json:"reason,omitempty"`
+}
+
+// ReviewRequestDecision defines model for ReviewRequest.Decision.
+type ReviewRequestDecision string
+
+// ReviewableDocument defines model for ReviewableDocument.
+type ReviewableDocument struct {
+	ContentType string               `json:"content_type"`
+	Document    VerificationDocument `json:"document"`
+	ScanStatus  string               `json:"scan_status"`
 }
 
 // Ride defines model for Ride.
@@ -444,13 +546,31 @@ type SetDriverCategoryRequest struct {
 	VehicleCategory string `json:"vehicle_category"`
 }
 
+// SignedDownload defines model for SignedDownload.
+type SignedDownload struct {
+	ExpiresAt time.Time `json:"expires_at"`
+	Url       string    `json:"url"`
+}
+
 // SignupRole defines model for SignupRole.
 type SignupRole string
+
+// StartVerificationRequest defines model for StartVerificationRequest.
+type StartVerificationRequest struct {
+	// PlateNumber Example: KMFB 123A
+	PlateNumber string `json:"plate_number"`
+}
 
 // StepUpGrant defines model for StepUpGrant.
 type StepUpGrant struct {
 	ExpiresIn   int32  `json:"expires_in"`
 	StepUpToken string `json:"step_up_token"`
+}
+
+// SubmitDocumentRequest defines model for SubmitDocumentRequest.
+type SubmitDocumentRequest struct {
+	ExpiresOn *openapi_types.Date `json:"expires_on,omitempty"`
+	UploadId  openapi_types.UUID  `json:"upload_id"`
 }
 
 // Subscription defines model for Subscription.
@@ -522,11 +642,88 @@ type VehicleCategoryList struct {
 	Data []VehicleCategory `json:"data"`
 }
 
+// VerificationApplication defines model for VerificationApplication.
+type VerificationApplication struct {
+	CreatedAt      time.Time          `json:"created_at"`
+	DecidedAt      *time.Time         `json:"decided_at,omitempty"`
+	DecisionReason *string            `json:"decision_reason,omitempty"`
+	Id             openapi_types.UUID `json:"id"`
+	Status         string             `json:"status"`
+}
+
+// VerificationApplicationDetail defines model for VerificationApplicationDetail.
+type VerificationApplicationDetail struct {
+	Documents []ReviewableDocument  `json:"documents"`
+	Summary   VerificationQueueItem `json:"summary"`
+}
+
+// VerificationDocument defines model for VerificationDocument.
+type VerificationDocument struct {
+	CreatedAt       time.Time           `json:"created_at"`
+	DocumentType    string              `json:"document_type"`
+	ExpiresOn       *openapi_types.Date `json:"expires_on,omitempty"`
+	Id              openapi_types.UUID  `json:"id"`
+	RejectionReason *string             `json:"rejection_reason,omitempty"`
+	Status          string              `json:"status"`
+	Version         int32               `json:"version"`
+}
+
+// VerificationQueue defines model for VerificationQueue.
+type VerificationQueue struct {
+	Data []VerificationQueueItem `json:"data"`
+}
+
+// VerificationQueueItem defines model for VerificationQueueItem.
+type VerificationQueueItem struct {
+	Application  VerificationApplication `json:"application"`
+	DriverId     openapi_types.UUID      `json:"driver_id"`
+	DriverStatus string                  `json:"driver_status"`
+	PhoneMasked  string                  `json:"phone_masked"`
+	PlateNumber  *string                 `json:"plate_number,omitempty"`
+}
+
+// VerificationRequirement defines model for VerificationRequirement.
+type VerificationRequirement struct {
+	Document       *VerificationDocument `json:"document,omitempty"`
+	DocumentType   string                `json:"document_type"`
+	Label          string                `json:"label"`
+	Required       bool                  `json:"required"`
+	RequiresExpiry bool                  `json:"requires_expiry"`
+}
+
+// VerificationStatus defines model for VerificationStatus.
+type VerificationStatus struct {
+	Application  *VerificationApplication  `json:"application,omitempty"`
+	DriverStatus string                    `json:"driver_status"`
+	PlateNumber  *string                   `json:"plate_number,omitempty"`
+	Requirements []VerificationRequirement `json:"requirements"`
+}
+
+// VerificationUpload defines model for VerificationUpload.
+type VerificationUpload struct {
+	ExpiresAt time.Time          `json:"expires_at"`
+	Headers   map[string]string  `json:"headers"`
+	UploadId  openapi_types.UUID `json:"upload_id"`
+	UploadUrl string             `json:"upload_url"`
+}
+
+// ApplicationId defines model for ApplicationId.
+type ApplicationId = openapi_types.UUID
+
 // CallbackToken defines model for CallbackToken.
 type CallbackToken = string
 
+// DocumentId defines model for DocumentId.
+type DocumentId = openapi_types.UUID
+
+// Limit defines model for Limit.
+type Limit = int32
+
 // OfferId defines model for OfferId.
 type OfferId = openapi_types.UUID
+
+// Offset defines model for Offset.
+type Offset = int32
 
 // RideId defines model for RideId.
 type RideId = openapi_types.UUID
@@ -544,6 +741,16 @@ type bearerAuthContextKey string
 type BeginTotpSetupParams struct {
 	XStepUpToken *StepUpToken `json:"X-Step-Up-Token,omitempty"`
 }
+
+// ListVerificationApplicationsParams defines parameters for ListVerificationApplications.
+type ListVerificationApplicationsParams struct {
+	Status ListVerificationApplicationsParamsStatus `form:"status" json:"status"`
+	Limit  *Limit                                   `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset *Offset                                  `form:"offset,omitempty" json:"offset,omitempty"`
+}
+
+// ListVerificationApplicationsParamsStatus defines parameters for ListVerificationApplications.
+type ListVerificationApplicationsParamsStatus string
 
 // LogoutJSONRequestBody defines body for Logout for application/json ContentType.
 type LogoutJSONRequestBody = RefreshRequest
@@ -569,6 +776,12 @@ type SetDriverCategoryJSONRequestBody = SetDriverCategoryRequest
 // UpdateDriverLocationJSONRequestBody defines body for UpdateDriverLocation for application/json ContentType.
 type UpdateDriverLocationJSONRequestBody = Coordinates
 
+// ReviewVerificationApplicationJSONRequestBody defines body for ReviewVerificationApplication for application/json ContentType.
+type ReviewVerificationApplicationJSONRequestBody = ReviewRequest
+
+// ReviewVerificationDocumentJSONRequestBody defines body for ReviewVerificationDocument for application/json ContentType.
+type ReviewVerificationDocumentJSONRequestBody = ReviewRequest
+
 // BookRideJSONRequestBody defines body for BookRide for application/json ContentType.
 type BookRideJSONRequestBody = BookRideRequest
 
@@ -580,6 +793,15 @@ type CancelRideJSONRequestBody = CancelRideRequest
 
 // CompleteTripJSONRequestBody defines body for CompleteTrip for application/json ContentType.
 type CompleteTripJSONRequestBody = CompleteTripRequest
+
+// StartVerificationJSONRequestBody defines body for StartVerification for application/json ContentType.
+type StartVerificationJSONRequestBody = StartVerificationRequest
+
+// SubmitVerificationDocumentJSONRequestBody defines body for SubmitVerificationDocument for application/json ContentType.
+type SubmitVerificationDocumentJSONRequestBody = SubmitDocumentRequest
+
+// PrepareVerificationUploadJSONRequestBody defines body for PrepareVerificationUpload for application/json ContentType.
+type PrepareVerificationUploadJSONRequestBody = PrepareUploadRequest
 
 // MpesaC2bConfirmationJSONRequestBody defines body for MpesaC2bConfirmation for application/json ContentType.
 type MpesaC2bConfirmationJSONRequestBody = MpesaCallback
@@ -646,6 +868,21 @@ type ServerInterface interface {
 	// RejectOffer Reject an offer
 	// (POST /v1/offers/{offer_id}/reject)
 	RejectOffer(w http.ResponseWriter, r *http.Request, offerId OfferId)
+	// ListVerificationApplications List applications in one status, oldest first
+	// (GET /v1/ops/verification/applications)
+	ListVerificationApplications(w http.ResponseWriter, r *http.Request, params ListVerificationApplicationsParams)
+	// GetVerificationApplication Load an application with the driver's current documents
+	// (GET /v1/ops/verification/applications/{application_id})
+	GetVerificationApplication(w http.ResponseWriter, r *http.Request, applicationId ApplicationId)
+	// ReviewVerificationApplication Make the final decision on an application
+	// (POST /v1/ops/verification/applications/{application_id}/review)
+	ReviewVerificationApplication(w http.ResponseWriter, r *http.Request, applicationId ApplicationId)
+	// DownloadVerificationDocument Get a five-minute link to a document's file
+	// (POST /v1/ops/verification/documents/{document_id}/download)
+	DownloadVerificationDocument(w http.ResponseWriter, r *http.Request, documentId DocumentId)
+	// ReviewVerificationDocument Decide on one document
+	// (POST /v1/ops/verification/documents/{document_id}/review)
+	ReviewVerificationDocument(w http.ResponseWriter, r *http.Request, documentId DocumentId)
 	// BookRide Book a quoted trip. Repeating the call returns the same ride.
 	// (POST /v1/rides)
 	BookRide(w http.ResponseWriter, r *http.Request)
@@ -685,6 +922,18 @@ type ServerInterface interface {
 	// ListVehicleCategories List the vehicle categories open for booking and driver sign-up
 	// (GET /v1/vehicle-categories)
 	ListVehicleCategories(w http.ResponseWriter, r *http.Request)
+	// StartVerification Open a verification application, or return the open one
+	// (POST /v1/verification/applications)
+	StartVerification(w http.ResponseWriter, r *http.Request)
+	// SubmitVerificationDocument Submit an uploaded file for checking
+	// (POST /v1/verification/documents)
+	SubmitVerificationDocument(w http.ResponseWriter, r *http.Request)
+	// GetVerificationStatus Report the driver's verification progress
+	// (GET /v1/verification/status)
+	GetVerificationStatus(w http.ResponseWriter, r *http.Request)
+	// PrepareVerificationUpload Get a signed URL to upload one document
+	// (POST /v1/verification/uploads)
+	PrepareVerificationUpload(w http.ResponseWriter, r *http.Request)
 	// MpesaC2bConfirmation Receive a paybill payment from Safaricom
 	// (POST /v1/webhooks/mpesa/{token}/c2b/confirmation)
 	MpesaC2bConfirmation(w http.ResponseWriter, r *http.Request, token CallbackToken)
@@ -1080,6 +1329,199 @@ func (siw *ServerInterfaceWrapper) RejectOffer(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// ListVerificationApplications operation middleware
+func (siw *ServerInterfaceWrapper) ListVerificationApplications(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin"})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListVerificationApplicationsParams
+
+	// ------------- Required query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "offset" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "offset", r.URL.Query(), &params.Offset, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "offset"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListVerificationApplications(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetVerificationApplication operation middleware
+func (siw *ServerInterfaceWrapper) GetVerificationApplication(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "application_id" -------------
+	var applicationId ApplicationId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "application_id", r.PathValue("application_id"), &applicationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "application_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetVerificationApplication(w, r, applicationId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReviewVerificationApplication operation middleware
+func (siw *ServerInterfaceWrapper) ReviewVerificationApplication(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "application_id" -------------
+	var applicationId ApplicationId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "application_id", r.PathValue("application_id"), &applicationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "application_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin", "mfa:step-up"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReviewVerificationApplication(w, r, applicationId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DownloadVerificationDocument operation middleware
+func (siw *ServerInterfaceWrapper) DownloadVerificationDocument(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "document_id" -------------
+	var documentId DocumentId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "document_id", r.PathValue("document_id"), &documentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "document_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DownloadVerificationDocument(w, r, documentId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReviewVerificationDocument operation middleware
+func (siw *ServerInterfaceWrapper) ReviewVerificationDocument(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "document_id" -------------
+	var documentId DocumentId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "document_id", r.PathValue("document_id"), &documentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "document_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin", "mfa:step-up"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReviewVerificationDocument(w, r, documentId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // BookRide operation middleware
 func (siw *ServerInterfaceWrapper) BookRide(w http.ResponseWriter, r *http.Request) {
 
@@ -1418,6 +1860,86 @@ func (siw *ServerInterfaceWrapper) ListVehicleCategories(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
+// StartVerification operation middleware
+func (siw *ServerInterfaceWrapper) StartVerification(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StartVerification(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SubmitVerificationDocument operation middleware
+func (siw *ServerInterfaceWrapper) SubmitVerificationDocument(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SubmitVerificationDocument(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetVerificationStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetVerificationStatus(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetVerificationStatus(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PrepareVerificationUpload operation middleware
+func (siw *ServerInterfaceWrapper) PrepareVerificationUpload(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PrepareVerificationUpload(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // MpesaC2bConfirmation operation middleware
 func (siw *ServerInterfaceWrapper) MpesaC2bConfirmation(w http.ResponseWriter, r *http.Request) {
 
@@ -1650,6 +2172,15 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/auth/mfa/totp/setup", wrapper.BeginTotpSetup)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/auth/mfa/totp/confirm", wrapper.ConfirmTotpSetup)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/auth/step-up", wrapper.VerifyStepUp)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/verification/applications", wrapper.StartVerification)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/verification/uploads", wrapper.PrepareVerificationUpload)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/verification/documents", wrapper.SubmitVerificationDocument)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/verification/status", wrapper.GetVerificationStatus)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/ops/verification/applications", wrapper.ListVerificationApplications)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/ops/verification/applications/{application_id}", wrapper.GetVerificationApplication)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/ops/verification/applications/{application_id}/review", wrapper.ReviewVerificationApplication)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/ops/verification/documents/{document_id}/review", wrapper.ReviewVerificationDocument)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/ops/verification/documents/{document_id}/download", wrapper.DownloadVerificationDocument)
 
 	return m
 }
@@ -2330,6 +2861,191 @@ func (response RejectOfferdefaultJSONResponse) VisitRejectOfferResponse(w http.R
 	return err
 }
 
+type ListVerificationApplicationsRequestObject struct {
+	Params ListVerificationApplicationsParams
+}
+
+type ListVerificationApplicationsResponseObject interface {
+	VisitListVerificationApplicationsResponse(w http.ResponseWriter) error
+}
+
+type ListVerificationApplications200JSONResponse VerificationQueue
+
+func (response ListVerificationApplications200JSONResponse) VisitListVerificationApplicationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListVerificationApplicationsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListVerificationApplicationsdefaultJSONResponse) VisitListVerificationApplicationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetVerificationApplicationRequestObject struct {
+	ApplicationId ApplicationId `json:"application_id"`
+}
+
+type GetVerificationApplicationResponseObject interface {
+	VisitGetVerificationApplicationResponse(w http.ResponseWriter) error
+}
+
+type GetVerificationApplication200JSONResponse VerificationApplicationDetail
+
+func (response GetVerificationApplication200JSONResponse) VisitGetVerificationApplicationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetVerificationApplicationdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetVerificationApplicationdefaultJSONResponse) VisitGetVerificationApplicationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReviewVerificationApplicationRequestObject struct {
+	ApplicationId ApplicationId `json:"application_id"`
+	Body          *ReviewVerificationApplicationJSONRequestBody
+}
+
+type ReviewVerificationApplicationResponseObject interface {
+	VisitReviewVerificationApplicationResponse(w http.ResponseWriter) error
+}
+
+type ReviewVerificationApplication204Response struct {
+}
+
+func (response ReviewVerificationApplication204Response) VisitReviewVerificationApplicationResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type ReviewVerificationApplicationdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ReviewVerificationApplicationdefaultJSONResponse) VisitReviewVerificationApplicationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DownloadVerificationDocumentRequestObject struct {
+	DocumentId DocumentId `json:"document_id"`
+}
+
+type DownloadVerificationDocumentResponseObject interface {
+	VisitDownloadVerificationDocumentResponse(w http.ResponseWriter) error
+}
+
+type DownloadVerificationDocument200JSONResponse SignedDownload
+
+func (response DownloadVerificationDocument200JSONResponse) VisitDownloadVerificationDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DownloadVerificationDocumentdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response DownloadVerificationDocumentdefaultJSONResponse) VisitDownloadVerificationDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReviewVerificationDocumentRequestObject struct {
+	DocumentId DocumentId `json:"document_id"`
+	Body       *ReviewVerificationDocumentJSONRequestBody
+}
+
+type ReviewVerificationDocumentResponseObject interface {
+	VisitReviewVerificationDocumentResponse(w http.ResponseWriter) error
+}
+
+type ReviewVerificationDocument204Response struct {
+}
+
+func (response ReviewVerificationDocument204Response) VisitReviewVerificationDocumentResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type ReviewVerificationDocumentdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ReviewVerificationDocumentdefaultJSONResponse) VisitReviewVerificationDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type BookRideRequestObject struct {
 	Body *BookRideJSONRequestBody
 }
@@ -2832,6 +3548,161 @@ func (response ListVehicleCategories500JSONResponse) VisitListVehicleCategoriesR
 	return err
 }
 
+type StartVerificationRequestObject struct {
+	Body *StartVerificationJSONRequestBody
+}
+
+type StartVerificationResponseObject interface {
+	VisitStartVerificationResponse(w http.ResponseWriter) error
+}
+
+type StartVerification201JSONResponse VerificationApplication
+
+func (response StartVerification201JSONResponse) VisitStartVerificationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartVerificationdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response StartVerificationdefaultJSONResponse) VisitStartVerificationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitVerificationDocumentRequestObject struct {
+	Body *SubmitVerificationDocumentJSONRequestBody
+}
+
+type SubmitVerificationDocumentResponseObject interface {
+	VisitSubmitVerificationDocumentResponse(w http.ResponseWriter) error
+}
+
+type SubmitVerificationDocument201JSONResponse VerificationDocument
+
+func (response SubmitVerificationDocument201JSONResponse) VisitSubmitVerificationDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitVerificationDocumentdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response SubmitVerificationDocumentdefaultJSONResponse) VisitSubmitVerificationDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetVerificationStatusRequestObject struct {
+}
+
+type GetVerificationStatusResponseObject interface {
+	VisitGetVerificationStatusResponse(w http.ResponseWriter) error
+}
+
+type GetVerificationStatus200JSONResponse VerificationStatus
+
+func (response GetVerificationStatus200JSONResponse) VisitGetVerificationStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetVerificationStatusdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetVerificationStatusdefaultJSONResponse) VisitGetVerificationStatusResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PrepareVerificationUploadRequestObject struct {
+	Body *PrepareVerificationUploadJSONRequestBody
+}
+
+type PrepareVerificationUploadResponseObject interface {
+	VisitPrepareVerificationUploadResponse(w http.ResponseWriter) error
+}
+
+type PrepareVerificationUpload201JSONResponse VerificationUpload
+
+func (response PrepareVerificationUpload201JSONResponse) VisitPrepareVerificationUploadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PrepareVerificationUploaddefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response PrepareVerificationUploaddefaultJSONResponse) VisitPrepareVerificationUploadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type MpesaC2bConfirmationRequestObject struct {
 	Token CallbackToken `json:"token"`
 	Body  *MpesaC2bConfirmationJSONRequestBody
@@ -3008,6 +3879,21 @@ type StrictServerInterface interface {
 	// RejectOffer Reject an offer
 	// (POST /v1/offers/{offer_id}/reject)
 	RejectOffer(ctx context.Context, request RejectOfferRequestObject) (RejectOfferResponseObject, error)
+	// ListVerificationApplications List applications in one status, oldest first
+	// (GET /v1/ops/verification/applications)
+	ListVerificationApplications(ctx context.Context, request ListVerificationApplicationsRequestObject) (ListVerificationApplicationsResponseObject, error)
+	// GetVerificationApplication Load an application with the driver's current documents
+	// (GET /v1/ops/verification/applications/{application_id})
+	GetVerificationApplication(ctx context.Context, request GetVerificationApplicationRequestObject) (GetVerificationApplicationResponseObject, error)
+	// ReviewVerificationApplication Make the final decision on an application
+	// (POST /v1/ops/verification/applications/{application_id}/review)
+	ReviewVerificationApplication(ctx context.Context, request ReviewVerificationApplicationRequestObject) (ReviewVerificationApplicationResponseObject, error)
+	// DownloadVerificationDocument Get a five-minute link to a document's file
+	// (POST /v1/ops/verification/documents/{document_id}/download)
+	DownloadVerificationDocument(ctx context.Context, request DownloadVerificationDocumentRequestObject) (DownloadVerificationDocumentResponseObject, error)
+	// ReviewVerificationDocument Decide on one document
+	// (POST /v1/ops/verification/documents/{document_id}/review)
+	ReviewVerificationDocument(ctx context.Context, request ReviewVerificationDocumentRequestObject) (ReviewVerificationDocumentResponseObject, error)
 	// BookRide Book a quoted trip. Repeating the call returns the same ride.
 	// (POST /v1/rides)
 	BookRide(ctx context.Context, request BookRideRequestObject) (BookRideResponseObject, error)
@@ -3047,6 +3933,18 @@ type StrictServerInterface interface {
 	// ListVehicleCategories List the vehicle categories open for booking and driver sign-up
 	// (GET /v1/vehicle-categories)
 	ListVehicleCategories(ctx context.Context, request ListVehicleCategoriesRequestObject) (ListVehicleCategoriesResponseObject, error)
+	// StartVerification Open a verification application, or return the open one
+	// (POST /v1/verification/applications)
+	StartVerification(ctx context.Context, request StartVerificationRequestObject) (StartVerificationResponseObject, error)
+	// SubmitVerificationDocument Submit an uploaded file for checking
+	// (POST /v1/verification/documents)
+	SubmitVerificationDocument(ctx context.Context, request SubmitVerificationDocumentRequestObject) (SubmitVerificationDocumentResponseObject, error)
+	// GetVerificationStatus Report the driver's verification progress
+	// (GET /v1/verification/status)
+	GetVerificationStatus(ctx context.Context, request GetVerificationStatusRequestObject) (GetVerificationStatusResponseObject, error)
+	// PrepareVerificationUpload Get a signed URL to upload one document
+	// (POST /v1/verification/uploads)
+	PrepareVerificationUpload(ctx context.Context, request PrepareVerificationUploadRequestObject) (PrepareVerificationUploadResponseObject, error)
 	// MpesaC2bConfirmation Receive a paybill payment from Safaricom
 	// (POST /v1/webhooks/mpesa/{token}/c2b/confirmation)
 	MpesaC2bConfirmation(ctx context.Context, request MpesaC2bConfirmationRequestObject) (MpesaC2bConfirmationResponseObject, error)
@@ -3591,6 +4489,150 @@ func (sh *strictHandler) RejectOffer(w http.ResponseWriter, r *http.Request, off
 	}
 }
 
+// ListVerificationApplications operation middleware
+func (sh *strictHandler) ListVerificationApplications(w http.ResponseWriter, r *http.Request, params ListVerificationApplicationsParams) {
+	var request ListVerificationApplicationsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListVerificationApplications(ctx, request.(ListVerificationApplicationsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListVerificationApplications")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListVerificationApplicationsResponseObject); ok {
+		if err := validResponse.VisitListVerificationApplicationsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetVerificationApplication operation middleware
+func (sh *strictHandler) GetVerificationApplication(w http.ResponseWriter, r *http.Request, applicationId ApplicationId) {
+	var request GetVerificationApplicationRequestObject
+
+	request.ApplicationId = applicationId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetVerificationApplication(ctx, request.(GetVerificationApplicationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetVerificationApplication")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetVerificationApplicationResponseObject); ok {
+		if err := validResponse.VisitGetVerificationApplicationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReviewVerificationApplication operation middleware
+func (sh *strictHandler) ReviewVerificationApplication(w http.ResponseWriter, r *http.Request, applicationId ApplicationId) {
+	var request ReviewVerificationApplicationRequestObject
+
+	request.ApplicationId = applicationId
+
+	var body ReviewVerificationApplicationJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReviewVerificationApplication(ctx, request.(ReviewVerificationApplicationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReviewVerificationApplication")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReviewVerificationApplicationResponseObject); ok {
+		if err := validResponse.VisitReviewVerificationApplicationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DownloadVerificationDocument operation middleware
+func (sh *strictHandler) DownloadVerificationDocument(w http.ResponseWriter, r *http.Request, documentId DocumentId) {
+	var request DownloadVerificationDocumentRequestObject
+
+	request.DocumentId = documentId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DownloadVerificationDocument(ctx, request.(DownloadVerificationDocumentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DownloadVerificationDocument")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DownloadVerificationDocumentResponseObject); ok {
+		if err := validResponse.VisitDownloadVerificationDocumentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReviewVerificationDocument operation middleware
+func (sh *strictHandler) ReviewVerificationDocument(w http.ResponseWriter, r *http.Request, documentId DocumentId) {
+	var request ReviewVerificationDocumentRequestObject
+
+	request.DocumentId = documentId
+
+	var body ReviewVerificationDocumentJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReviewVerificationDocument(ctx, request.(ReviewVerificationDocumentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReviewVerificationDocument")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReviewVerificationDocumentResponseObject); ok {
+		if err := validResponse.VisitReviewVerificationDocumentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // BookRide operation middleware
 func (sh *strictHandler) BookRide(w http.ResponseWriter, r *http.Request) {
 	var request BookRideRequestObject
@@ -3938,6 +4980,123 @@ func (sh *strictHandler) ListVehicleCategories(w http.ResponseWriter, r *http.Re
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListVehicleCategoriesResponseObject); ok {
 		if err := validResponse.VisitListVehicleCategoriesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// StartVerification operation middleware
+func (sh *strictHandler) StartVerification(w http.ResponseWriter, r *http.Request) {
+	var request StartVerificationRequestObject
+
+	var body StartVerificationJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.StartVerification(ctx, request.(StartVerificationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "StartVerification")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(StartVerificationResponseObject); ok {
+		if err := validResponse.VisitStartVerificationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SubmitVerificationDocument operation middleware
+func (sh *strictHandler) SubmitVerificationDocument(w http.ResponseWriter, r *http.Request) {
+	var request SubmitVerificationDocumentRequestObject
+
+	var body SubmitVerificationDocumentJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SubmitVerificationDocument(ctx, request.(SubmitVerificationDocumentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SubmitVerificationDocument")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SubmitVerificationDocumentResponseObject); ok {
+		if err := validResponse.VisitSubmitVerificationDocumentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetVerificationStatus operation middleware
+func (sh *strictHandler) GetVerificationStatus(w http.ResponseWriter, r *http.Request) {
+	var request GetVerificationStatusRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetVerificationStatus(ctx, request.(GetVerificationStatusRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetVerificationStatus")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetVerificationStatusResponseObject); ok {
+		if err := validResponse.VisitGetVerificationStatusResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PrepareVerificationUpload operation middleware
+func (sh *strictHandler) PrepareVerificationUpload(w http.ResponseWriter, r *http.Request) {
+	var request PrepareVerificationUploadRequestObject
+
+	var body PrepareVerificationUploadJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PrepareVerificationUpload(ctx, request.(PrepareVerificationUploadRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PrepareVerificationUpload")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PrepareVerificationUploadResponseObject); ok {
+		if err := validResponse.VisitPrepareVerificationUploadResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

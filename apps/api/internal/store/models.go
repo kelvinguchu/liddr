@@ -19,6 +19,7 @@ type AuditEvent struct {
 	RequestID string
 	Ip        netip.Addr
 	CreatedAt time.Time
+	Target    *string
 }
 
 type AuthChallenge struct {
@@ -56,6 +57,7 @@ type Driver struct {
 	IsOnline           bool
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
+	PlateNumber        *string
 }
 
 type DriverLocation struct {
@@ -222,4 +224,71 @@ type VehicleCategory struct {
 	MinFareCents          int64
 	DiscountBps           int32
 	SearchRadiusM         int32
+}
+
+type VerificationApplication struct {
+	ID             uuid.UUID
+	DriverID       uuid.UUID
+	Status         string
+	DecidedAt      *time.Time
+	DecisionReason *string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
+type VerificationDocument struct {
+	ID               uuid.UUID
+	ApplicationID    uuid.UUID
+	DriverID         uuid.UUID
+	DocumentType     string
+	Version          int32
+	Status           string
+	StorageKey       string
+	ContentType      string
+	SizeBytes        int64
+	ExpiresOn        *time.Time
+	RejectionReason  *string
+	ScanStatus       string
+	ScanSignature    *string
+	ScanAttempts     int32
+	ScanClaimedUntil *time.Time
+	ScannedAt        *time.Time
+	ReviewedAt       *time.Time
+	ReviewedBy       *uuid.UUID
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+}
+
+type VerificationRequirement struct {
+	DocumentType   string
+	Label          string
+	Required       bool
+	RequiresExpiry bool
+	Active         bool
+	DisplayOrder   int32
+}
+
+type VerificationReview struct {
+	ID            int64
+	ApplicationID uuid.UUID
+	DocumentID    *uuid.UUID
+	DriverID      uuid.UUID
+	ReviewerID    *uuid.UUID
+	Decision      string
+	StatusBefore  string
+	StatusAfter   string
+	Reason        *string
+	CreatedAt     time.Time
+}
+
+type VerificationUpload struct {
+	ID           uuid.UUID
+	DriverID     uuid.UUID
+	DocumentType string
+	StorageKey   string
+	ContentType  string
+	SizeBytes    int64
+	ExpiresAt    time.Time
+	ConsumedAt   *time.Time
+	CreatedAt    time.Time
 }

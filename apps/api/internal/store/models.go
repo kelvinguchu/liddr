@@ -184,32 +184,53 @@ type ReportReview struct {
 }
 
 type Ride struct {
-	ID                  uuid.UUID
-	RiderID             uuid.UUID
-	DriverID            *uuid.UUID
-	QuoteID             uuid.UUID
-	VehicleCategoryID   int64
-	Status              string
-	PickupLat           float64
-	PickupLng           float64
-	DropoffLat          float64
-	DropoffLng          float64
-	FareKes             int32
-	PaymentMode         *string
-	SearchExpiresAt     time.Time
-	NextDispatchAt      *time.Time
-	DispatchWave        int32
-	RequestedAt         time.Time
-	AcceptedAt          *time.Time
-	ArrivingAt          *time.Time
-	ArrivedAt           *time.Time
-	StartedAt           *time.Time
-	CompletedAt         *time.Time
-	CancelledAt         *time.Time
-	CancelledBy         *string
-	CancelReason        *string
-	ArrivalDistanceM    *int32
-	CompletionDistanceM *int32
+	ID                      uuid.UUID
+	RiderID                 uuid.UUID
+	DriverID                *uuid.UUID
+	QuoteID                 uuid.UUID
+	VehicleCategoryID       int64
+	Status                  string
+	PickupLat               float64
+	PickupLng               float64
+	DropoffLat              float64
+	DropoffLng              float64
+	FareKes                 int32
+	PaymentMode             *string
+	SearchExpiresAt         time.Time
+	NextDispatchAt          *time.Time
+	DispatchWave            int32
+	RequestedAt             time.Time
+	AcceptedAt              *time.Time
+	ArrivingAt              *time.Time
+	ArrivedAt               *time.Time
+	StartedAt               *time.Time
+	CompletedAt             *time.Time
+	CancelledAt             *time.Time
+	CancelledBy             *string
+	CancelReason            *string
+	ArrivalDistanceM        *int32
+	CompletionDistanceM     *int32
+	PickupDistanceMAtAccept *int32
+	PickupEtaSAtAccept      *int32
+	ReassignCount           int32
+}
+
+type RideDestinationChange struct {
+	ID            uuid.UUID
+	RideID        uuid.UUID
+	RequestedBy   uuid.UUID
+	DriverID      uuid.UUID
+	OldDropoffLat float64
+	OldDropoffLng float64
+	NewDropoffLat float64
+	NewDropoffLng float64
+	OldFareKes    int32
+	NewFareKes    int32
+	Status        string
+	ReasonCode    string
+	Notes         *string
+	RequestedAt   time.Time
+	RespondedAt   *time.Time
 }
 
 type RideEvent struct {

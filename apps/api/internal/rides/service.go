@@ -38,6 +38,14 @@ var (
 	ErrDropoffProofRequired = errors.New("delivery photo is required before completing")
 	ErrRecipientPending     = errors.New("waiting for the recipient to confirm")
 	ErrPackageCollected     = errors.New("package has already been collected")
+
+	ErrReassignNotAllowed  = errors.New("driver shows no sign of trouble")
+	ErrDestinationWindow   = errors.New("trip started too long ago to change destination")
+	ErrSameDestination     = errors.New("that is already the destination")
+	ErrDestinationLimit    = errors.New("destination has been changed too many times")
+	ErrDestinationPending  = errors.New("a recent change is still in progress")
+	ErrDestinationNotFound = errors.New("destination change not found")
+	ErrDestinationStale    = errors.New("destination change request has lapsed")
 )
 
 // RouteFinder computes a driving route.

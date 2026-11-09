@@ -79,6 +79,57 @@ func (e DeliveryRequestPaymentTiming) Valid() bool {
 	}
 }
 
+// Defines values for DestinationChangeRequestReasonCode.
+const (
+	DestinationChangeRequestReasonCodeIntermediateStop     DestinationChangeRequestReasonCode = "intermediate_stop"
+	DestinationChangeRequestReasonCodeOther                DestinationChangeRequestReasonCode = "other"
+	DestinationChangeRequestReasonCodeRiderChangedPlan     DestinationChangeRequestReasonCode = "rider_changed_plan"
+	DestinationChangeRequestReasonCodeTrafficOrSafety      DestinationChangeRequestReasonCode = "traffic_or_safety"
+	DestinationChangeRequestReasonCodeWrongDropoffSelected DestinationChangeRequestReasonCode = "wrong_dropoff_selected"
+)
+
+// Valid indicates whether the value is a known member of the DestinationChangeRequestReasonCode enum.
+func (e DestinationChangeRequestReasonCode) Valid() bool {
+	switch e {
+	case DestinationChangeRequestReasonCodeIntermediateStop:
+		return true
+	case DestinationChangeRequestReasonCodeOther:
+		return true
+	case DestinationChangeRequestReasonCodeRiderChangedPlan:
+		return true
+	case DestinationChangeRequestReasonCodeTrafficOrSafety:
+		return true
+	case DestinationChangeRequestReasonCodeWrongDropoffSelected:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DestinationRejectionReasonCode.
+const (
+	DestinationRejectionReasonCodeDriverDeclined     DestinationRejectionReasonCode = "driver_declined"
+	DestinationRejectionReasonCodeOther              DestinationRejectionReasonCode = "other"
+	DestinationRejectionReasonCodeRouteUnserviceable DestinationRejectionReasonCode = "route_unserviceable"
+	DestinationRejectionReasonCodeUnsafeRequest      DestinationRejectionReasonCode = "unsafe_request"
+)
+
+// Valid indicates whether the value is a known member of the DestinationRejectionReasonCode enum.
+func (e DestinationRejectionReasonCode) Valid() bool {
+	switch e {
+	case DestinationRejectionReasonCodeDriverDeclined:
+		return true
+	case DestinationRejectionReasonCodeOther:
+		return true
+	case DestinationRejectionReasonCodeRouteUnserviceable:
+		return true
+	case DestinationRejectionReasonCodeUnsafeRequest:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DisputeResolutionOutcome.
 const (
 	DisputeResolutionOutcomeCreditNote    DisputeResolutionOutcome = "credit_note"
@@ -111,37 +162,37 @@ func (e DisputeResolutionOutcome) Valid() bool {
 
 // Defines values for DisputeSubmissionDisputeType.
 const (
-	AppError           DisputeSubmissionDisputeType = "app_error"
-	DriverNotArrived   DisputeSubmissionDisputeType = "driver_not_arrived"
-	FareDispute        DisputeSubmissionDisputeType = "fare_dispute"
-	LostItem           DisputeSubmissionDisputeType = "lost_item"
-	Other              DisputeSubmissionDisputeType = "other"
-	PaymentNotReceived DisputeSubmissionDisputeType = "payment_not_received"
-	SafetyIncident     DisputeSubmissionDisputeType = "safety_incident"
-	WrongDriver        DisputeSubmissionDisputeType = "wrong_driver"
-	WrongRoute         DisputeSubmissionDisputeType = "wrong_route"
+	DisputeSubmissionDisputeTypeAppError           DisputeSubmissionDisputeType = "app_error"
+	DisputeSubmissionDisputeTypeDriverNotArrived   DisputeSubmissionDisputeType = "driver_not_arrived"
+	DisputeSubmissionDisputeTypeFareDispute        DisputeSubmissionDisputeType = "fare_dispute"
+	DisputeSubmissionDisputeTypeLostItem           DisputeSubmissionDisputeType = "lost_item"
+	DisputeSubmissionDisputeTypeOther              DisputeSubmissionDisputeType = "other"
+	DisputeSubmissionDisputeTypePaymentNotReceived DisputeSubmissionDisputeType = "payment_not_received"
+	DisputeSubmissionDisputeTypeSafetyIncident     DisputeSubmissionDisputeType = "safety_incident"
+	DisputeSubmissionDisputeTypeWrongDriver        DisputeSubmissionDisputeType = "wrong_driver"
+	DisputeSubmissionDisputeTypeWrongRoute         DisputeSubmissionDisputeType = "wrong_route"
 )
 
 // Valid indicates whether the value is a known member of the DisputeSubmissionDisputeType enum.
 func (e DisputeSubmissionDisputeType) Valid() bool {
 	switch e {
-	case AppError:
+	case DisputeSubmissionDisputeTypeAppError:
 		return true
-	case DriverNotArrived:
+	case DisputeSubmissionDisputeTypeDriverNotArrived:
 		return true
-	case FareDispute:
+	case DisputeSubmissionDisputeTypeFareDispute:
 		return true
-	case LostItem:
+	case DisputeSubmissionDisputeTypeLostItem:
 		return true
-	case Other:
+	case DisputeSubmissionDisputeTypeOther:
 		return true
-	case PaymentNotReceived:
+	case DisputeSubmissionDisputeTypePaymentNotReceived:
 		return true
-	case SafetyIncident:
+	case DisputeSubmissionDisputeTypeSafetyIncident:
 		return true
-	case WrongDriver:
+	case DisputeSubmissionDisputeTypeWrongDriver:
 		return true
-	case WrongRoute:
+	case DisputeSubmissionDisputeTypeWrongRoute:
 		return true
 	default:
 		return false
@@ -664,6 +715,24 @@ func (e ListVerificationApplicationsParamsStatus) Valid() bool {
 	}
 }
 
+// Defines values for ListRideHistoryParamsAs.
+const (
+	ListRideHistoryParamsAsDriver ListRideHistoryParamsAs = "driver"
+	ListRideHistoryParamsAsRider  ListRideHistoryParamsAs = "rider"
+)
+
+// Valid indicates whether the value is a known member of the ListRideHistoryParamsAs enum.
+func (e ListRideHistoryParamsAs) Valid() bool {
+	switch e {
+	case ListRideHistoryParamsAsDriver:
+		return true
+	case ListRideHistoryParamsAsRider:
+		return true
+	default:
+		return false
+	}
+}
+
 // BookRideRequest defines model for BookRideRequest.
 type BookRideRequest struct {
 	QuoteId openapi_types.UUID `json:"quote_id"`
@@ -748,6 +817,41 @@ type DeliveryRequestPayer string
 
 // DeliveryRequestPaymentTiming defines model for DeliveryRequest.PaymentTiming.
 type DeliveryRequestPaymentTiming string
+
+// DestinationChange defines model for DestinationChange.
+type DestinationChange struct {
+	Dropoff     Coordinates        `json:"dropoff"`
+	Id          openapi_types.UUID `json:"id"`
+	NewFareKes  int32              `json:"new_fare_kes"`
+	OldFareKes  int32              `json:"old_fare_kes"`
+	ReasonCode  string             `json:"reason_code"`
+	RequestedAt time.Time          `json:"requested_at"`
+	RespondedAt *time.Time         `json:"responded_at,omitempty"`
+	Status      string             `json:"status"`
+}
+
+// DestinationChangeList defines model for DestinationChangeList.
+type DestinationChangeList struct {
+	Data []DestinationChange `json:"data"`
+}
+
+// DestinationChangeRequest defines model for DestinationChangeRequest.
+type DestinationChangeRequest struct {
+	Dropoff    Coordinates                        `json:"dropoff"`
+	Notes      *string                            `json:"notes,omitempty"`
+	ReasonCode DestinationChangeRequestReasonCode `json:"reason_code"`
+}
+
+// DestinationChangeRequestReasonCode defines model for DestinationChangeRequest.ReasonCode.
+type DestinationChangeRequestReasonCode string
+
+// DestinationRejection defines model for DestinationRejection.
+type DestinationRejection struct {
+	ReasonCode *DestinationRejectionReasonCode `json:"reason_code,omitempty"`
+}
+
+// DestinationRejectionReasonCode defines model for DestinationRejection.ReasonCode.
+type DestinationRejectionReasonCode string
 
 // DisputeCase defines model for DisputeCase.
 type DisputeCase struct {
@@ -1009,6 +1113,15 @@ type PendingRatingList struct {
 	Data []PendingRating `json:"data"`
 }
 
+// PickupHealth defines model for PickupHealth.
+type PickupHealth struct {
+	Late              bool `json:"late"`
+	LocationStale     bool `json:"location_stale"`
+	MovingAway        bool `json:"moving_away"`
+	NoProgress        bool `json:"no_progress"`
+	RecommendReassign bool `json:"recommend_reassign"`
+}
+
 // PrepareUploadRequest defines model for PrepareUploadRequest.
 type PrepareUploadRequest struct {
 	ContentType  PrepareUploadRequestContentType `json:"content_type"`
@@ -1235,6 +1348,23 @@ type Ride struct {
 	Status         RideStatus         `json:"status"`
 }
 
+// RideHistory defines model for RideHistory.
+type RideHistory struct {
+	Data []RideHistoryItem `json:"data"`
+}
+
+// RideHistoryItem defines model for RideHistoryItem.
+type RideHistoryItem struct {
+	CancelledAt *time.Time         `json:"cancelled_at,omitempty"`
+	Category    string             `json:"category"`
+	CompletedAt *time.Time         `json:"completed_at,omitempty"`
+	FareKes     int32              `json:"fare_kes"`
+	Id          openapi_types.UUID `json:"id"`
+	PaymentMode *string            `json:"payment_mode,omitempty"`
+	RequestedAt time.Time          `json:"requested_at"`
+	Status      string             `json:"status"`
+}
+
 // RideMessage defines model for RideMessage.
 type RideMessage struct {
 	Body            string             `json:"body"`
@@ -1250,6 +1380,19 @@ type RideMessage struct {
 
 // RideStatus defines model for RideStatus.
 type RideStatus string
+
+// RideTimeline defines model for RideTimeline.
+type RideTimeline struct {
+	Data []RideTimelineEntry `json:"data"`
+}
+
+// RideTimelineEntry defines model for RideTimelineEntry.
+type RideTimelineEntry struct {
+	FromStatus *string   `json:"from_status,omitempty"`
+	OccurredAt time.Time `json:"occurred_at"`
+	Reason     *string   `json:"reason,omitempty"`
+	ToStatus   string    `json:"to_status"`
+}
 
 // Role defines model for Role.
 type Role string
@@ -1556,6 +1699,17 @@ type ListVerificationApplicationsParams struct {
 // ListVerificationApplicationsParamsStatus defines parameters for ListVerificationApplications.
 type ListVerificationApplicationsParamsStatus string
 
+// ListRideHistoryParams defines parameters for ListRideHistory.
+type ListRideHistoryParams struct {
+	As       ListRideHistoryParamsAs `form:"as" json:"as"`
+	Category *string                 `form:"category,omitempty" json:"category,omitempty"`
+	Limit    *Limit                  `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset   *Offset                 `form:"offset,omitempty" json:"offset,omitempty"`
+}
+
+// ListRideHistoryParamsAs defines parameters for ListRideHistory.
+type ListRideHistoryParamsAs string
+
 // ListRideMessagesParams defines parameters for ListRideMessages.
 type ListRideMessagesParams struct {
 	AfterSeq *int64 `form:"after_seq,omitempty" json:"after_seq,omitempty"`
@@ -1636,6 +1790,12 @@ type CancelRideJSONRequestBody = CancelRideRequest
 
 // CompleteTripJSONRequestBody defines body for CompleteTrip for application/json ContentType.
 type CompleteTripJSONRequestBody = CompleteTripRequest
+
+// RequestDestinationChangeJSONRequestBody defines body for RequestDestinationChange for application/json ContentType.
+type RequestDestinationChangeJSONRequestBody = DestinationChangeRequest
+
+// RejectDestinationChangeJSONRequestBody defines body for RejectDestinationChange for application/json ContentType.
+type RejectDestinationChangeJSONRequestBody = DestinationRejection
 
 // SendRideMessageJSONRequestBody defines body for SendRideMessage for application/json ContentType.
 type SendRideMessageJSONRequestBody = MessageDraft
@@ -1837,6 +1997,9 @@ type ServerInterface interface {
 	// BookRide Book a quoted trip. Repeating the call returns the same ride.
 	// (POST /v1/rides)
 	BookRide(w http.ResponseWriter, r *http.Request)
+	// ListRideHistory List past and current trips
+	// (GET /v1/rides/history)
+	ListRideHistory(w http.ResponseWriter, r *http.Request, params ListRideHistoryParams)
 	// ListQuickActions List canned chat messages
 	// (GET /v1/rides/messages/quick-actions)
 	ListQuickActions(w http.ResponseWriter, r *http.Request)
@@ -1858,6 +2021,21 @@ type ServerInterface interface {
 	// CompleteTrip Complete the trip at the quoted fare. The driver must be near dropoff.
 	// (POST /v1/rides/{ride_id}/complete)
 	CompleteTrip(w http.ResponseWriter, r *http.Request, rideId RideId)
+	// ListDestinationChanges List destination changes
+	// (GET /v1/rides/{ride_id}/destination-changes)
+	ListDestinationChanges(w http.ResponseWriter, r *http.Request, rideId RideId)
+	// RequestDestinationChange Propose a new destination
+	// (POST /v1/rides/{ride_id}/destination-changes)
+	RequestDestinationChange(w http.ResponseWriter, r *http.Request, rideId RideId)
+	// AcceptDestinationChange Accept a new destination and its fare
+	// (POST /v1/rides/{ride_id}/destination-changes/{change_id}/accept)
+	AcceptDestinationChange(w http.ResponseWriter, r *http.Request, rideId RideId, changeId openapi_types.UUID)
+	// RejectDestinationChange Decline a new destination
+	// (POST /v1/rides/{ride_id}/destination-changes/{change_id}/reject)
+	RejectDestinationChange(w http.ResponseWriter, r *http.Request, rideId RideId, changeId openapi_types.UUID)
+	// ListRideEvents List the steps of a ride
+	// (GET /v1/rides/{ride_id}/events)
+	ListRideEvents(w http.ResponseWriter, r *http.Request, rideId RideId)
 	// ListRideMessages Read a ride's chat
 	// (GET /v1/rides/{ride_id}/messages)
 	ListRideMessages(w http.ResponseWriter, r *http.Request, rideId RideId, params ListRideMessagesParams)
@@ -1876,12 +2054,18 @@ type ServerInterface interface {
 	// MarkNoShow Report that the rider did not come after the waiting period
 	// (POST /v1/rides/{ride_id}/no-show)
 	MarkNoShow(w http.ResponseWriter, r *http.Request, rideId RideId)
+	// GetPickupHealth Report whether the driver appears to be coming
+	// (GET /v1/rides/{ride_id}/pickup-health)
+	GetPickupHealth(w http.ResponseWriter, r *http.Request, rideId RideId)
 	// RateRide Rate the other person on a completed ride
 	// (POST /v1/rides/{ride_id}/rate)
 	RateRide(w http.ResponseWriter, r *http.Request, rideId RideId)
 	// SkipRating Decline to rate
 	// (POST /v1/rides/{ride_id}/rate/skip)
 	SkipRating(w http.ResponseWriter, r *http.Request, rideId RideId)
+	// ReassignRide Find another driver when this one is not coming
+	// (POST /v1/rides/{ride_id}/reassign)
+	ReassignRide(w http.ResponseWriter, r *http.Request, rideId RideId)
 	// StartTrip Start the trip
 	// (POST /v1/rides/{ride_id}/start)
 	StartTrip(w http.ResponseWriter, r *http.Request, rideId RideId)
@@ -3590,6 +3774,84 @@ func (siw *ServerInterfaceWrapper) BookRide(w http.ResponseWriter, r *http.Reque
 	handler.ServeHTTP(w, r)
 }
 
+// ListRideHistory operation middleware
+func (siw *ServerInterfaceWrapper) ListRideHistory(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider", "driver"})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListRideHistoryParams
+
+	// ------------- Required query parameter "as" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "as", r.URL.Query(), &params.As, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "as"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "as", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "category" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "category", r.URL.Query(), &params.Category, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "category"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "category", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "offset" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "offset", r.URL.Query(), &params.Offset, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "offset"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListRideHistory(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListQuickActions operation middleware
 func (siw *ServerInterfaceWrapper) ListQuickActions(w http.ResponseWriter, r *http.Request) {
 
@@ -3781,6 +4043,184 @@ func (siw *ServerInterfaceWrapper) CompleteTrip(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CompleteTrip(w, r, rideId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListDestinationChanges operation middleware
+func (siw *ServerInterfaceWrapper) ListDestinationChanges(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "ride_id" -------------
+	var rideId RideId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ride_id", r.PathValue("ride_id"), &rideId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ride_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider", "driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDestinationChanges(w, r, rideId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RequestDestinationChange operation middleware
+func (siw *ServerInterfaceWrapper) RequestDestinationChange(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "ride_id" -------------
+	var rideId RideId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ride_id", r.PathValue("ride_id"), &rideId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ride_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RequestDestinationChange(w, r, rideId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AcceptDestinationChange operation middleware
+func (siw *ServerInterfaceWrapper) AcceptDestinationChange(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "ride_id" -------------
+	var rideId RideId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ride_id", r.PathValue("ride_id"), &rideId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ride_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "change_id" -------------
+	var changeId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "change_id", r.PathValue("change_id"), &changeId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "change_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AcceptDestinationChange(w, r, rideId, changeId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RejectDestinationChange operation middleware
+func (siw *ServerInterfaceWrapper) RejectDestinationChange(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "ride_id" -------------
+	var rideId RideId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ride_id", r.PathValue("ride_id"), &rideId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ride_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "change_id" -------------
+	var changeId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "change_id", r.PathValue("change_id"), &changeId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "change_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RejectDestinationChange(w, r, rideId, changeId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListRideEvents operation middleware
+func (siw *ServerInterfaceWrapper) ListRideEvents(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "ride_id" -------------
+	var rideId RideId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ride_id", r.PathValue("ride_id"), &rideId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ride_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider", "driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListRideEvents(w, r, rideId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4038,6 +4478,38 @@ func (siw *ServerInterfaceWrapper) MarkNoShow(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// GetPickupHealth operation middleware
+func (siw *ServerInterfaceWrapper) GetPickupHealth(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "ride_id" -------------
+	var rideId RideId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ride_id", r.PathValue("ride_id"), &rideId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ride_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPickupHealth(w, r, rideId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // RateRide operation middleware
 func (siw *ServerInterfaceWrapper) RateRide(w http.ResponseWriter, r *http.Request) {
 
@@ -4093,6 +4565,38 @@ func (siw *ServerInterfaceWrapper) SkipRating(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SkipRating(w, r, rideId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReassignRide operation middleware
+func (siw *ServerInterfaceWrapper) ReassignRide(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "ride_id" -------------
+	var rideId RideId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ride_id", r.PathValue("ride_id"), &rideId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ride_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReassignRide(w, r, rideId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4752,6 +5256,14 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/ops/send/rides/{ride_id}/proofs/{proof_kind}/download", wrapper.DownloadDeliveryProof)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/ops/send/prohibited-items", wrapper.ListProhibitedItems)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/v1/ops/send/prohibited-items", wrapper.SaveProhibitedItem)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/rides/{ride_id}/pickup-health", wrapper.GetPickupHealth)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides/{ride_id}/reassign", wrapper.ReassignRide)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/rides/{ride_id}/destination-changes", wrapper.ListDestinationChanges)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides/{ride_id}/destination-changes", wrapper.RequestDestinationChange)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides/{ride_id}/destination-changes/{change_id}/accept", wrapper.AcceptDestinationChange)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides/{ride_id}/destination-changes/{change_id}/reject", wrapper.RejectDestinationChange)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/rides/history", wrapper.ListRideHistory)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/rides/{ride_id}/events", wrapper.ListRideEvents)
 
 	return m
 }
@@ -6729,6 +7241,45 @@ func (response BookRidedefaultJSONResponse) VisitBookRideResponse(w http.Respons
 	return err
 }
 
+type ListRideHistoryRequestObject struct {
+	Params ListRideHistoryParams
+}
+
+type ListRideHistoryResponseObject interface {
+	VisitListRideHistoryResponse(w http.ResponseWriter) error
+}
+
+type ListRideHistory200JSONResponse RideHistory
+
+func (response ListRideHistory200JSONResponse) VisitListRideHistoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRideHistorydefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListRideHistorydefaultJSONResponse) VisitListRideHistoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListQuickActionsRequestObject struct {
 }
 
@@ -7003,6 +7554,193 @@ func (response CompleteTripdefaultJSONResponse) VisitCompleteTripResponse(w http
 	return err
 }
 
+type ListDestinationChangesRequestObject struct {
+	RideId RideId `json:"ride_id"`
+}
+
+type ListDestinationChangesResponseObject interface {
+	VisitListDestinationChangesResponse(w http.ResponseWriter) error
+}
+
+type ListDestinationChanges200JSONResponse DestinationChangeList
+
+func (response ListDestinationChanges200JSONResponse) VisitListDestinationChangesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDestinationChangesdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListDestinationChangesdefaultJSONResponse) VisitListDestinationChangesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RequestDestinationChangeRequestObject struct {
+	RideId RideId `json:"ride_id"`
+	Body   *RequestDestinationChangeJSONRequestBody
+}
+
+type RequestDestinationChangeResponseObject interface {
+	VisitRequestDestinationChangeResponse(w http.ResponseWriter) error
+}
+
+type RequestDestinationChange201JSONResponse DestinationChange
+
+func (response RequestDestinationChange201JSONResponse) VisitRequestDestinationChangeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RequestDestinationChangedefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response RequestDestinationChangedefaultJSONResponse) VisitRequestDestinationChangeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AcceptDestinationChangeRequestObject struct {
+	RideId   RideId             `json:"ride_id"`
+	ChangeId openapi_types.UUID `json:"change_id"`
+}
+
+type AcceptDestinationChangeResponseObject interface {
+	VisitAcceptDestinationChangeResponse(w http.ResponseWriter) error
+}
+
+type AcceptDestinationChange204Response struct {
+}
+
+func (response AcceptDestinationChange204Response) VisitAcceptDestinationChangeResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type AcceptDestinationChangedefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response AcceptDestinationChangedefaultJSONResponse) VisitAcceptDestinationChangeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RejectDestinationChangeRequestObject struct {
+	RideId   RideId             `json:"ride_id"`
+	ChangeId openapi_types.UUID `json:"change_id"`
+	Body     *RejectDestinationChangeJSONRequestBody
+}
+
+type RejectDestinationChangeResponseObject interface {
+	VisitRejectDestinationChangeResponse(w http.ResponseWriter) error
+}
+
+type RejectDestinationChange204Response struct {
+}
+
+func (response RejectDestinationChange204Response) VisitRejectDestinationChangeResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RejectDestinationChangedefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response RejectDestinationChangedefaultJSONResponse) VisitRejectDestinationChangeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRideEventsRequestObject struct {
+	RideId RideId `json:"ride_id"`
+}
+
+type ListRideEventsResponseObject interface {
+	VisitListRideEventsResponse(w http.ResponseWriter) error
+}
+
+type ListRideEvents200JSONResponse RideTimeline
+
+func (response ListRideEvents200JSONResponse) VisitListRideEventsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRideEventsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListRideEventsdefaultJSONResponse) VisitListRideEventsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListRideMessagesRequestObject struct {
 	RideId RideId `json:"ride_id"`
 	Params ListRideMessagesParams
@@ -7231,6 +7969,45 @@ func (response MarkNoShowdefaultJSONResponse) VisitMarkNoShowResponse(w http.Res
 	return err
 }
 
+type GetPickupHealthRequestObject struct {
+	RideId RideId `json:"ride_id"`
+}
+
+type GetPickupHealthResponseObject interface {
+	VisitGetPickupHealthResponse(w http.ResponseWriter) error
+}
+
+type GetPickupHealth200JSONResponse PickupHealth
+
+func (response GetPickupHealth200JSONResponse) VisitGetPickupHealthResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPickupHealthdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetPickupHealthdefaultJSONResponse) VisitGetPickupHealthResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type RateRideRequestObject struct {
 	RideId RideId `json:"ride_id"`
 	Body   *RateRideJSONRequestBody
@@ -7287,6 +8064,45 @@ type SkipRatingdefaultJSONResponse struct {
 }
 
 func (response SkipRatingdefaultJSONResponse) VisitSkipRatingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReassignRideRequestObject struct {
+	RideId RideId `json:"ride_id"`
+}
+
+type ReassignRideResponseObject interface {
+	VisitReassignRideResponse(w http.ResponseWriter) error
+}
+
+type ReassignRide200JSONResponse Ride
+
+func (response ReassignRide200JSONResponse) VisitReassignRideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReassignRidedefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ReassignRidedefaultJSONResponse) VisitReassignRideResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -8141,6 +8957,9 @@ type StrictServerInterface interface {
 	// BookRide Book a quoted trip. Repeating the call returns the same ride.
 	// (POST /v1/rides)
 	BookRide(ctx context.Context, request BookRideRequestObject) (BookRideResponseObject, error)
+	// ListRideHistory List past and current trips
+	// (GET /v1/rides/history)
+	ListRideHistory(ctx context.Context, request ListRideHistoryRequestObject) (ListRideHistoryResponseObject, error)
 	// ListQuickActions List canned chat messages
 	// (GET /v1/rides/messages/quick-actions)
 	ListQuickActions(ctx context.Context, request ListQuickActionsRequestObject) (ListQuickActionsResponseObject, error)
@@ -8162,6 +8981,21 @@ type StrictServerInterface interface {
 	// CompleteTrip Complete the trip at the quoted fare. The driver must be near dropoff.
 	// (POST /v1/rides/{ride_id}/complete)
 	CompleteTrip(ctx context.Context, request CompleteTripRequestObject) (CompleteTripResponseObject, error)
+	// ListDestinationChanges List destination changes
+	// (GET /v1/rides/{ride_id}/destination-changes)
+	ListDestinationChanges(ctx context.Context, request ListDestinationChangesRequestObject) (ListDestinationChangesResponseObject, error)
+	// RequestDestinationChange Propose a new destination
+	// (POST /v1/rides/{ride_id}/destination-changes)
+	RequestDestinationChange(ctx context.Context, request RequestDestinationChangeRequestObject) (RequestDestinationChangeResponseObject, error)
+	// AcceptDestinationChange Accept a new destination and its fare
+	// (POST /v1/rides/{ride_id}/destination-changes/{change_id}/accept)
+	AcceptDestinationChange(ctx context.Context, request AcceptDestinationChangeRequestObject) (AcceptDestinationChangeResponseObject, error)
+	// RejectDestinationChange Decline a new destination
+	// (POST /v1/rides/{ride_id}/destination-changes/{change_id}/reject)
+	RejectDestinationChange(ctx context.Context, request RejectDestinationChangeRequestObject) (RejectDestinationChangeResponseObject, error)
+	// ListRideEvents List the steps of a ride
+	// (GET /v1/rides/{ride_id}/events)
+	ListRideEvents(ctx context.Context, request ListRideEventsRequestObject) (ListRideEventsResponseObject, error)
 	// ListRideMessages Read a ride's chat
 	// (GET /v1/rides/{ride_id}/messages)
 	ListRideMessages(ctx context.Context, request ListRideMessagesRequestObject) (ListRideMessagesResponseObject, error)
@@ -8180,12 +9014,18 @@ type StrictServerInterface interface {
 	// MarkNoShow Report that the rider did not come after the waiting period
 	// (POST /v1/rides/{ride_id}/no-show)
 	MarkNoShow(ctx context.Context, request MarkNoShowRequestObject) (MarkNoShowResponseObject, error)
+	// GetPickupHealth Report whether the driver appears to be coming
+	// (GET /v1/rides/{ride_id}/pickup-health)
+	GetPickupHealth(ctx context.Context, request GetPickupHealthRequestObject) (GetPickupHealthResponseObject, error)
 	// RateRide Rate the other person on a completed ride
 	// (POST /v1/rides/{ride_id}/rate)
 	RateRide(ctx context.Context, request RateRideRequestObject) (RateRideResponseObject, error)
 	// SkipRating Decline to rate
 	// (POST /v1/rides/{ride_id}/rate/skip)
 	SkipRating(ctx context.Context, request SkipRatingRequestObject) (SkipRatingResponseObject, error)
+	// ReassignRide Find another driver when this one is not coming
+	// (POST /v1/rides/{ride_id}/reassign)
+	ReassignRide(ctx context.Context, request ReassignRideRequestObject) (ReassignRideResponseObject, error)
 	// StartTrip Start the trip
 	// (POST /v1/rides/{ride_id}/start)
 	StartTrip(ctx context.Context, request StartTripRequestObject) (StartTripResponseObject, error)
@@ -9762,6 +10602,32 @@ func (sh *strictHandler) BookRide(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ListRideHistory operation middleware
+func (sh *strictHandler) ListRideHistory(w http.ResponseWriter, r *http.Request, params ListRideHistoryParams) {
+	var request ListRideHistoryRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListRideHistory(ctx, request.(ListRideHistoryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListRideHistory")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListRideHistoryResponseObject); ok {
+		if err := validResponse.VisitListRideHistoryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListQuickActions operation middleware
 func (sh *strictHandler) ListQuickActions(w http.ResponseWriter, r *http.Request) {
 	var request ListQuickActionsRequestObject
@@ -9961,6 +10827,152 @@ func (sh *strictHandler) CompleteTrip(w http.ResponseWriter, r *http.Request, ri
 	}
 }
 
+// ListDestinationChanges operation middleware
+func (sh *strictHandler) ListDestinationChanges(w http.ResponseWriter, r *http.Request, rideId RideId) {
+	var request ListDestinationChangesRequestObject
+
+	request.RideId = rideId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListDestinationChanges(ctx, request.(ListDestinationChangesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDestinationChanges")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDestinationChangesResponseObject); ok {
+		if err := validResponse.VisitListDestinationChangesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RequestDestinationChange operation middleware
+func (sh *strictHandler) RequestDestinationChange(w http.ResponseWriter, r *http.Request, rideId RideId) {
+	var request RequestDestinationChangeRequestObject
+
+	request.RideId = rideId
+
+	var body RequestDestinationChangeJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RequestDestinationChange(ctx, request.(RequestDestinationChangeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RequestDestinationChange")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RequestDestinationChangeResponseObject); ok {
+		if err := validResponse.VisitRequestDestinationChangeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AcceptDestinationChange operation middleware
+func (sh *strictHandler) AcceptDestinationChange(w http.ResponseWriter, r *http.Request, rideId RideId, changeId openapi_types.UUID) {
+	var request AcceptDestinationChangeRequestObject
+
+	request.RideId = rideId
+	request.ChangeId = changeId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AcceptDestinationChange(ctx, request.(AcceptDestinationChangeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AcceptDestinationChange")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AcceptDestinationChangeResponseObject); ok {
+		if err := validResponse.VisitAcceptDestinationChangeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RejectDestinationChange operation middleware
+func (sh *strictHandler) RejectDestinationChange(w http.ResponseWriter, r *http.Request, rideId RideId, changeId openapi_types.UUID) {
+	var request RejectDestinationChangeRequestObject
+
+	request.RideId = rideId
+	request.ChangeId = changeId
+
+	var body RejectDestinationChangeJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RejectDestinationChange(ctx, request.(RejectDestinationChangeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RejectDestinationChange")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RejectDestinationChangeResponseObject); ok {
+		if err := validResponse.VisitRejectDestinationChangeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListRideEvents operation middleware
+func (sh *strictHandler) ListRideEvents(w http.ResponseWriter, r *http.Request, rideId RideId) {
+	var request ListRideEventsRequestObject
+
+	request.RideId = rideId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListRideEvents(ctx, request.(ListRideEventsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListRideEvents")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListRideEventsResponseObject); ok {
+		if err := validResponse.VisitListRideEventsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListRideMessages operation middleware
 func (sh *strictHandler) ListRideMessages(w http.ResponseWriter, r *http.Request, rideId RideId, params ListRideMessagesParams) {
 	var request ListRideMessagesRequestObject
@@ -10135,6 +11147,32 @@ func (sh *strictHandler) MarkNoShow(w http.ResponseWriter, r *http.Request, ride
 	}
 }
 
+// GetPickupHealth operation middleware
+func (sh *strictHandler) GetPickupHealth(w http.ResponseWriter, r *http.Request, rideId RideId) {
+	var request GetPickupHealthRequestObject
+
+	request.RideId = rideId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPickupHealth(ctx, request.(GetPickupHealthRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPickupHealth")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetPickupHealthResponseObject); ok {
+		if err := validResponse.VisitGetPickupHealthResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // RateRide operation middleware
 func (sh *strictHandler) RateRide(w http.ResponseWriter, r *http.Request, rideId RideId) {
 	var request RateRideRequestObject
@@ -10187,6 +11225,32 @@ func (sh *strictHandler) SkipRating(w http.ResponseWriter, r *http.Request, ride
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SkipRatingResponseObject); ok {
 		if err := validResponse.VisitSkipRatingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReassignRide operation middleware
+func (sh *strictHandler) ReassignRide(w http.ResponseWriter, r *http.Request, rideId RideId) {
+	var request ReassignRideRequestObject
+
+	request.RideId = rideId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReassignRide(ctx, request.(ReassignRideRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReassignRide")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReassignRideResponseObject); ok {
+		if err := validResponse.VisitReassignRideResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

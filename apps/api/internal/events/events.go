@@ -28,6 +28,7 @@ const (
 	TypeRideMessage         = "ride.message"
 	TypeRideMessageRead     = "ride.message_read"
 	TypeSendUpdated         = "send.updated"
+	TypeDestinationChange   = "destination.change"
 )
 
 // Event is what a client receives.

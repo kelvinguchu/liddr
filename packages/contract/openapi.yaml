@@ -1702,6 +1702,158 @@ paths:
         default:
           $ref: "#/components/responses/Problem"
 
+  /v1/rides/{ride_id}/pickup-health:
+    get:
+      operationId: getPickupHealth
+      summary: Report whether the driver appears to be coming
+      security:
+        - bearerAuth: [rider]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PickupHealth"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/reassign:
+    post:
+      operationId: reassignRide
+      summary: Find another driver when this one is not coming
+      security:
+        - bearerAuth: [rider]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ride"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/destination-changes:
+    get:
+      operationId: listDestinationChanges
+      summary: List destination changes
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DestinationChangeList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+    post:
+      operationId: requestDestinationChange
+      summary: Propose a new destination
+      security:
+        - bearerAuth: [rider]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DestinationChangeRequest"
+      responses:
+        "201":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DestinationChange"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/destination-changes/{change_id}/accept:
+    post:
+      operationId: acceptDestinationChange
+      summary: Accept a new destination and its fare
+      security:
+        - bearerAuth: [driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+        - {name: change_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/destination-changes/{change_id}/reject:
+    post:
+      operationId: rejectDestinationChange
+      summary: Decline a new destination
+      security:
+        - bearerAuth: [driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+        - {name: change_id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DestinationRejection"
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/history:
+    get:
+      operationId: listRideHistory
+      summary: List past and current trips
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - {name: as, in: query, required: true, schema: {type: string, enum: [rider, driver]}}
+        - {name: category, in: query, required: false, schema: {type: string}}
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RideHistory"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/events:
+    get:
+      operationId: listRideEvents
+      summary: List the steps of a ride
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RideTimeline"
+        default:
+          $ref: "#/components/responses/Problem"
+
 components:
   parameters:
     ReportId:
@@ -2945,3 +3097,86 @@ components:
         data:
           type: array
           items: {$ref: "#/components/schemas/ProhibitedItem"}
+
+    PickupHealth:
+      type: object
+      additionalProperties: false
+      required: [location_stale, late, no_progress, moving_away, recommend_reassign]
+      properties:
+        location_stale: {type: boolean}
+        late: {type: boolean}
+        no_progress: {type: boolean}
+        moving_away: {type: boolean}
+        recommend_reassign: {type: boolean}
+    DestinationChangeRequest:
+      type: object
+      additionalProperties: false
+      required: [dropoff, reason_code]
+      properties:
+        dropoff: {$ref: "#/components/schemas/Coordinates"}
+        reason_code: {type: string, enum: [rider_changed_plan, wrong_dropoff_selected, traffic_or_safety, intermediate_stop, other]}
+        notes: {type: string, maxLength: 300}
+    DestinationRejection:
+      type: object
+      additionalProperties: false
+      properties:
+        reason_code: {type: string, enum: [driver_declined, unsafe_request, route_unserviceable, other]}
+    DestinationChange:
+      type: object
+      additionalProperties: false
+      required: [id, dropoff, old_fare_kes, new_fare_kes, status, reason_code, requested_at]
+      properties:
+        id: {type: string, format: uuid}
+        dropoff: {$ref: "#/components/schemas/Coordinates"}
+        old_fare_kes: {type: integer, format: int32}
+        new_fare_kes: {type: integer, format: int32}
+        status: {type: string}
+        reason_code: {type: string}
+        requested_at: {type: string, format: date-time}
+        responded_at: {type: string, format: date-time}
+    DestinationChangeList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/DestinationChange"}
+    RideHistoryItem:
+      type: object
+      additionalProperties: false
+      required: [id, status, category, fare_kes, requested_at]
+      properties:
+        id: {type: string, format: uuid}
+        status: {type: string}
+        category: {type: string}
+        fare_kes: {type: integer, format: int32}
+        payment_mode: {type: string}
+        requested_at: {type: string, format: date-time}
+        completed_at: {type: string, format: date-time}
+        cancelled_at: {type: string, format: date-time}
+    RideHistory:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/RideHistoryItem"}
+    RideTimelineEntry:
+      type: object
+      additionalProperties: false
+      required: [to_status, occurred_at]
+      properties:
+        from_status: {type: string}
+        to_status: {type: string}
+        reason: {type: string}
+        occurred_at: {type: string, format: date-time}
+    RideTimeline:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/RideTimelineEntry"}

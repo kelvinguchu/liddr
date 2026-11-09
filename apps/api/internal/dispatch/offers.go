@@ -104,7 +104,7 @@ func (s *Service) Accept(ctx context.Context, driverID, offerID uuid.UUID) (uuid
 		if err := rides.WithdrawOffers(ctx, q, rideID, now); err != nil {
 			return err
 		}
-		return rides.Transition(ctx, q, rides.Change{
+		err = rides.Transition(ctx, q, rides.Change{
 			RideID: rideID,
 			From:   ride.Status,
 			To:     rides.StatusAccepted,
@@ -112,6 +112,10 @@ func (s *Service) Accept(ctx context.Context, driverID, offerID uuid.UUID) (uuid
 			Fields: store.SetRideStatusParams{DriverID: new(driverID), AcceptedAt: new(now)},
 			At:     now,
 		})
+		if err != nil {
+			return err
+		}
+		return rides.RecordAcceptBaseline(ctx, q, ride, driverID)
 	})
 	if err != nil {
 		return uuid.Nil, err

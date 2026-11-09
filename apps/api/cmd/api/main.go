@@ -166,6 +166,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	workers.Go(func() { documents.Run(workerCtx) })
 	workers.Go(func() { inbox.Run(workerCtx) })
 	workers.Go(func() { moderator.Run(workerCtx, logger) })
+	workers.Go(func() { bookings.RunWatchdog(workerCtx, logger) })
 	defer workers.Wait()
 	defer stopWorkers()
 

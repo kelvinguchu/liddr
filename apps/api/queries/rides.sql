@@ -120,3 +120,94 @@ RETURNING id, driver_id;
 
 -- name: GetDriverLocation :one
 SELECT lat, lng, captured_at FROM driver_locations WHERE driver_id = sqlc.arg(driver_id);
+
+-- name: ResetRideForDispatch :exec
+UPDATE rides
+SET driver_id = NULL, accepted_at = NULL, arriving_at = NULL, arrived_at = NULL, arrival_distance_m = NULL,
+    pickup_distance_m_at_accept = NULL, pickup_eta_s_at_accept = NULL,
+    next_dispatch_at = sqlc.arg(now), search_expires_at = sqlc.arg(search_expires_at), dispatch_wave = 0,
+    reassign_count = reassign_count + 1
+WHERE id = sqlc.arg(id);
+
+-- name: WithdrawAcceptedOffer :exec
+UPDATE ride_offers SET status = 'withdrawn', responded_at = sqlc.arg(now)
+WHERE ride_id = sqlc.arg(ride_id) AND driver_id = sqlc.arg(driver_id) AND status = 'accepted';
+
+-- name: RecordAcceptBaseline :exec
+UPDATE rides SET pickup_distance_m_at_accept = sqlc.arg(distance_m), pickup_eta_s_at_accept = sqlc.arg(eta_s) WHERE id = sqlc.arg(id);
+
+-- name: ListRidesAwaitingPickup :many
+SELECT id FROM rides
+WHERE status IN ('accepted', 'driver_arriving') AND accepted_at <= sqlc.arg(accepted_before)
+ORDER BY accepted_at
+LIMIT sqlc.arg(batch);
+
+-- name: GetRideForUpdateSkipLocked :one
+SELECT * FROM rides WHERE id = sqlc.arg(id) FOR UPDATE SKIP LOCKED;
+
+-- name: GetRideFull :one
+SELECT * FROM rides WHERE id = sqlc.arg(id);
+
+-- name: GetCategoryRates :one
+SELECT slug, base_fee_cents, price_per_km_cents, price_per_min_cents, min_fare_cents, discount_bps
+FROM vehicle_categories WHERE id = sqlc.arg(id);
+
+-- name: GetQuoteSurge :one
+SELECT surge_bps FROM ride_quotes WHERE id = sqlc.arg(id);
+
+-- name: CountDestinationChanges :one
+SELECT count(*) FROM ride_destination_changes WHERE ride_id = sqlc.arg(ride_id);
+
+-- name: LatestDestinationChangeAt :one
+SELECT requested_at FROM ride_destination_changes WHERE ride_id = sqlc.arg(ride_id) ORDER BY requested_at DESC LIMIT 1;
+
+-- A request the driver never answered must not block the rider forever.
+-- name: ExpireStaleDestinationChanges :exec
+UPDATE ride_destination_changes SET status = 'expired', responded_at = sqlc.arg(now)
+WHERE ride_id = sqlc.arg(ride_id) AND status = 'requested' AND requested_at <= sqlc.arg(stale_before);
+
+-- name: HasOpenDestinationChange :one
+SELECT EXISTS (SELECT 1 FROM ride_destination_changes WHERE ride_id = sqlc.arg(ride_id) AND status = 'requested');
+
+-- name: InsertDestinationChange :exec
+INSERT INTO ride_destination_changes (
+    id, ride_id, requested_by, driver_id, old_dropoff_lat, old_dropoff_lng, new_dropoff_lat, new_dropoff_lng,
+    old_fare_kes, new_fare_kes, status, reason_code, notes, requested_at
+) VALUES (
+    sqlc.arg(id), sqlc.arg(ride_id), sqlc.arg(requested_by), sqlc.arg(driver_id), sqlc.arg(old_dropoff_lat), sqlc.arg(old_dropoff_lng),
+    sqlc.arg(new_dropoff_lat), sqlc.arg(new_dropoff_lng), sqlc.arg(old_fare_kes), sqlc.arg(new_fare_kes), 'requested',
+    sqlc.arg(reason_code), sqlc.arg(notes), sqlc.arg(now)
+);
+
+-- name: GetDestinationChangeForUpdate :one
+SELECT id, ride_id, driver_id, new_dropoff_lat, new_dropoff_lng, new_fare_kes, status, requested_at
+FROM ride_destination_changes WHERE id = sqlc.arg(id) AND ride_id = sqlc.arg(ride_id) FOR UPDATE;
+
+-- name: FinishDestinationChange :exec
+UPDATE ride_destination_changes SET status = sqlc.arg(status), responded_at = sqlc.arg(now),
+    reason_code = COALESCE(sqlc.narg(reason_code), reason_code)
+WHERE id = sqlc.arg(id);
+
+-- name: ApplyDestinationChange :exec
+UPDATE rides SET dropoff_lat = sqlc.arg(lat), dropoff_lng = sqlc.arg(lng), fare_kes = sqlc.arg(fare_kes) WHERE id = sqlc.arg(id);
+
+-- name: ListDestinationChanges :many
+SELECT id, new_dropoff_lat, new_dropoff_lng, old_fare_kes, new_fare_kes, status, reason_code, requested_at, responded_at
+FROM ride_destination_changes WHERE ride_id = sqlc.arg(ride_id) ORDER BY requested_at DESC;
+
+-- name: ListRideHistoryForRider :many
+SELECT r.id, r.status, r.fare_kes, r.payment_mode, r.requested_at, r.completed_at, r.cancelled_at, c.slug AS category
+FROM rides AS r JOIN vehicle_categories AS c ON c.id = r.vehicle_category_id
+WHERE r.rider_id = sqlc.arg(user_id) AND (sqlc.narg(category)::text IS NULL OR c.slug = sqlc.narg(category))
+ORDER BY r.requested_at DESC, r.id
+LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);
+
+-- name: ListRideHistoryForDriver :many
+SELECT r.id, r.status, r.fare_kes, r.payment_mode, r.requested_at, r.completed_at, r.cancelled_at, c.slug AS category
+FROM rides AS r JOIN vehicle_categories AS c ON c.id = r.vehicle_category_id
+WHERE r.driver_id = sqlc.arg(user_id) AND (sqlc.narg(category)::text IS NULL OR c.slug = sqlc.narg(category))
+ORDER BY r.requested_at DESC, r.id
+LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);
+
+-- name: ListRideEvents :many
+SELECT from_status, to_status, reason, occurred_at FROM ride_events WHERE ride_id = sqlc.arg(ride_id) ORDER BY occurred_at, id;

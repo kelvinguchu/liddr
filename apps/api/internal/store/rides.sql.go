@@ -12,6 +12,27 @@ import (
 	"github.com/google/uuid"
 )
 
+const applyDestinationChange = `-- name: ApplyDestinationChange :exec
+UPDATE rides SET dropoff_lat = $1, dropoff_lng = $2, fare_kes = $3 WHERE id = $4
+`
+
+type ApplyDestinationChangeParams struct {
+	Lat     float64
+	Lng     float64
+	FareKes int32
+	ID      uuid.UUID
+}
+
+func (q *Queries) ApplyDestinationChange(ctx context.Context, arg ApplyDestinationChangeParams) error {
+	_, err := q.db.Exec(ctx, applyDestinationChange,
+		arg.Lat,
+		arg.Lng,
+		arg.FareKes,
+		arg.ID,
+	)
+	return err
+}
+
 const countAvailableDrivers = `-- name: CountAvailableDrivers :one
 SELECT count(*)
 FROM driver_locations AS l
@@ -50,6 +71,17 @@ func (q *Queries) CountAvailableDrivers(ctx context.Context, arg CountAvailableD
 		arg.FreshSince,
 		arg.VehicleCategoryID,
 	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countDestinationChanges = `-- name: CountDestinationChanges :one
+SELECT count(*) FROM ride_destination_changes WHERE ride_id = $1
+`
+
+func (q *Queries) CountDestinationChanges(ctx context.Context, rideID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countDestinationChanges, rideID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -121,6 +153,46 @@ func (q *Queries) CountSearchingRides(ctx context.Context, arg CountSearchingRid
 	return count, err
 }
 
+const expireStaleDestinationChanges = `-- name: ExpireStaleDestinationChanges :exec
+UPDATE ride_destination_changes SET status = 'expired', responded_at = $1
+WHERE ride_id = $2 AND status = 'requested' AND requested_at <= $3
+`
+
+type ExpireStaleDestinationChangesParams struct {
+	Now         *time.Time
+	RideID      uuid.UUID
+	StaleBefore time.Time
+}
+
+// A request the driver never answered must not block the rider forever.
+func (q *Queries) ExpireStaleDestinationChanges(ctx context.Context, arg ExpireStaleDestinationChangesParams) error {
+	_, err := q.db.Exec(ctx, expireStaleDestinationChanges, arg.Now, arg.RideID, arg.StaleBefore)
+	return err
+}
+
+const finishDestinationChange = `-- name: FinishDestinationChange :exec
+UPDATE ride_destination_changes SET status = $1, responded_at = $2,
+    reason_code = COALESCE($3, reason_code)
+WHERE id = $4
+`
+
+type FinishDestinationChangeParams struct {
+	Status     string
+	Now        *time.Time
+	ReasonCode *string
+	ID         uuid.UUID
+}
+
+func (q *Queries) FinishDestinationChange(ctx context.Context, arg FinishDestinationChangeParams) error {
+	_, err := q.db.Exec(ctx, finishDestinationChange,
+		arg.Status,
+		arg.Now,
+		arg.ReasonCode,
+		arg.ID,
+	)
+	return err
+}
+
 const getActiveCategoryBySlug = `-- name: GetActiveCategoryBySlug :one
 SELECT id, slug, base_fee_cents, price_per_km_cents, price_per_min_cents, min_fare_cents,
     discount_bps, search_radius_m
@@ -151,6 +223,71 @@ func (q *Queries) GetActiveCategoryBySlug(ctx context.Context, slug string) (Get
 		&i.MinFareCents,
 		&i.DiscountBps,
 		&i.SearchRadiusM,
+	)
+	return i, err
+}
+
+const getCategoryRates = `-- name: GetCategoryRates :one
+SELECT slug, base_fee_cents, price_per_km_cents, price_per_min_cents, min_fare_cents, discount_bps
+FROM vehicle_categories WHERE id = $1
+`
+
+type GetCategoryRatesRow struct {
+	Slug             string
+	BaseFeeCents     int64
+	PricePerKmCents  int64
+	PricePerMinCents int64
+	MinFareCents     int64
+	DiscountBps      int32
+}
+
+func (q *Queries) GetCategoryRates(ctx context.Context, id int64) (GetCategoryRatesRow, error) {
+	row := q.db.QueryRow(ctx, getCategoryRates, id)
+	var i GetCategoryRatesRow
+	err := row.Scan(
+		&i.Slug,
+		&i.BaseFeeCents,
+		&i.PricePerKmCents,
+		&i.PricePerMinCents,
+		&i.MinFareCents,
+		&i.DiscountBps,
+	)
+	return i, err
+}
+
+const getDestinationChangeForUpdate = `-- name: GetDestinationChangeForUpdate :one
+SELECT id, ride_id, driver_id, new_dropoff_lat, new_dropoff_lng, new_fare_kes, status, requested_at
+FROM ride_destination_changes WHERE id = $1 AND ride_id = $2 FOR UPDATE
+`
+
+type GetDestinationChangeForUpdateParams struct {
+	ID     uuid.UUID
+	RideID uuid.UUID
+}
+
+type GetDestinationChangeForUpdateRow struct {
+	ID            uuid.UUID
+	RideID        uuid.UUID
+	DriverID      uuid.UUID
+	NewDropoffLat float64
+	NewDropoffLng float64
+	NewFareKes    int32
+	Status        string
+	RequestedAt   time.Time
+}
+
+func (q *Queries) GetDestinationChangeForUpdate(ctx context.Context, arg GetDestinationChangeForUpdateParams) (GetDestinationChangeForUpdateRow, error) {
+	row := q.db.QueryRow(ctx, getDestinationChangeForUpdate, arg.ID, arg.RideID)
+	var i GetDestinationChangeForUpdateRow
+	err := row.Scan(
+		&i.ID,
+		&i.RideID,
+		&i.DriverID,
+		&i.NewDropoffLat,
+		&i.NewDropoffLng,
+		&i.NewFareKes,
+		&i.Status,
+		&i.RequestedAt,
 	)
 	return i, err
 }
@@ -211,8 +348,19 @@ func (q *Queries) GetQuote(ctx context.Context, id uuid.UUID) (GetQuoteRow, erro
 	return i, err
 }
 
+const getQuoteSurge = `-- name: GetQuoteSurge :one
+SELECT surge_bps FROM ride_quotes WHERE id = $1
+`
+
+func (q *Queries) GetQuoteSurge(ctx context.Context, id uuid.UUID) (int32, error) {
+	row := q.db.QueryRow(ctx, getQuoteSurge, id)
+	var surge_bps int32
+	err := row.Scan(&surge_bps)
+	return surge_bps, err
+}
+
 const getRide = `-- name: GetRide :one
-SELECT id, rider_id, driver_id, quote_id, vehicle_category_id, status, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, fare_kes, payment_mode, search_expires_at, next_dispatch_at, dispatch_wave, requested_at, accepted_at, arriving_at, arrived_at, started_at, completed_at, cancelled_at, cancelled_by, cancel_reason, arrival_distance_m, completion_distance_m FROM rides WHERE id = $1
+SELECT id, rider_id, driver_id, quote_id, vehicle_category_id, status, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, fare_kes, payment_mode, search_expires_at, next_dispatch_at, dispatch_wave, requested_at, accepted_at, arriving_at, arrived_at, started_at, completed_at, cancelled_at, cancelled_by, cancel_reason, arrival_distance_m, completion_distance_m, pickup_distance_m_at_accept, pickup_eta_s_at_accept, reassign_count FROM rides WHERE id = $1
 `
 
 func (q *Queries) GetRide(ctx context.Context, id uuid.UUID) (Ride, error) {
@@ -245,12 +393,15 @@ func (q *Queries) GetRide(ctx context.Context, id uuid.UUID) (Ride, error) {
 		&i.CancelReason,
 		&i.ArrivalDistanceM,
 		&i.CompletionDistanceM,
+		&i.PickupDistanceMAtAccept,
+		&i.PickupEtaSAtAccept,
+		&i.ReassignCount,
 	)
 	return i, err
 }
 
 const getRideForUpdate = `-- name: GetRideForUpdate :one
-SELECT id, rider_id, driver_id, quote_id, vehicle_category_id, status, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, fare_kes, payment_mode, search_expires_at, next_dispatch_at, dispatch_wave, requested_at, accepted_at, arriving_at, arrived_at, started_at, completed_at, cancelled_at, cancelled_by, cancel_reason, arrival_distance_m, completion_distance_m FROM rides WHERE id = $1 FOR UPDATE
+SELECT id, rider_id, driver_id, quote_id, vehicle_category_id, status, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, fare_kes, payment_mode, search_expires_at, next_dispatch_at, dispatch_wave, requested_at, accepted_at, arriving_at, arrived_at, started_at, completed_at, cancelled_at, cancelled_by, cancel_reason, arrival_distance_m, completion_distance_m, pickup_distance_m_at_accept, pickup_eta_s_at_accept, reassign_count FROM rides WHERE id = $1 FOR UPDATE
 `
 
 func (q *Queries) GetRideForUpdate(ctx context.Context, id uuid.UUID) (Ride, error) {
@@ -283,6 +434,91 @@ func (q *Queries) GetRideForUpdate(ctx context.Context, id uuid.UUID) (Ride, err
 		&i.CancelReason,
 		&i.ArrivalDistanceM,
 		&i.CompletionDistanceM,
+		&i.PickupDistanceMAtAccept,
+		&i.PickupEtaSAtAccept,
+		&i.ReassignCount,
+	)
+	return i, err
+}
+
+const getRideForUpdateSkipLocked = `-- name: GetRideForUpdateSkipLocked :one
+SELECT id, rider_id, driver_id, quote_id, vehicle_category_id, status, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, fare_kes, payment_mode, search_expires_at, next_dispatch_at, dispatch_wave, requested_at, accepted_at, arriving_at, arrived_at, started_at, completed_at, cancelled_at, cancelled_by, cancel_reason, arrival_distance_m, completion_distance_m, pickup_distance_m_at_accept, pickup_eta_s_at_accept, reassign_count FROM rides WHERE id = $1 FOR UPDATE SKIP LOCKED
+`
+
+func (q *Queries) GetRideForUpdateSkipLocked(ctx context.Context, id uuid.UUID) (Ride, error) {
+	row := q.db.QueryRow(ctx, getRideForUpdateSkipLocked, id)
+	var i Ride
+	err := row.Scan(
+		&i.ID,
+		&i.RiderID,
+		&i.DriverID,
+		&i.QuoteID,
+		&i.VehicleCategoryID,
+		&i.Status,
+		&i.PickupLat,
+		&i.PickupLng,
+		&i.DropoffLat,
+		&i.DropoffLng,
+		&i.FareKes,
+		&i.PaymentMode,
+		&i.SearchExpiresAt,
+		&i.NextDispatchAt,
+		&i.DispatchWave,
+		&i.RequestedAt,
+		&i.AcceptedAt,
+		&i.ArrivingAt,
+		&i.ArrivedAt,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.CancelledAt,
+		&i.CancelledBy,
+		&i.CancelReason,
+		&i.ArrivalDistanceM,
+		&i.CompletionDistanceM,
+		&i.PickupDistanceMAtAccept,
+		&i.PickupEtaSAtAccept,
+		&i.ReassignCount,
+	)
+	return i, err
+}
+
+const getRideFull = `-- name: GetRideFull :one
+SELECT id, rider_id, driver_id, quote_id, vehicle_category_id, status, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, fare_kes, payment_mode, search_expires_at, next_dispatch_at, dispatch_wave, requested_at, accepted_at, arriving_at, arrived_at, started_at, completed_at, cancelled_at, cancelled_by, cancel_reason, arrival_distance_m, completion_distance_m, pickup_distance_m_at_accept, pickup_eta_s_at_accept, reassign_count FROM rides WHERE id = $1
+`
+
+func (q *Queries) GetRideFull(ctx context.Context, id uuid.UUID) (Ride, error) {
+	row := q.db.QueryRow(ctx, getRideFull, id)
+	var i Ride
+	err := row.Scan(
+		&i.ID,
+		&i.RiderID,
+		&i.DriverID,
+		&i.QuoteID,
+		&i.VehicleCategoryID,
+		&i.Status,
+		&i.PickupLat,
+		&i.PickupLng,
+		&i.DropoffLat,
+		&i.DropoffLng,
+		&i.FareKes,
+		&i.PaymentMode,
+		&i.SearchExpiresAt,
+		&i.NextDispatchAt,
+		&i.DispatchWave,
+		&i.RequestedAt,
+		&i.AcceptedAt,
+		&i.ArrivingAt,
+		&i.ArrivedAt,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.CancelledAt,
+		&i.CancelledBy,
+		&i.CancelReason,
+		&i.ArrivalDistanceM,
+		&i.CompletionDistanceM,
+		&i.PickupDistanceMAtAccept,
+		&i.PickupEtaSAtAccept,
+		&i.ReassignCount,
 	)
 	return i, err
 }
@@ -296,6 +532,63 @@ func (q *Queries) GetRideIDByQuote(ctx context.Context, quoteID uuid.UUID) (uuid
 	var id uuid.UUID
 	err := row.Scan(&id)
 	return id, err
+}
+
+const hasOpenDestinationChange = `-- name: HasOpenDestinationChange :one
+SELECT EXISTS (SELECT 1 FROM ride_destination_changes WHERE ride_id = $1 AND status = 'requested')
+`
+
+func (q *Queries) HasOpenDestinationChange(ctx context.Context, rideID uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, hasOpenDestinationChange, rideID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const insertDestinationChange = `-- name: InsertDestinationChange :exec
+INSERT INTO ride_destination_changes (
+    id, ride_id, requested_by, driver_id, old_dropoff_lat, old_dropoff_lng, new_dropoff_lat, new_dropoff_lng,
+    old_fare_kes, new_fare_kes, status, reason_code, notes, requested_at
+) VALUES (
+    $1, $2, $3, $4, $5, $6,
+    $7, $8, $9, $10, 'requested',
+    $11, $12, $13
+)
+`
+
+type InsertDestinationChangeParams struct {
+	ID            uuid.UUID
+	RideID        uuid.UUID
+	RequestedBy   uuid.UUID
+	DriverID      uuid.UUID
+	OldDropoffLat float64
+	OldDropoffLng float64
+	NewDropoffLat float64
+	NewDropoffLng float64
+	OldFareKes    int32
+	NewFareKes    int32
+	ReasonCode    string
+	Notes         *string
+	Now           time.Time
+}
+
+func (q *Queries) InsertDestinationChange(ctx context.Context, arg InsertDestinationChangeParams) error {
+	_, err := q.db.Exec(ctx, insertDestinationChange,
+		arg.ID,
+		arg.RideID,
+		arg.RequestedBy,
+		arg.DriverID,
+		arg.OldDropoffLat,
+		arg.OldDropoffLng,
+		arg.NewDropoffLat,
+		arg.NewDropoffLng,
+		arg.OldFareKes,
+		arg.NewFareKes,
+		arg.ReasonCode,
+		arg.Notes,
+		arg.Now,
+	)
+	return err
 }
 
 const insertQuote = `-- name: InsertQuote :exec
@@ -429,6 +722,287 @@ func (q *Queries) InsertRideEvent(ctx context.Context, arg InsertRideEventParams
 	return err
 }
 
+const latestDestinationChangeAt = `-- name: LatestDestinationChangeAt :one
+SELECT requested_at FROM ride_destination_changes WHERE ride_id = $1 ORDER BY requested_at DESC LIMIT 1
+`
+
+func (q *Queries) LatestDestinationChangeAt(ctx context.Context, rideID uuid.UUID) (time.Time, error) {
+	row := q.db.QueryRow(ctx, latestDestinationChangeAt, rideID)
+	var requested_at time.Time
+	err := row.Scan(&requested_at)
+	return requested_at, err
+}
+
+const listDestinationChanges = `-- name: ListDestinationChanges :many
+SELECT id, new_dropoff_lat, new_dropoff_lng, old_fare_kes, new_fare_kes, status, reason_code, requested_at, responded_at
+FROM ride_destination_changes WHERE ride_id = $1 ORDER BY requested_at DESC
+`
+
+type ListDestinationChangesRow struct {
+	ID            uuid.UUID
+	NewDropoffLat float64
+	NewDropoffLng float64
+	OldFareKes    int32
+	NewFareKes    int32
+	Status        string
+	ReasonCode    string
+	RequestedAt   time.Time
+	RespondedAt   *time.Time
+}
+
+func (q *Queries) ListDestinationChanges(ctx context.Context, rideID uuid.UUID) ([]ListDestinationChangesRow, error) {
+	rows, err := q.db.Query(ctx, listDestinationChanges, rideID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListDestinationChangesRow{}
+	for rows.Next() {
+		var i ListDestinationChangesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.NewDropoffLat,
+			&i.NewDropoffLng,
+			&i.OldFareKes,
+			&i.NewFareKes,
+			&i.Status,
+			&i.ReasonCode,
+			&i.RequestedAt,
+			&i.RespondedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRideEvents = `-- name: ListRideEvents :many
+SELECT from_status, to_status, reason, occurred_at FROM ride_events WHERE ride_id = $1 ORDER BY occurred_at, id
+`
+
+type ListRideEventsRow struct {
+	FromStatus *string
+	ToStatus   string
+	Reason     *string
+	OccurredAt time.Time
+}
+
+func (q *Queries) ListRideEvents(ctx context.Context, rideID uuid.UUID) ([]ListRideEventsRow, error) {
+	rows, err := q.db.Query(ctx, listRideEvents, rideID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListRideEventsRow{}
+	for rows.Next() {
+		var i ListRideEventsRow
+		if err := rows.Scan(
+			&i.FromStatus,
+			&i.ToStatus,
+			&i.Reason,
+			&i.OccurredAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRideHistoryForDriver = `-- name: ListRideHistoryForDriver :many
+SELECT r.id, r.status, r.fare_kes, r.payment_mode, r.requested_at, r.completed_at, r.cancelled_at, c.slug AS category
+FROM rides AS r JOIN vehicle_categories AS c ON c.id = r.vehicle_category_id
+WHERE r.driver_id = $1 AND ($2::text IS NULL OR c.slug = $2)
+ORDER BY r.requested_at DESC, r.id
+LIMIT $4 OFFSET $3
+`
+
+type ListRideHistoryForDriverParams struct {
+	UserID    *uuid.UUID
+	Category  *string
+	RowOffset int32
+	RowLimit  int32
+}
+
+type ListRideHistoryForDriverRow struct {
+	ID          uuid.UUID
+	Status      string
+	FareKes     int32
+	PaymentMode *string
+	RequestedAt time.Time
+	CompletedAt *time.Time
+	CancelledAt *time.Time
+	Category    string
+}
+
+func (q *Queries) ListRideHistoryForDriver(ctx context.Context, arg ListRideHistoryForDriverParams) ([]ListRideHistoryForDriverRow, error) {
+	rows, err := q.db.Query(ctx, listRideHistoryForDriver,
+		arg.UserID,
+		arg.Category,
+		arg.RowOffset,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListRideHistoryForDriverRow{}
+	for rows.Next() {
+		var i ListRideHistoryForDriverRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Status,
+			&i.FareKes,
+			&i.PaymentMode,
+			&i.RequestedAt,
+			&i.CompletedAt,
+			&i.CancelledAt,
+			&i.Category,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRideHistoryForRider = `-- name: ListRideHistoryForRider :many
+SELECT r.id, r.status, r.fare_kes, r.payment_mode, r.requested_at, r.completed_at, r.cancelled_at, c.slug AS category
+FROM rides AS r JOIN vehicle_categories AS c ON c.id = r.vehicle_category_id
+WHERE r.rider_id = $1 AND ($2::text IS NULL OR c.slug = $2)
+ORDER BY r.requested_at DESC, r.id
+LIMIT $4 OFFSET $3
+`
+
+type ListRideHistoryForRiderParams struct {
+	UserID    uuid.UUID
+	Category  *string
+	RowOffset int32
+	RowLimit  int32
+}
+
+type ListRideHistoryForRiderRow struct {
+	ID          uuid.UUID
+	Status      string
+	FareKes     int32
+	PaymentMode *string
+	RequestedAt time.Time
+	CompletedAt *time.Time
+	CancelledAt *time.Time
+	Category    string
+}
+
+func (q *Queries) ListRideHistoryForRider(ctx context.Context, arg ListRideHistoryForRiderParams) ([]ListRideHistoryForRiderRow, error) {
+	rows, err := q.db.Query(ctx, listRideHistoryForRider,
+		arg.UserID,
+		arg.Category,
+		arg.RowOffset,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListRideHistoryForRiderRow{}
+	for rows.Next() {
+		var i ListRideHistoryForRiderRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Status,
+			&i.FareKes,
+			&i.PaymentMode,
+			&i.RequestedAt,
+			&i.CompletedAt,
+			&i.CancelledAt,
+			&i.Category,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRidesAwaitingPickup = `-- name: ListRidesAwaitingPickup :many
+SELECT id FROM rides
+WHERE status IN ('accepted', 'driver_arriving') AND accepted_at <= $1
+ORDER BY accepted_at
+LIMIT $2
+`
+
+type ListRidesAwaitingPickupParams struct {
+	AcceptedBefore *time.Time
+	Batch          int32
+}
+
+func (q *Queries) ListRidesAwaitingPickup(ctx context.Context, arg ListRidesAwaitingPickupParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listRidesAwaitingPickup, arg.AcceptedBefore, arg.Batch)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const recordAcceptBaseline = `-- name: RecordAcceptBaseline :exec
+UPDATE rides SET pickup_distance_m_at_accept = $1, pickup_eta_s_at_accept = $2 WHERE id = $3
+`
+
+type RecordAcceptBaselineParams struct {
+	DistanceM *int32
+	EtaS      *int32
+	ID        uuid.UUID
+}
+
+func (q *Queries) RecordAcceptBaseline(ctx context.Context, arg RecordAcceptBaselineParams) error {
+	_, err := q.db.Exec(ctx, recordAcceptBaseline, arg.DistanceM, arg.EtaS, arg.ID)
+	return err
+}
+
+const resetRideForDispatch = `-- name: ResetRideForDispatch :exec
+UPDATE rides
+SET driver_id = NULL, accepted_at = NULL, arriving_at = NULL, arrived_at = NULL, arrival_distance_m = NULL,
+    pickup_distance_m_at_accept = NULL, pickup_eta_s_at_accept = NULL,
+    next_dispatch_at = $1, search_expires_at = $2, dispatch_wave = 0,
+    reassign_count = reassign_count + 1
+WHERE id = $3
+`
+
+type ResetRideForDispatchParams struct {
+	Now             *time.Time
+	SearchExpiresAt time.Time
+	ID              uuid.UUID
+}
+
+func (q *Queries) ResetRideForDispatch(ctx context.Context, arg ResetRideForDispatchParams) error {
+	_, err := q.db.Exec(ctx, resetRideForDispatch, arg.Now, arg.SearchExpiresAt, arg.ID)
+	return err
+}
+
 const riderHasActiveRide = `-- name: RiderHasActiveRide :one
 SELECT EXISTS (
     SELECT 1 FROM rides
@@ -506,6 +1080,22 @@ func (q *Queries) SetRideStatus(ctx context.Context, arg SetRideStatusParams) (S
 	var i SetRideStatusRow
 	err := row.Scan(&i.RiderID, &i.DriverID)
 	return i, err
+}
+
+const withdrawAcceptedOffer = `-- name: WithdrawAcceptedOffer :exec
+UPDATE ride_offers SET status = 'withdrawn', responded_at = $1
+WHERE ride_id = $2 AND driver_id = $3 AND status = 'accepted'
+`
+
+type WithdrawAcceptedOfferParams struct {
+	Now      *time.Time
+	RideID   uuid.UUID
+	DriverID uuid.UUID
+}
+
+func (q *Queries) WithdrawAcceptedOffer(ctx context.Context, arg WithdrawAcceptedOfferParams) error {
+	_, err := q.db.Exec(ctx, withdrawAcceptedOffer, arg.Now, arg.RideID, arg.DriverID)
+	return err
 }
 
 const withdrawOpenOffersForRide = `-- name: WithdrawOpenOffersForRide :many

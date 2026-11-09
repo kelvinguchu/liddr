@@ -31,8 +31,8 @@ const (
 // legalTransitions is the ride state machine. Any move not listed is refused.
 var legalTransitions = map[string][]string{
 	StatusSearching:      {StatusAccepted, StatusCancelled, StatusNoDrivers},
-	StatusAccepted:       {StatusDriverArriving, StatusArrived, StatusCancelled},
-	StatusDriverArriving: {StatusArrived, StatusCancelled},
+	StatusAccepted:       {StatusDriverArriving, StatusArrived, StatusCancelled, StatusSearching},
+	StatusDriverArriving: {StatusArrived, StatusCancelled, StatusSearching},
 	StatusArrived:        {StatusInProgress, StatusCancelled},
 	StatusInProgress:     {StatusCompleted, StatusCancelled},
 }

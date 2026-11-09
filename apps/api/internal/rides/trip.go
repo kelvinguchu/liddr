@@ -14,6 +14,8 @@ import (
 	"github.com/kelvinguchu/liddr/apps/api/internal/store"
 )
 
+const ratingWindow = 24 * time.Hour
+
 // Ride statuses.
 const (
 	StatusSearching      = "searching"
@@ -69,6 +71,15 @@ func Transition(ctx context.Context, q *store.Queries, change Change) error {
 	})
 	if err != nil {
 		return fmt.Errorf("record ride event: %w", err)
+	}
+
+	if change.To == StatusCompleted && participants.DriverID != nil {
+		err := q.InsertRatingActions(ctx, store.InsertRatingActionsParams{
+			RideID: change.RideID, RiderID: participants.RiderID, DriverID: *participants.DriverID, DueAt: change.At.Add(ratingWindow),
+		})
+		if err != nil {
+			return fmt.Errorf("open ratings: %w", err)
+		}
 	}
 
 	to := []uuid.UUID{participants.RiderID}

@@ -49,6 +49,24 @@ type AuthSession struct {
 	CreatedAt        time.Time
 }
 
+type DisputeCompensation struct {
+	ID                  uuid.UUID
+	ReportID            uuid.UUID
+	RideID              uuid.UUID
+	BeneficiaryID       uuid.UUID
+	CounterpartyID      *uuid.UUID
+	ActorID             *uuid.UUID
+	CompensationType    string
+	Status              string
+	AmountKes           int32
+	ReasonText          *string
+	ProcessingChannel   *string
+	ProcessingReference *string
+	ProcessedAt         *time.Time
+	ProcessedBy         *uuid.UUID
+	CreatedAt           time.Time
+}
+
 type Driver struct {
 	UserID             uuid.UUID
 	VehicleCategoryID  int64
@@ -100,6 +118,60 @@ type PushToken struct {
 	LastSeenAt time.Time
 	RevokedAt  *time.Time
 	CreatedAt  time.Time
+}
+
+type RatingAction struct {
+	RideID     uuid.UUID
+	RatedBy    uuid.UUID
+	RatedUser  uuid.UUID
+	RaterRole  string
+	Status     string
+	DueAt      time.Time
+	ResolvedAt *time.Time
+}
+
+type Report struct {
+	ID                  uuid.UUID
+	ReporterID          *uuid.UUID
+	ReportedID          uuid.UUID
+	Category            string
+	Status              string
+	Severity            int32
+	Source              string
+	IncidentType        string
+	RideID              *uuid.UUID
+	SignalKey           *string
+	DisputeType         *string
+	RequestedResolution *string
+	Description         string
+	AssignedReviewerID  *uuid.UUID
+	TriagedAt           *time.Time
+	ResolvedAt          *time.Time
+	ResolutionOutcome   *string
+	ResolutionSummary   *string
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+}
+
+type ReportCategory struct {
+	Slug            string
+	Label           string
+	AppliesTo       string
+	DefaultSeverity int32
+	Active          bool
+	DisplayOrder    int32
+}
+
+type ReportReview struct {
+	ID           int64
+	ReportID     uuid.UUID
+	ReviewerID   *uuid.UUID
+	Decision     string
+	StatusBefore string
+	StatusAfter  string
+	ReasonCode   *string
+	Notes        *string
+	CreatedAt    time.Time
 }
 
 type Ride struct {
@@ -172,6 +244,22 @@ type RideQuote struct {
 	CreatedAt         time.Time
 }
 
+type RideRating struct {
+	ID                  uuid.UUID
+	RideID              uuid.UUID
+	RatedBy             uuid.UUID
+	RatedUser           uuid.UUID
+	Score               int32
+	ReasonTags          []string
+	Comment             *string
+	IncludeInScore      bool
+	ExclusionReason     *string
+	NullifiedAt         *time.Time
+	NullifiedBy         *uuid.UUID
+	NullificationReason *string
+	SubmittedAt         time.Time
+}
+
 type Subscription struct {
 	ID                uuid.UUID
 	DriverID          uuid.UUID
@@ -224,6 +312,24 @@ type User struct {
 	AccountStatus string
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
+	RatingCenti   *int32
+	RatingCount   int32
+}
+
+type UserEnforcement struct {
+	ID         uuid.UUID
+	UserID     uuid.UUID
+	ReportID   *uuid.UUID
+	ActorID    *uuid.UUID
+	Action     string
+	Status     string
+	ReasonCode string
+	ReasonText *string
+	StartsAt   time.Time
+	EndsAt     *time.Time
+	LiftedAt   *time.Time
+	LiftedBy   *uuid.UUID
+	CreatedAt  time.Time
 }
 
 type UserRole struct {

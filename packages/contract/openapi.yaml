@@ -980,8 +980,474 @@ paths:
         default:
           $ref: "#/components/responses/Problem"
 
+  /v1/reports/categories:
+    get:
+      operationId: listReportCategories
+      summary: List what can be reported
+      security:
+        - bearerAuth: [rider, driver]
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportCategoryList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/reports:
+    post:
+      operationId: submitReport
+      summary: Report the other person on a ride
+      security:
+        - bearerAuth: [rider, driver]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportSubmission"
+      responses:
+        "201":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FiledCase"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/moderation/reports:
+    get:
+      operationId: listReports
+      summary: List reports in one status, most severe first
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - {name: status, in: query, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/moderation/reports/{report_id}:
+    get:
+      operationId: getReport
+      summary: Load one report including its text
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - $ref: "#/components/parameters/ReportId"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/moderation/reports/{report_id}/triage:
+    post:
+      operationId: triageReport
+      summary: Claim a report for review
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - $ref: "#/components/parameters/ReportId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TriageRequest"
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/moderation/reports/{report_id}/review:
+    post:
+      operationId: reviewReport
+      summary: Rule on a report and apply any penalty
+      security:
+        - bearerAuth: [ops, admin, "mfa:step-up"]
+      parameters:
+        - $ref: "#/components/parameters/ReportId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportReviewRequest"
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/moderation/enforcements:
+    get:
+      operationId: listEnforcements
+      summary: List penalties in one status
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - {name: status, in: query, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnforcementList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+    post:
+      operationId: applyEnforcement
+      summary: Apply a penalty directly
+      security:
+        - bearerAuth: [ops, admin, "mfa:step-up"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnforcementRequest"
+      responses:
+        "201":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Enforcement"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/moderation/enforcements/{enforcement_id}/lift:
+    post:
+      operationId: liftEnforcement
+      summary: End a penalty early
+      security:
+        - bearerAuth: [ops, admin, "mfa:step-up"]
+      parameters:
+        - $ref: "#/components/parameters/EnforcementId"
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ratings/pending:
+    get:
+      operationId: listPendingRatings
+      summary: List ratings the user can still give
+      security:
+        - bearerAuth: [rider, driver]
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PendingRatingList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/rate:
+    post:
+      operationId: rateRide
+      summary: Rate the other person on a completed ride
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RatingSubmission"
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/rate/skip:
+    post:
+      operationId: skipRating
+      summary: Decline to rate
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/ratings:
+    get:
+      operationId: listRatings
+      summary: List ratings
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - {name: rated_user_id, in: query, required: false, schema: {type: string, format: uuid}}
+        - {name: excluded_only, in: query, required: false, schema: {type: boolean, default: false}}
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RatingList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/ratings/{rating_id}/nullify:
+    post:
+      operationId: nullifyRating
+      summary: Remove a rating from the score
+      security:
+        - bearerAuth: [ops, admin, "mfa:step-up"]
+      parameters:
+        - $ref: "#/components/parameters/RatingId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NullifyRequest"
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/ratings/{rating_id}/reinstate:
+    post:
+      operationId: reinstateRating
+      summary: Return a rating to the score
+      security:
+        - bearerAuth: [ops, admin, "mfa:step-up"]
+      parameters:
+        - $ref: "#/components/parameters/RatingId"
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/disputes:
+    post:
+      operationId: submitDispute
+      summary: Raise a dispute about a ride
+      security:
+        - bearerAuth: [rider, driver]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DisputeSubmission"
+      responses:
+        "201":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FiledCase"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/disputes/me:
+    get:
+      operationId: listMyDisputes
+      summary: List disputes this account may see
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyDisputeList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/disputes/me/compensations:
+    get:
+      operationId: listMyCompensations
+      summary: List compensation owed to this account
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompensationList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/disputes:
+    get:
+      operationId: listDisputes
+      summary: List disputes in one status
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - {name: status, in: query, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DisputeCaseList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/disputes/{report_id}/resolve:
+    post:
+      operationId: resolveDispute
+      summary: Rule on a dispute
+      security:
+        - bearerAuth: [ops, admin, "mfa:step-up"]
+      parameters:
+        - $ref: "#/components/parameters/ReportId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DisputeResolution"
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/disputes/compensations:
+    get:
+      operationId: listCompensations
+      summary: List compensation in one status
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - {name: status, in: query, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompensationList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/disputes/compensations/{compensation_id}/mark-paid:
+    post:
+      operationId: markCompensationPaid
+      summary: Record that compensation was paid
+      security:
+        - bearerAuth: [ops, admin, "mfa:step-up"]
+      parameters:
+        - $ref: "#/components/parameters/CompensationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarkPaidRequest"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Compensation"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/disputes/compensations/{compensation_id}/cancel:
+    post:
+      operationId: cancelCompensation
+      summary: Withdraw approved compensation
+      security:
+        - bearerAuth: [ops, admin, "mfa:step-up"]
+      parameters:
+        - $ref: "#/components/parameters/CompensationId"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Compensation"
+        default:
+          $ref: "#/components/responses/Problem"
+
 components:
   parameters:
+    ReportId:
+      name: report_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    EnforcementId:
+      name: enforcement_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RatingId:
+      name: rating_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CompensationId:
+      name: compensation_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     Limit:
       name: limit
       in: query
@@ -1793,3 +2259,270 @@ components:
         token:
           type: string
           maxLength: 4096
+
+    ReportCategory:
+      type: object
+      additionalProperties: false
+      required: [slug, label, applies_to]
+      properties:
+        slug: {type: string}
+        label: {type: string}
+        applies_to: {type: string}
+    ReportCategoryList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/ReportCategory"}
+    ReportSubmission:
+      type: object
+      additionalProperties: false
+      required: [ride_id, category, description]
+      properties:
+        ride_id: {type: string, format: uuid}
+        category: {type: string}
+        description: {type: string, maxLength: 2000}
+    FiledCase:
+      type: object
+      additionalProperties: false
+      required: [id, status, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        status: {type: string}
+        created_at: {type: string, format: date-time}
+    ReportSummary:
+      type: object
+      additionalProperties: false
+      required: [id, reported_id, category, status, severity, source, incident_type, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        reporter_id: {type: string, format: uuid}
+        reported_id: {type: string, format: uuid}
+        category: {type: string}
+        status: {type: string}
+        severity: {type: integer, format: int32}
+        source: {type: string}
+        incident_type: {type: string}
+        ride_id: {type: string, format: uuid}
+        created_at: {type: string, format: date-time}
+    ReportList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/ReportSummary"}
+    ReportDetail:
+      type: object
+      additionalProperties: false
+      required: [summary, description]
+      properties:
+        summary: {$ref: "#/components/schemas/ReportSummary"}
+        description: {type: string}
+        outcome: {type: string}
+    TriageRequest:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: {type: string, enum: [triaged, under_review]}
+    ReportReviewRequest:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [needs_more_info, no_action, warning, temporary_suspension, permanent_ban, escalate, dismiss]
+        reason_code: {type: string, maxLength: 100}
+        notes: {type: string, maxLength: 1000}
+        ends_at: {type: string, format: date-time}
+    EnforcementRequest:
+      type: object
+      additionalProperties: false
+      required: [user_id, action, reason_code]
+      properties:
+        user_id: {type: string, format: uuid}
+        action: {type: string, enum: [warning, feature_restriction, temporary_suspension, permanent_ban]}
+        reason_code: {type: string, maxLength: 100}
+        reason_text: {type: string, maxLength: 1000}
+        ends_at: {type: string, format: date-time}
+    Enforcement:
+      type: object
+      additionalProperties: false
+      required: [id, user_id, action, status, reason_code, starts_at]
+      properties:
+        id: {type: string, format: uuid}
+        user_id: {type: string, format: uuid}
+        report_id: {type: string, format: uuid}
+        action: {type: string}
+        status: {type: string}
+        reason_code: {type: string}
+        starts_at: {type: string, format: date-time}
+        ends_at: {type: string, format: date-time}
+        lifted_at: {type: string, format: date-time}
+    EnforcementList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/Enforcement"}
+    PendingRating:
+      type: object
+      additionalProperties: false
+      required: [ride_id, rater_role, due_at]
+      properties:
+        ride_id: {type: string, format: uuid}
+        rater_role: {type: string}
+        due_at: {type: string, format: date-time}
+        completed_at: {type: string, format: date-time}
+    PendingRatingList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/PendingRating"}
+    RatingSubmission:
+      type: object
+      additionalProperties: false
+      required: [score]
+      properties:
+        score: {type: integer, format: int32, minimum: 1, maximum: 5}
+        reason_tags:
+          type: array
+          maxItems: 5
+          items: {type: string, maxLength: 40}
+        comment: {type: string, maxLength: 200}
+    Rating:
+      type: object
+      additionalProperties: false
+      required: [id, ride_id, rated_by, rated_user, score, reason_tags, include_in_score, submitted_at]
+      properties:
+        id: {type: string, format: uuid}
+        ride_id: {type: string, format: uuid}
+        rated_by: {type: string, format: uuid}
+        rated_user: {type: string, format: uuid}
+        score: {type: integer, format: int32}
+        reason_tags:
+          type: array
+          items: {type: string}
+        comment: {type: string}
+        include_in_score: {type: boolean}
+        exclusion_reason: {type: string}
+        nullified_at: {type: string, format: date-time}
+        submitted_at: {type: string, format: date-time}
+    RatingList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/Rating"}
+    NullifyRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: {type: string, maxLength: 200}
+    DisputeSubmission:
+      type: object
+      additionalProperties: false
+      required: [ride_id, dispute_type, description]
+      properties:
+        ride_id: {type: string, format: uuid}
+        dispute_type:
+          type: string
+          enum: [fare_dispute, driver_not_arrived, wrong_route, safety_incident, lost_item, payment_not_received, wrong_driver, app_error, other]
+        description: {type: string, maxLength: 2000}
+        requested_resolution: {type: string, maxLength: 200}
+    MyDispute:
+      type: object
+      additionalProperties: false
+      required: [id, dispute_type, status, opened_by_me, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        ride_id: {type: string, format: uuid}
+        dispute_type: {type: string}
+        status: {type: string}
+        outcome: {type: string}
+        opened_by_me: {type: boolean}
+        created_at: {type: string, format: date-time}
+    MyDisputeList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/MyDispute"}
+    DisputeCase:
+      type: object
+      additionalProperties: false
+      required: [id, reported_id, dispute_type, status, severity, incident_type, description, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        reporter_id: {type: string, format: uuid}
+        reported_id: {type: string, format: uuid}
+        ride_id: {type: string, format: uuid}
+        dispute_type: {type: string}
+        status: {type: string}
+        severity: {type: integer, format: int32}
+        incident_type: {type: string}
+        requested_resolution: {type: string}
+        description: {type: string}
+        created_at: {type: string, format: date-time}
+    DisputeCaseList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/DisputeCase"}
+    DisputeResolution:
+      type: object
+      additionalProperties: false
+      required: [outcome]
+      properties:
+        outcome: {type: string, enum: [dismissed, no_action, refund_full, refund_partial, credit_note, escalate]}
+        amount_kes: {type: integer, format: int32, minimum: 1}
+        summary: {type: string, maxLength: 1000}
+    Compensation:
+      type: object
+      additionalProperties: false
+      required: [id, report_id, ride_id, beneficiary_id, compensation_type, status, amount_kes, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        report_id: {type: string, format: uuid}
+        ride_id: {type: string, format: uuid}
+        beneficiary_id: {type: string, format: uuid}
+        compensation_type: {type: string}
+        status: {type: string}
+        amount_kes: {type: integer, format: int32}
+        processing_channel: {type: string}
+        processing_reference: {type: string}
+        processed_at: {type: string, format: date-time}
+        created_at: {type: string, format: date-time}
+    CompensationList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/Compensation"}
+    MarkPaidRequest:
+      type: object
+      additionalProperties: false
+      required: [channel, reference]
+      properties:
+        channel: {type: string, enum: [manual_ops, mpesa_reversal, wallet_credit, bank_transfer]}
+        reference: {type: string, maxLength: 200}

@@ -17,8 +17,11 @@ import (
 
 	"github.com/kelvinguchu/liddr/apps/api/internal/config"
 	"github.com/kelvinguchu/liddr/apps/api/internal/dispatch"
+	"github.com/kelvinguchu/liddr/apps/api/internal/disputes"
 	"github.com/kelvinguchu/liddr/apps/api/internal/httpapi"
 	"github.com/kelvinguchu/liddr/apps/api/internal/maps"
+	"github.com/kelvinguchu/liddr/apps/api/internal/moderation"
+	"github.com/kelvinguchu/liddr/apps/api/internal/ratings"
 	"github.com/kelvinguchu/liddr/apps/api/internal/realtime"
 	"github.com/kelvinguchu/liddr/apps/api/internal/rides"
 	"github.com/kelvinguchu/liddr/apps/api/internal/store"
@@ -100,6 +103,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	moderator := moderation.NewService(moderation.Config{Pool: pool, Now: time.Now})
 	dispatcher := dispatch.NewService(dispatch.Config{Pool: pool, Now: time.Now})
 	billing := newSubscriptions(cfg, pool, logger)
 	hub := realtime.NewHub(logger)
@@ -117,6 +121,9 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		Subscriptions:    billing,
 		Verification:     documents,
 		Notifications:    inbox,
+		Moderation:       moderator,
+		Ratings:          ratings.NewService(ratings.Config{Pool: pool, Moderation: moderator, Now: time.Now}),
+		Disputes:         disputes.NewService(disputes.Config{Pool: pool, Moderation: moderator, Now: time.Now}),
 		Realtime:         hub,
 		RealtimeBase:     ctx,
 		RealtimeOrigins:  cfg.RealtimeOrigins,
@@ -150,6 +157,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	workers.Go(func() { hub.Listen(workerCtx, pool) })
 	workers.Go(func() { documents.Run(workerCtx) })
 	workers.Go(func() { inbox.Run(workerCtx) })
+	workers.Go(func() { moderator.Run(workerCtx, logger) })
 	defer workers.Wait()
 	defer stopWorkers()
 

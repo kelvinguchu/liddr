@@ -6,8 +6,11 @@ import (
 
 	"github.com/kelvinguchu/liddr/apps/api/internal/auth"
 	"github.com/kelvinguchu/liddr/apps/api/internal/dispatch"
+	"github.com/kelvinguchu/liddr/apps/api/internal/disputes"
+	"github.com/kelvinguchu/liddr/apps/api/internal/moderation"
 	"github.com/kelvinguchu/liddr/apps/api/internal/notifications"
 	"github.com/kelvinguchu/liddr/apps/api/internal/payments"
+	"github.com/kelvinguchu/liddr/apps/api/internal/ratings"
 	"github.com/kelvinguchu/liddr/apps/api/internal/rides"
 	"github.com/kelvinguchu/liddr/apps/api/internal/subscriptions"
 	"github.com/kelvinguchu/liddr/apps/api/internal/verification"
@@ -84,6 +87,41 @@ var problems = []problem{
 	{verification.ErrDocumentsMissing, http.StatusConflict, "DOCUMENTS_INCOMPLETE", "Every required document must be validated first."},
 	{notifications.ErrNotFound, http.StatusNotFound, "NOT_FOUND", "That notification could not be found."},
 	{notifications.ErrInvalidToken, http.StatusBadRequest, "INVALID_PUSH_TOKEN", "That device token is not valid."},
+	{moderation.ErrNotFound, http.StatusNotFound, "NOT_FOUND", "That could not be found."},
+	{moderation.ErrInvalidCategory, http.StatusBadRequest, "INVALID_CATEGORY", "Choose a valid reason."},
+	{moderation.ErrInvalidDescription, http.StatusBadRequest, "INVALID_DESCRIPTION", "Describe what happened in up to 2,000 characters."},
+	{moderation.ErrNotParticipant, http.StatusNotFound, "NOT_FOUND", "That ride could not be found."},
+	{moderation.ErrNoOtherParty, http.StatusConflict, "NO_OTHER_PARTY", "No driver was assigned to this ride."},
+	{moderation.ErrWrongParty, http.StatusBadRequest, "WRONG_PARTY", "That reason does not apply here."},
+	{moderation.ErrRateLimited, http.StatusTooManyRequests, "RATE_LIMITED", "Too many reports today. Please contact support."},
+	{moderation.ErrInvalidDecision, http.StatusBadRequest, "INVALID_DECISION", "That decision is not available."},
+	{moderation.ErrInvalidStatus, http.StatusBadRequest, "INVALID_STATUS", "That status is not available."},
+	{moderation.ErrReportClosed, http.StatusConflict, "REPORT_CLOSED", "This report has already been closed."},
+	{moderation.ErrConflictOfInterest, http.StatusForbidden, "CONFLICT_OF_INTEREST", "You cannot act on a case involving yourself."},
+	{moderation.ErrInvalidEnd, http.StatusBadRequest, "INVALID_END_TIME", "Choose an end time within the next year."},
+	{moderation.ErrEnforcementClosed, http.StatusConflict, "ENFORCEMENT_CLOSED", "This penalty is no longer active."},
+	{ratings.ErrNotRateable, http.StatusConflict, "RATING_NOT_AVAILABLE", "This ride can no longer be rated."},
+	{ratings.ErrInvalidScore, http.StatusBadRequest, "INVALID_SCORE", "Choose between one and five stars."},
+	{ratings.ErrReasonsRequired, http.StatusBadRequest, "REASON_REQUIRED", "Tell us what went wrong."},
+	{ratings.ErrInvalidTags, http.StatusBadRequest, "INVALID_TAGS", "Those reasons are not valid."},
+	{ratings.ErrInvalidComment, http.StatusBadRequest, "INVALID_COMMENT", "Keep your comment under 200 characters."},
+	{ratings.ErrNotFound, http.StatusNotFound, "NOT_FOUND", "That rating could not be found."},
+	{ratings.ErrAlreadyDone, http.StatusConflict, "ALREADY_DONE", "That has already been done."},
+	{ratings.ErrReasonRequired, http.StatusBadRequest, "REASON_REQUIRED", "Give a reason of up to 200 characters."},
+	{ratings.ErrSelfAction, http.StatusForbidden, "CONFLICT_OF_INTEREST", "You cannot change your own ratings."},
+	{disputes.ErrInvalidType, http.StatusBadRequest, "INVALID_DISPUTE_TYPE", "Choose a valid dispute type."},
+	{disputes.ErrRideNotEligible, http.StatusConflict, "RIDE_NOT_ELIGIBLE", "This ride cannot be disputed right now."},
+	{disputes.ErrWindowClosed, http.StatusConflict, "DISPUTE_WINDOW_CLOSED", "Disputes must be raised within 48 hours of the ride."},
+	{disputes.ErrRideLimit, http.StatusTooManyRequests, "DISPUTE_RIDE_LIMIT", "You have raised the maximum disputes for this ride."},
+	{disputes.ErrWeeklyLimit, http.StatusTooManyRequests, "DISPUTE_WEEKLY_LIMIT", "You have raised too many disputes this week. Please contact support."},
+	{disputes.ErrNotFound, http.StatusNotFound, "NOT_FOUND", "That dispute could not be found."},
+	{disputes.ErrInvalidOutcome, http.StatusBadRequest, "INVALID_OUTCOME", "That outcome is not available."},
+	{disputes.ErrInvalidAmount, http.StatusBadRequest, "INVALID_AMOUNT", "The amount must be positive and no more than the fare."},
+	{disputes.ErrNotRefundable, http.StatusConflict, "NOT_REFUNDABLE", "Only the rider who paid this fare can be compensated."},
+	{disputes.ErrAlreadySettled, http.StatusConflict, "ALREADY_SETTLED", "This compensation has already been settled."},
+	{disputes.ErrInvalidChannel, http.StatusBadRequest, "INVALID_CHANNEL", "Choose a valid payment channel."},
+	{disputes.ErrReferenceNeeded, http.StatusBadRequest, "REFERENCE_REQUIRED", "Enter the payment reference."},
+	{disputes.ErrSelfAction, http.StatusForbidden, "CONFLICT_OF_INTEREST", "You cannot settle your own case."},
 	{payments.ErrInvalidCallback, http.StatusBadRequest, "INVALID_CALLBACK", "The callback could not be read."},
 }
 

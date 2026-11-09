@@ -22,6 +22,75 @@ const (
 	BearerAuthScopes bearerAuthContextKey = "bearerAuth.Scopes"
 )
 
+// Defines values for DisputeResolutionOutcome.
+const (
+	DisputeResolutionOutcomeCreditNote    DisputeResolutionOutcome = "credit_note"
+	DisputeResolutionOutcomeDismissed     DisputeResolutionOutcome = "dismissed"
+	DisputeResolutionOutcomeEscalate      DisputeResolutionOutcome = "escalate"
+	DisputeResolutionOutcomeNoAction      DisputeResolutionOutcome = "no_action"
+	DisputeResolutionOutcomeRefundFull    DisputeResolutionOutcome = "refund_full"
+	DisputeResolutionOutcomeRefundPartial DisputeResolutionOutcome = "refund_partial"
+)
+
+// Valid indicates whether the value is a known member of the DisputeResolutionOutcome enum.
+func (e DisputeResolutionOutcome) Valid() bool {
+	switch e {
+	case DisputeResolutionOutcomeCreditNote:
+		return true
+	case DisputeResolutionOutcomeDismissed:
+		return true
+	case DisputeResolutionOutcomeEscalate:
+		return true
+	case DisputeResolutionOutcomeNoAction:
+		return true
+	case DisputeResolutionOutcomeRefundFull:
+		return true
+	case DisputeResolutionOutcomeRefundPartial:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DisputeSubmissionDisputeType.
+const (
+	AppError           DisputeSubmissionDisputeType = "app_error"
+	DriverNotArrived   DisputeSubmissionDisputeType = "driver_not_arrived"
+	FareDispute        DisputeSubmissionDisputeType = "fare_dispute"
+	LostItem           DisputeSubmissionDisputeType = "lost_item"
+	Other              DisputeSubmissionDisputeType = "other"
+	PaymentNotReceived DisputeSubmissionDisputeType = "payment_not_received"
+	SafetyIncident     DisputeSubmissionDisputeType = "safety_incident"
+	WrongDriver        DisputeSubmissionDisputeType = "wrong_driver"
+	WrongRoute         DisputeSubmissionDisputeType = "wrong_route"
+)
+
+// Valid indicates whether the value is a known member of the DisputeSubmissionDisputeType enum.
+func (e DisputeSubmissionDisputeType) Valid() bool {
+	switch e {
+	case AppError:
+		return true
+	case DriverNotArrived:
+		return true
+	case FareDispute:
+		return true
+	case LostItem:
+		return true
+	case Other:
+		return true
+	case PaymentNotReceived:
+		return true
+	case SafetyIncident:
+		return true
+	case WrongDriver:
+		return true
+	case WrongRoute:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DriverProfileSubscriptionStatus.
 const (
 	DriverProfileSubscriptionStatusActive    DriverProfileSubscriptionStatus = "active"
@@ -67,6 +136,30 @@ func (e DriverProfileVerificationStatus) Valid() bool {
 	}
 }
 
+// Defines values for EnforcementRequestAction.
+const (
+	EnforcementRequestActionFeatureRestriction  EnforcementRequestAction = "feature_restriction"
+	EnforcementRequestActionPermanentBan        EnforcementRequestAction = "permanent_ban"
+	EnforcementRequestActionTemporarySuspension EnforcementRequestAction = "temporary_suspension"
+	EnforcementRequestActionWarning             EnforcementRequestAction = "warning"
+)
+
+// Valid indicates whether the value is a known member of the EnforcementRequestAction enum.
+func (e EnforcementRequestAction) Valid() bool {
+	switch e {
+	case EnforcementRequestActionFeatureRestriction:
+		return true
+	case EnforcementRequestActionPermanentBan:
+		return true
+	case EnforcementRequestActionTemporarySuspension:
+		return true
+	case EnforcementRequestActionWarning:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for HealthStatus.
 const (
 	Ok          HealthStatus = "ok"
@@ -79,6 +172,30 @@ func (e HealthStatus) Valid() bool {
 	case Ok:
 		return true
 	case Unavailable:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MarkPaidRequestChannel.
+const (
+	BankTransfer  MarkPaidRequestChannel = "bank_transfer"
+	ManualOps     MarkPaidRequestChannel = "manual_ops"
+	MpesaReversal MarkPaidRequestChannel = "mpesa_reversal"
+	WalletCredit  MarkPaidRequestChannel = "wallet_credit"
+)
+
+// Valid indicates whether the value is a known member of the MarkPaidRequestChannel enum.
+func (e MarkPaidRequestChannel) Valid() bool {
+	switch e {
+	case BankTransfer:
+		return true
+	case ManualOps:
+		return true
+	case MpesaReversal:
+		return true
+	case WalletCredit:
 		return true
 	default:
 		return false
@@ -136,6 +253,39 @@ func (e PushTokenRegistrationPlatform) Valid() bool {
 	case Android:
 		return true
 	case Ios:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReportReviewRequestDecision.
+const (
+	ReportReviewRequestDecisionDismiss             ReportReviewRequestDecision = "dismiss"
+	ReportReviewRequestDecisionEscalate            ReportReviewRequestDecision = "escalate"
+	ReportReviewRequestDecisionNeedsMoreInfo       ReportReviewRequestDecision = "needs_more_info"
+	ReportReviewRequestDecisionNoAction            ReportReviewRequestDecision = "no_action"
+	ReportReviewRequestDecisionPermanentBan        ReportReviewRequestDecision = "permanent_ban"
+	ReportReviewRequestDecisionTemporarySuspension ReportReviewRequestDecision = "temporary_suspension"
+	ReportReviewRequestDecisionWarning             ReportReviewRequestDecision = "warning"
+)
+
+// Valid indicates whether the value is a known member of the ReportReviewRequestDecision enum.
+func (e ReportReviewRequestDecision) Valid() bool {
+	switch e {
+	case ReportReviewRequestDecisionDismiss:
+		return true
+	case ReportReviewRequestDecisionEscalate:
+		return true
+	case ReportReviewRequestDecisionNeedsMoreInfo:
+		return true
+	case ReportReviewRequestDecisionNoAction:
+		return true
+	case ReportReviewRequestDecisionPermanentBan:
+		return true
+	case ReportReviewRequestDecisionTemporarySuspension:
+		return true
+	case ReportReviewRequestDecisionWarning:
 		return true
 	default:
 		return false
@@ -319,6 +469,24 @@ func (e SubscriptionPaymentStatus) Valid() bool {
 	}
 }
 
+// Defines values for TriageRequestStatus.
+const (
+	TriageRequestStatusTriaged     TriageRequestStatus = "triaged"
+	TriageRequestStatusUnderReview TriageRequestStatus = "under_review"
+)
+
+// Valid indicates whether the value is a known member of the TriageRequestStatus enum.
+func (e TriageRequestStatus) Valid() bool {
+	switch e {
+	case TriageRequestStatusTriaged:
+		return true
+	case TriageRequestStatusUnderReview:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListVerificationApplicationsParamsStatus.
 const (
 	ListVerificationApplicationsParamsStatusApproved             ListVerificationApplicationsParamsStatus = "approved"
@@ -362,6 +530,26 @@ type CancelRideRequest struct {
 	Reason string `json:"reason"`
 }
 
+// Compensation defines model for Compensation.
+type Compensation struct {
+	AmountKes           int32              `json:"amount_kes"`
+	BeneficiaryId       openapi_types.UUID `json:"beneficiary_id"`
+	CompensationType    string             `json:"compensation_type"`
+	CreatedAt           time.Time          `json:"created_at"`
+	Id                  openapi_types.UUID `json:"id"`
+	ProcessedAt         *time.Time         `json:"processed_at,omitempty"`
+	ProcessingChannel   *string            `json:"processing_channel,omitempty"`
+	ProcessingReference *string            `json:"processing_reference,omitempty"`
+	ReportId            openapi_types.UUID `json:"report_id"`
+	RideId              openapi_types.UUID `json:"ride_id"`
+	Status              string             `json:"status"`
+}
+
+// CompensationList defines model for CompensationList.
+type CompensationList struct {
+	Data []Compensation `json:"data"`
+}
+
 // CompleteTripRequest defines model for CompleteTripRequest.
 type CompleteTripRequest struct {
 	PaymentMode PaymentMode `json:"payment_mode"`
@@ -372,6 +560,47 @@ type Coordinates struct {
 	Lat float64 `json:"lat"`
 	Lng float64 `json:"lng"`
 }
+
+// DisputeCase defines model for DisputeCase.
+type DisputeCase struct {
+	CreatedAt           time.Time           `json:"created_at"`
+	Description         string              `json:"description"`
+	DisputeType         string              `json:"dispute_type"`
+	Id                  openapi_types.UUID  `json:"id"`
+	IncidentType        string              `json:"incident_type"`
+	ReportedId          openapi_types.UUID  `json:"reported_id"`
+	ReporterId          *openapi_types.UUID `json:"reporter_id,omitempty"`
+	RequestedResolution *string             `json:"requested_resolution,omitempty"`
+	RideId              *openapi_types.UUID `json:"ride_id,omitempty"`
+	Severity            int32               `json:"severity"`
+	Status              string              `json:"status"`
+}
+
+// DisputeCaseList defines model for DisputeCaseList.
+type DisputeCaseList struct {
+	Data []DisputeCase `json:"data"`
+}
+
+// DisputeResolution defines model for DisputeResolution.
+type DisputeResolution struct {
+	AmountKes *int32                   `json:"amount_kes,omitempty"`
+	Outcome   DisputeResolutionOutcome `json:"outcome"`
+	Summary   *string                  `json:"summary,omitempty"`
+}
+
+// DisputeResolutionOutcome defines model for DisputeResolution.Outcome.
+type DisputeResolutionOutcome string
+
+// DisputeSubmission defines model for DisputeSubmission.
+type DisputeSubmission struct {
+	Description         string                       `json:"description"`
+	DisputeType         DisputeSubmissionDisputeType `json:"dispute_type"`
+	RequestedResolution *string                      `json:"requested_resolution,omitempty"`
+	RideId              openapi_types.UUID           `json:"ride_id"`
+}
+
+// DisputeSubmissionDisputeType defines model for DisputeSubmission.DisputeType.
+type DisputeSubmissionDisputeType string
 
 // DriverProfile defines model for DriverProfile.
 type DriverProfile struct {
@@ -387,6 +616,36 @@ type DriverProfileSubscriptionStatus string
 // DriverProfileVerificationStatus defines model for DriverProfile.VerificationStatus.
 type DriverProfileVerificationStatus string
 
+// Enforcement defines model for Enforcement.
+type Enforcement struct {
+	Action     string              `json:"action"`
+	EndsAt     *time.Time          `json:"ends_at,omitempty"`
+	Id         openapi_types.UUID  `json:"id"`
+	LiftedAt   *time.Time          `json:"lifted_at,omitempty"`
+	ReasonCode string              `json:"reason_code"`
+	ReportId   *openapi_types.UUID `json:"report_id,omitempty"`
+	StartsAt   time.Time           `json:"starts_at"`
+	Status     string              `json:"status"`
+	UserId     openapi_types.UUID  `json:"user_id"`
+}
+
+// EnforcementList defines model for EnforcementList.
+type EnforcementList struct {
+	Data []Enforcement `json:"data"`
+}
+
+// EnforcementRequest defines model for EnforcementRequest.
+type EnforcementRequest struct {
+	Action     EnforcementRequestAction `json:"action"`
+	EndsAt     *time.Time               `json:"ends_at,omitempty"`
+	ReasonCode string                   `json:"reason_code"`
+	ReasonText *string                  `json:"reason_text,omitempty"`
+	UserId     openapi_types.UUID       `json:"user_id"`
+}
+
+// EnforcementRequestAction defines model for EnforcementRequest.Action.
+type EnforcementRequestAction string
+
 // Error defines model for Error.
 type Error struct {
 	// Code Stable machine-readable error code.
@@ -401,6 +660,13 @@ type Error struct {
 	RequestId string `json:"request_id"`
 }
 
+// FiledCase defines model for FiledCase.
+type FiledCase struct {
+	CreatedAt time.Time          `json:"created_at"`
+	Id        openapi_types.UUID `json:"id"`
+	Status    string             `json:"status"`
+}
+
 // Health defines model for Health.
 type Health struct {
 	Status HealthStatus `json:"status"`
@@ -408,6 +674,15 @@ type Health struct {
 
 // HealthStatus defines model for Health.Status.
 type HealthStatus string
+
+// MarkPaidRequest defines model for MarkPaidRequest.
+type MarkPaidRequest struct {
+	Channel   MarkPaidRequestChannel `json:"channel"`
+	Reference string                 `json:"reference"`
+}
+
+// MarkPaidRequestChannel defines model for MarkPaidRequest.Channel.
+type MarkPaidRequestChannel string
 
 // Me defines model for Me.
 type Me struct {
@@ -424,6 +699,22 @@ type MpesaAck struct {
 
 // MpesaCallback A Daraja callback body. Its shape is owned by Safaricom.
 type MpesaCallback map[string]interface{}
+
+// MyDispute defines model for MyDispute.
+type MyDispute struct {
+	CreatedAt   time.Time           `json:"created_at"`
+	DisputeType string              `json:"dispute_type"`
+	Id          openapi_types.UUID  `json:"id"`
+	OpenedByMe  bool                `json:"opened_by_me"`
+	Outcome     *string             `json:"outcome,omitempty"`
+	RideId      *openapi_types.UUID `json:"ride_id,omitempty"`
+	Status      string              `json:"status"`
+}
+
+// MyDisputeList defines model for MyDisputeList.
+type MyDisputeList struct {
+	Data []MyDispute `json:"data"`
+}
 
 // Notification defines model for Notification.
 type Notification struct {
@@ -444,6 +735,11 @@ type NotificationList struct {
 // NotificationSummary defines model for NotificationSummary.
 type NotificationSummary struct {
 	Unread int64 `json:"unread"`
+}
+
+// NullifyRequest defines model for NullifyRequest.
+type NullifyRequest struct {
+	Reason string `json:"reason"`
 }
 
 // Offer defines model for Offer.
@@ -484,6 +780,19 @@ type OtpVerification struct {
 
 // PaymentMode defines model for PaymentMode.
 type PaymentMode string
+
+// PendingRating defines model for PendingRating.
+type PendingRating struct {
+	CompletedAt *time.Time         `json:"completed_at,omitempty"`
+	DueAt       time.Time          `json:"due_at"`
+	RaterRole   string             `json:"rater_role"`
+	RideId      openapi_types.UUID `json:"ride_id"`
+}
+
+// PendingRatingList defines model for PendingRatingList.
+type PendingRatingList struct {
+	Data []PendingRating `json:"data"`
+}
 
 // PrepareUploadRequest defines model for PrepareUploadRequest.
 type PrepareUploadRequest struct {
@@ -538,9 +847,92 @@ type QuoteRequest struct {
 	VehicleCategory string `json:"vehicle_category"`
 }
 
+// Rating defines model for Rating.
+type Rating struct {
+	Comment         *string            `json:"comment,omitempty"`
+	ExclusionReason *string            `json:"exclusion_reason,omitempty"`
+	Id              openapi_types.UUID `json:"id"`
+	IncludeInScore  bool               `json:"include_in_score"`
+	NullifiedAt     *time.Time         `json:"nullified_at,omitempty"`
+	RatedBy         openapi_types.UUID `json:"rated_by"`
+	RatedUser       openapi_types.UUID `json:"rated_user"`
+	ReasonTags      []string           `json:"reason_tags"`
+	RideId          openapi_types.UUID `json:"ride_id"`
+	Score           int32              `json:"score"`
+	SubmittedAt     time.Time          `json:"submitted_at"`
+}
+
+// RatingList defines model for RatingList.
+type RatingList struct {
+	Data []Rating `json:"data"`
+}
+
+// RatingSubmission defines model for RatingSubmission.
+type RatingSubmission struct {
+	Comment    *string   `json:"comment,omitempty"`
+	ReasonTags *[]string `json:"reason_tags,omitempty"`
+	Score      int32     `json:"score"`
+}
+
 // RefreshRequest defines model for RefreshRequest.
 type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token"`
+}
+
+// ReportCategory defines model for ReportCategory.
+type ReportCategory struct {
+	AppliesTo string `json:"applies_to"`
+	Label     string `json:"label"`
+	Slug      string `json:"slug"`
+}
+
+// ReportCategoryList defines model for ReportCategoryList.
+type ReportCategoryList struct {
+	Data []ReportCategory `json:"data"`
+}
+
+// ReportDetail defines model for ReportDetail.
+type ReportDetail struct {
+	Description string        `json:"description"`
+	Outcome     *string       `json:"outcome,omitempty"`
+	Summary     ReportSummary `json:"summary"`
+}
+
+// ReportList defines model for ReportList.
+type ReportList struct {
+	Data []ReportSummary `json:"data"`
+}
+
+// ReportReviewRequest defines model for ReportReviewRequest.
+type ReportReviewRequest struct {
+	Decision   ReportReviewRequestDecision `json:"decision"`
+	EndsAt     *time.Time                  `json:"ends_at,omitempty"`
+	Notes      *string                     `json:"notes,omitempty"`
+	ReasonCode *string                     `json:"reason_code,omitempty"`
+}
+
+// ReportReviewRequestDecision defines model for ReportReviewRequest.Decision.
+type ReportReviewRequestDecision string
+
+// ReportSubmission defines model for ReportSubmission.
+type ReportSubmission struct {
+	Category    string             `json:"category"`
+	Description string             `json:"description"`
+	RideId      openapi_types.UUID `json:"ride_id"`
+}
+
+// ReportSummary defines model for ReportSummary.
+type ReportSummary struct {
+	Category     string              `json:"category"`
+	CreatedAt    time.Time           `json:"created_at"`
+	Id           openapi_types.UUID  `json:"id"`
+	IncidentType string              `json:"incident_type"`
+	ReportedId   openapi_types.UUID  `json:"reported_id"`
+	ReporterId   *openapi_types.UUID `json:"reporter_id,omitempty"`
+	RideId       *openapi_types.UUID `json:"ride_id,omitempty"`
+	Severity     int32               `json:"severity"`
+	Source       string              `json:"source"`
+	Status       string              `json:"status"`
 }
 
 // ReviewRequest defines model for ReviewRequest.
@@ -675,6 +1067,14 @@ type TotpSetup struct {
 	Secret     string    `json:"secret"`
 }
 
+// TriageRequest defines model for TriageRequest.
+type TriageRequest struct {
+	Status TriageRequestStatus `json:"status"`
+}
+
+// TriageRequestStatus defines model for TriageRequest.Status.
+type TriageRequestStatus string
+
 // VehicleCategory defines model for VehicleCategory.
 type VehicleCategory struct {
 	// Capacity Passenger seats. Zero for package delivery.
@@ -766,8 +1166,14 @@ type ApplicationId = openapi_types.UUID
 // CallbackToken defines model for CallbackToken.
 type CallbackToken = string
 
+// CompensationId defines model for CompensationId.
+type CompensationId = openapi_types.UUID
+
 // DocumentId defines model for DocumentId.
 type DocumentId = openapi_types.UUID
+
+// EnforcementId defines model for EnforcementId.
+type EnforcementId = openapi_types.UUID
 
 // Limit defines model for Limit.
 type Limit = int32
@@ -777,6 +1183,12 @@ type OfferId = openapi_types.UUID
 
 // Offset defines model for Offset.
 type Offset = int32
+
+// RatingId defines model for RatingId.
+type RatingId = openapi_types.UUID
+
+// ReportId defines model for ReportId.
+type ReportId = openapi_types.UUID
 
 // RideId defines model for RideId.
 type RideId = openapi_types.UUID
@@ -795,10 +1207,58 @@ type BeginTotpSetupParams struct {
 	XStepUpToken *StepUpToken `json:"X-Step-Up-Token,omitempty"`
 }
 
+// ListMyDisputesParams defines parameters for ListMyDisputes.
+type ListMyDisputesParams struct {
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset *Offset `form:"offset,omitempty" json:"offset,omitempty"`
+}
+
+// ListMyCompensationsParams defines parameters for ListMyCompensations.
+type ListMyCompensationsParams struct {
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset *Offset `form:"offset,omitempty" json:"offset,omitempty"`
+}
+
 // ListNotificationsParams defines parameters for ListNotifications.
 type ListNotificationsParams struct {
 	IncludeAcked *bool  `form:"include_acked,omitempty" json:"include_acked,omitempty"`
 	Limit        *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListDisputesParams defines parameters for ListDisputes.
+type ListDisputesParams struct {
+	Status string  `form:"status" json:"status"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset *Offset `form:"offset,omitempty" json:"offset,omitempty"`
+}
+
+// ListCompensationsParams defines parameters for ListCompensations.
+type ListCompensationsParams struct {
+	Status string  `form:"status" json:"status"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset *Offset `form:"offset,omitempty" json:"offset,omitempty"`
+}
+
+// ListEnforcementsParams defines parameters for ListEnforcements.
+type ListEnforcementsParams struct {
+	Status string  `form:"status" json:"status"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset *Offset `form:"offset,omitempty" json:"offset,omitempty"`
+}
+
+// ListReportsParams defines parameters for ListReports.
+type ListReportsParams struct {
+	Status string  `form:"status" json:"status"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset *Offset `form:"offset,omitempty" json:"offset,omitempty"`
+}
+
+// ListRatingsParams defines parameters for ListRatings.
+type ListRatingsParams struct {
+	RatedUserId  *openapi_types.UUID `form:"rated_user_id,omitempty" json:"rated_user_id,omitempty"`
+	ExcludedOnly *bool               `form:"excluded_only,omitempty" json:"excluded_only,omitempty"`
+	Limit        *Limit              `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset       *Offset             `form:"offset,omitempty" json:"offset,omitempty"`
 }
 
 // ListVerificationApplicationsParams defines parameters for ListVerificationApplications.
@@ -829,11 +1289,32 @@ type RefreshSessionJSONRequestBody = RefreshRequest
 // VerifyStepUpJSONRequestBody defines body for VerifyStepUp for application/json ContentType.
 type VerifyStepUpJSONRequestBody = TotpCode
 
+// SubmitDisputeJSONRequestBody defines body for SubmitDispute for application/json ContentType.
+type SubmitDisputeJSONRequestBody = DisputeSubmission
+
 // SetDriverCategoryJSONRequestBody defines body for SetDriverCategory for application/json ContentType.
 type SetDriverCategoryJSONRequestBody = SetDriverCategoryRequest
 
 // UpdateDriverLocationJSONRequestBody defines body for UpdateDriverLocation for application/json ContentType.
 type UpdateDriverLocationJSONRequestBody = Coordinates
+
+// MarkCompensationPaidJSONRequestBody defines body for MarkCompensationPaid for application/json ContentType.
+type MarkCompensationPaidJSONRequestBody = MarkPaidRequest
+
+// ResolveDisputeJSONRequestBody defines body for ResolveDispute for application/json ContentType.
+type ResolveDisputeJSONRequestBody = DisputeResolution
+
+// ApplyEnforcementJSONRequestBody defines body for ApplyEnforcement for application/json ContentType.
+type ApplyEnforcementJSONRequestBody = EnforcementRequest
+
+// ReviewReportJSONRequestBody defines body for ReviewReport for application/json ContentType.
+type ReviewReportJSONRequestBody = ReportReviewRequest
+
+// TriageReportJSONRequestBody defines body for TriageReport for application/json ContentType.
+type TriageReportJSONRequestBody = TriageRequest
+
+// NullifyRatingJSONRequestBody defines body for NullifyRating for application/json ContentType.
+type NullifyRatingJSONRequestBody = NullifyRequest
 
 // ReviewVerificationApplicationJSONRequestBody defines body for ReviewVerificationApplication for application/json ContentType.
 type ReviewVerificationApplicationJSONRequestBody = ReviewRequest
@@ -847,6 +1328,9 @@ type RegisterPushTokenJSONRequestBody = PushTokenRegistration
 // RevokePushTokenJSONRequestBody defines body for RevokePushToken for application/json ContentType.
 type RevokePushTokenJSONRequestBody = PushTokenRevocation
 
+// SubmitReportJSONRequestBody defines body for SubmitReport for application/json ContentType.
+type SubmitReportJSONRequestBody = ReportSubmission
+
 // BookRideJSONRequestBody defines body for BookRide for application/json ContentType.
 type BookRideJSONRequestBody = BookRideRequest
 
@@ -858,6 +1342,9 @@ type CancelRideJSONRequestBody = CancelRideRequest
 
 // CompleteTripJSONRequestBody defines body for CompleteTrip for application/json ContentType.
 type CompleteTripJSONRequestBody = CompleteTripRequest
+
+// RateRideJSONRequestBody defines body for RateRide for application/json ContentType.
+type RateRideJSONRequestBody = RatingSubmission
 
 // StartVerificationJSONRequestBody defines body for StartVerification for application/json ContentType.
 type StartVerificationJSONRequestBody = StartVerificationRequest
@@ -906,6 +1393,15 @@ type ServerInterface interface {
 	// VerifyStepUp Exchange an authenticator code for a short-lived step-up token
 	// (POST /v1/auth/step-up)
 	VerifyStepUp(w http.ResponseWriter, r *http.Request)
+	// SubmitDispute Raise a dispute about a ride
+	// (POST /v1/disputes)
+	SubmitDispute(w http.ResponseWriter, r *http.Request)
+	// ListMyDisputes List disputes this account may see
+	// (GET /v1/disputes/me)
+	ListMyDisputes(w http.ResponseWriter, r *http.Request, params ListMyDisputesParams)
+	// ListMyCompensations List compensation owed to this account
+	// (GET /v1/disputes/me/compensations)
+	ListMyCompensations(w http.ResponseWriter, r *http.Request, params ListMyCompensationsParams)
 	// GetDriverProfile Return the signed-in driver's profile
 	// (GET /v1/drivers/me)
 	GetDriverProfile(w http.ResponseWriter, r *http.Request)
@@ -942,6 +1438,51 @@ type ServerInterface interface {
 	// RejectOffer Reject an offer
 	// (POST /v1/offers/{offer_id}/reject)
 	RejectOffer(w http.ResponseWriter, r *http.Request, offerId OfferId)
+	// ListDisputes List disputes in one status
+	// (GET /v1/ops/disputes)
+	ListDisputes(w http.ResponseWriter, r *http.Request, params ListDisputesParams)
+	// ListCompensations List compensation in one status
+	// (GET /v1/ops/disputes/compensations)
+	ListCompensations(w http.ResponseWriter, r *http.Request, params ListCompensationsParams)
+	// CancelCompensation Withdraw approved compensation
+	// (POST /v1/ops/disputes/compensations/{compensation_id}/cancel)
+	CancelCompensation(w http.ResponseWriter, r *http.Request, compensationId CompensationId)
+	// MarkCompensationPaid Record that compensation was paid
+	// (POST /v1/ops/disputes/compensations/{compensation_id}/mark-paid)
+	MarkCompensationPaid(w http.ResponseWriter, r *http.Request, compensationId CompensationId)
+	// ResolveDispute Rule on a dispute
+	// (POST /v1/ops/disputes/{report_id}/resolve)
+	ResolveDispute(w http.ResponseWriter, r *http.Request, reportId ReportId)
+	// ListEnforcements List penalties in one status
+	// (GET /v1/ops/moderation/enforcements)
+	ListEnforcements(w http.ResponseWriter, r *http.Request, params ListEnforcementsParams)
+	// ApplyEnforcement Apply a penalty directly
+	// (POST /v1/ops/moderation/enforcements)
+	ApplyEnforcement(w http.ResponseWriter, r *http.Request)
+	// LiftEnforcement End a penalty early
+	// (POST /v1/ops/moderation/enforcements/{enforcement_id}/lift)
+	LiftEnforcement(w http.ResponseWriter, r *http.Request, enforcementId EnforcementId)
+	// ListReports List reports in one status, most severe first
+	// (GET /v1/ops/moderation/reports)
+	ListReports(w http.ResponseWriter, r *http.Request, params ListReportsParams)
+	// GetReport Load one report including its text
+	// (GET /v1/ops/moderation/reports/{report_id})
+	GetReport(w http.ResponseWriter, r *http.Request, reportId ReportId)
+	// ReviewReport Rule on a report and apply any penalty
+	// (POST /v1/ops/moderation/reports/{report_id}/review)
+	ReviewReport(w http.ResponseWriter, r *http.Request, reportId ReportId)
+	// TriageReport Claim a report for review
+	// (POST /v1/ops/moderation/reports/{report_id}/triage)
+	TriageReport(w http.ResponseWriter, r *http.Request, reportId ReportId)
+	// ListRatings List ratings
+	// (GET /v1/ops/ratings)
+	ListRatings(w http.ResponseWriter, r *http.Request, params ListRatingsParams)
+	// NullifyRating Remove a rating from the score
+	// (POST /v1/ops/ratings/{rating_id}/nullify)
+	NullifyRating(w http.ResponseWriter, r *http.Request, ratingId RatingId)
+	// ReinstateRating Return a rating to the score
+	// (POST /v1/ops/ratings/{rating_id}/reinstate)
+	ReinstateRating(w http.ResponseWriter, r *http.Request, ratingId RatingId)
 	// ListVerificationApplications List applications in one status, oldest first
 	// (GET /v1/ops/verification/applications)
 	ListVerificationApplications(w http.ResponseWriter, r *http.Request, params ListVerificationApplicationsParams)
@@ -963,6 +1504,15 @@ type ServerInterface interface {
 	// RevokePushToken Stop push notifications to this device
 	// (POST /v1/push-tokens/revoke)
 	RevokePushToken(w http.ResponseWriter, r *http.Request)
+	// ListPendingRatings List ratings the user can still give
+	// (GET /v1/ratings/pending)
+	ListPendingRatings(w http.ResponseWriter, r *http.Request)
+	// SubmitReport Report the other person on a ride
+	// (POST /v1/reports)
+	SubmitReport(w http.ResponseWriter, r *http.Request)
+	// ListReportCategories List what can be reported
+	// (GET /v1/reports/categories)
+	ListReportCategories(w http.ResponseWriter, r *http.Request)
 	// BookRide Book a quoted trip. Repeating the call returns the same ride.
 	// (POST /v1/rides)
 	BookRide(w http.ResponseWriter, r *http.Request)
@@ -987,6 +1537,12 @@ type ServerInterface interface {
 	// MarkNoShow Report that the rider did not come after the waiting period
 	// (POST /v1/rides/{ride_id}/no-show)
 	MarkNoShow(w http.ResponseWriter, r *http.Request, rideId RideId)
+	// RateRide Rate the other person on a completed ride
+	// (POST /v1/rides/{ride_id}/rate)
+	RateRide(w http.ResponseWriter, r *http.Request, rideId RideId)
+	// SkipRating Decline to rate
+	// (POST /v1/rides/{ride_id}/rate/skip)
+	SkipRating(w http.ResponseWriter, r *http.Request, rideId RideId)
 	// StartTrip Start the trip
 	// (POST /v1/rides/{ride_id}/start)
 	StartTrip(w http.ResponseWriter, r *http.Request, rideId RideId)
@@ -1196,6 +1752,130 @@ func (siw *ServerInterfaceWrapper) VerifyStepUp(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.VerifyStepUp(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SubmitDispute operation middleware
+func (siw *ServerInterfaceWrapper) SubmitDispute(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider", "driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SubmitDispute(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListMyDisputes operation middleware
+func (siw *ServerInterfaceWrapper) ListMyDisputes(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider", "driver"})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListMyDisputesParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "offset" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "offset", r.URL.Query(), &params.Offset, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "offset"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMyDisputes(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListMyCompensations operation middleware
+func (siw *ServerInterfaceWrapper) ListMyCompensations(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider", "driver"})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListMyCompensationsParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "offset" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "offset", r.URL.Query(), &params.Offset, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "offset"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMyCompensations(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1513,6 +2193,652 @@ func (siw *ServerInterfaceWrapper) RejectOffer(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// ListDisputes operation middleware
+func (siw *ServerInterfaceWrapper) ListDisputes(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin"})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListDisputesParams
+
+	// ------------- Required query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "offset" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "offset", r.URL.Query(), &params.Offset, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "offset"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDisputes(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListCompensations operation middleware
+func (siw *ServerInterfaceWrapper) ListCompensations(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin"})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListCompensationsParams
+
+	// ------------- Required query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "offset" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "offset", r.URL.Query(), &params.Offset, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "offset"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCompensations(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CancelCompensation operation middleware
+func (siw *ServerInterfaceWrapper) CancelCompensation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "compensation_id" -------------
+	var compensationId CompensationId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "compensation_id", r.PathValue("compensation_id"), &compensationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "compensation_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin", "mfa:step-up"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CancelCompensation(w, r, compensationId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MarkCompensationPaid operation middleware
+func (siw *ServerInterfaceWrapper) MarkCompensationPaid(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "compensation_id" -------------
+	var compensationId CompensationId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "compensation_id", r.PathValue("compensation_id"), &compensationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "compensation_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin", "mfa:step-up"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MarkCompensationPaid(w, r, compensationId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ResolveDispute operation middleware
+func (siw *ServerInterfaceWrapper) ResolveDispute(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "report_id" -------------
+	var reportId ReportId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "report_id", r.PathValue("report_id"), &reportId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "report_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin", "mfa:step-up"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ResolveDispute(w, r, reportId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListEnforcements operation middleware
+func (siw *ServerInterfaceWrapper) ListEnforcements(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin"})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListEnforcementsParams
+
+	// ------------- Required query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "offset" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "offset", r.URL.Query(), &params.Offset, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "offset"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListEnforcements(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ApplyEnforcement operation middleware
+func (siw *ServerInterfaceWrapper) ApplyEnforcement(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin", "mfa:step-up"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ApplyEnforcement(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// LiftEnforcement operation middleware
+func (siw *ServerInterfaceWrapper) LiftEnforcement(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "enforcement_id" -------------
+	var enforcementId EnforcementId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "enforcement_id", r.PathValue("enforcement_id"), &enforcementId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "enforcement_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin", "mfa:step-up"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.LiftEnforcement(w, r, enforcementId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListReports operation middleware
+func (siw *ServerInterfaceWrapper) ListReports(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin"})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListReportsParams
+
+	// ------------- Required query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "offset" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "offset", r.URL.Query(), &params.Offset, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "offset"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListReports(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetReport operation middleware
+func (siw *ServerInterfaceWrapper) GetReport(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "report_id" -------------
+	var reportId ReportId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "report_id", r.PathValue("report_id"), &reportId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "report_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetReport(w, r, reportId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReviewReport operation middleware
+func (siw *ServerInterfaceWrapper) ReviewReport(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "report_id" -------------
+	var reportId ReportId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "report_id", r.PathValue("report_id"), &reportId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "report_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin", "mfa:step-up"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReviewReport(w, r, reportId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// TriageReport operation middleware
+func (siw *ServerInterfaceWrapper) TriageReport(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "report_id" -------------
+	var reportId ReportId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "report_id", r.PathValue("report_id"), &reportId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "report_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TriageReport(w, r, reportId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListRatings operation middleware
+func (siw *ServerInterfaceWrapper) ListRatings(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin"})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListRatingsParams
+
+	// ------------- Optional query parameter "rated_user_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "rated_user_id", r.URL.Query(), &params.RatedUserId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "rated_user_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "rated_user_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "excluded_only" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "excluded_only", r.URL.Query(), &params.ExcludedOnly, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "excluded_only"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "excluded_only", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "offset" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "offset", r.URL.Query(), &params.Offset, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "offset"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListRatings(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// NullifyRating operation middleware
+func (siw *ServerInterfaceWrapper) NullifyRating(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "rating_id" -------------
+	var ratingId RatingId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "rating_id", r.PathValue("rating_id"), &ratingId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "rating_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin", "mfa:step-up"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.NullifyRating(w, r, ratingId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReinstateRating operation middleware
+func (siw *ServerInterfaceWrapper) ReinstateRating(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "rating_id" -------------
+	var ratingId RatingId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "rating_id", r.PathValue("rating_id"), &ratingId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "rating_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin", "mfa:step-up"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReinstateRating(w, r, ratingId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListVerificationApplications operation middleware
 func (siw *ServerInterfaceWrapper) ListVerificationApplications(w http.ResponseWriter, r *http.Request) {
 
@@ -1746,6 +3072,66 @@ func (siw *ServerInterfaceWrapper) RevokePushToken(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
+// ListPendingRatings operation middleware
+func (siw *ServerInterfaceWrapper) ListPendingRatings(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider", "driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListPendingRatings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SubmitReport operation middleware
+func (siw *ServerInterfaceWrapper) SubmitReport(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider", "driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SubmitReport(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListReportCategories operation middleware
+func (siw *ServerInterfaceWrapper) ListReportCategories(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider", "driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListReportCategories(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // BookRide operation middleware
 func (siw *ServerInterfaceWrapper) BookRide(w http.ResponseWriter, r *http.Request) {
 
@@ -1969,6 +3355,70 @@ func (siw *ServerInterfaceWrapper) MarkNoShow(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.MarkNoShow(w, r, rideId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RateRide operation middleware
+func (siw *ServerInterfaceWrapper) RateRide(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "ride_id" -------------
+	var rideId RideId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ride_id", r.PathValue("ride_id"), &rideId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ride_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider", "driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RateRide(w, r, rideId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SkipRating operation middleware
+func (siw *ServerInterfaceWrapper) SkipRating(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "ride_id" -------------
+	var rideId RideId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ride_id", r.PathValue("ride_id"), &rideId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ride_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider", "driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SkipRating(w, r, rideId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2410,6 +3860,29 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/notifications/{notification_id}/ack", wrapper.AckNotification)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/v1/push-tokens", wrapper.RegisterPushToken)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/push-tokens/revoke", wrapper.RevokePushToken)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/reports/categories", wrapper.ListReportCategories)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/reports", wrapper.SubmitReport)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/ops/moderation/reports", wrapper.ListReports)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/ops/moderation/reports/{report_id}", wrapper.GetReport)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/ops/moderation/reports/{report_id}/triage", wrapper.TriageReport)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/ops/moderation/reports/{report_id}/review", wrapper.ReviewReport)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/ops/moderation/enforcements", wrapper.ListEnforcements)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/ops/moderation/enforcements", wrapper.ApplyEnforcement)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/ops/moderation/enforcements/{enforcement_id}/lift", wrapper.LiftEnforcement)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/ratings/pending", wrapper.ListPendingRatings)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides/{ride_id}/rate", wrapper.RateRide)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides/{ride_id}/rate/skip", wrapper.SkipRating)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/ops/ratings", wrapper.ListRatings)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/ops/ratings/{rating_id}/nullify", wrapper.NullifyRating)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/ops/ratings/{rating_id}/reinstate", wrapper.ReinstateRating)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/disputes", wrapper.SubmitDispute)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/disputes/me", wrapper.ListMyDisputes)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/disputes/me/compensations", wrapper.ListMyCompensations)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/ops/disputes", wrapper.ListDisputes)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/ops/disputes/{report_id}/resolve", wrapper.ResolveDispute)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/ops/disputes/compensations", wrapper.ListCompensations)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/ops/disputes/compensations/{compensation_id}/mark-paid", wrapper.MarkCompensationPaid)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/ops/disputes/compensations/{compensation_id}/cancel", wrapper.CancelCompensation)
 
 	return m
 }
@@ -2774,6 +4247,123 @@ type VerifyStepUpdefaultJSONResponse struct {
 }
 
 func (response VerifyStepUpdefaultJSONResponse) VisitVerifyStepUpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitDisputeRequestObject struct {
+	Body *SubmitDisputeJSONRequestBody
+}
+
+type SubmitDisputeResponseObject interface {
+	VisitSubmitDisputeResponse(w http.ResponseWriter) error
+}
+
+type SubmitDispute201JSONResponse FiledCase
+
+func (response SubmitDispute201JSONResponse) VisitSubmitDisputeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitDisputedefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response SubmitDisputedefaultJSONResponse) VisitSubmitDisputeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMyDisputesRequestObject struct {
+	Params ListMyDisputesParams
+}
+
+type ListMyDisputesResponseObject interface {
+	VisitListMyDisputesResponse(w http.ResponseWriter) error
+}
+
+type ListMyDisputes200JSONResponse MyDisputeList
+
+func (response ListMyDisputes200JSONResponse) VisitListMyDisputesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMyDisputesdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListMyDisputesdefaultJSONResponse) VisitListMyDisputesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMyCompensationsRequestObject struct {
+	Params ListMyCompensationsParams
+}
+
+type ListMyCompensationsResponseObject interface {
+	VisitListMyCompensationsResponse(w http.ResponseWriter) error
+}
+
+type ListMyCompensations200JSONResponse CompensationList
+
+func (response ListMyCompensations200JSONResponse) VisitListMyCompensationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMyCompensationsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListMyCompensationsdefaultJSONResponse) VisitListMyCompensationsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -3200,6 +4790,560 @@ func (response RejectOfferdefaultJSONResponse) VisitRejectOfferResponse(w http.R
 	return err
 }
 
+type ListDisputesRequestObject struct {
+	Params ListDisputesParams
+}
+
+type ListDisputesResponseObject interface {
+	VisitListDisputesResponse(w http.ResponseWriter) error
+}
+
+type ListDisputes200JSONResponse DisputeCaseList
+
+func (response ListDisputes200JSONResponse) VisitListDisputesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDisputesdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListDisputesdefaultJSONResponse) VisitListDisputesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCompensationsRequestObject struct {
+	Params ListCompensationsParams
+}
+
+type ListCompensationsResponseObject interface {
+	VisitListCompensationsResponse(w http.ResponseWriter) error
+}
+
+type ListCompensations200JSONResponse CompensationList
+
+func (response ListCompensations200JSONResponse) VisitListCompensationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCompensationsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListCompensationsdefaultJSONResponse) VisitListCompensationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelCompensationRequestObject struct {
+	CompensationId CompensationId `json:"compensation_id"`
+}
+
+type CancelCompensationResponseObject interface {
+	VisitCancelCompensationResponse(w http.ResponseWriter) error
+}
+
+type CancelCompensation200JSONResponse Compensation
+
+func (response CancelCompensation200JSONResponse) VisitCancelCompensationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelCompensationdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response CancelCompensationdefaultJSONResponse) VisitCancelCompensationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkCompensationPaidRequestObject struct {
+	CompensationId CompensationId `json:"compensation_id"`
+	Body           *MarkCompensationPaidJSONRequestBody
+}
+
+type MarkCompensationPaidResponseObject interface {
+	VisitMarkCompensationPaidResponse(w http.ResponseWriter) error
+}
+
+type MarkCompensationPaid200JSONResponse Compensation
+
+func (response MarkCompensationPaid200JSONResponse) VisitMarkCompensationPaidResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkCompensationPaiddefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response MarkCompensationPaiddefaultJSONResponse) VisitMarkCompensationPaidResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResolveDisputeRequestObject struct {
+	ReportId ReportId `json:"report_id"`
+	Body     *ResolveDisputeJSONRequestBody
+}
+
+type ResolveDisputeResponseObject interface {
+	VisitResolveDisputeResponse(w http.ResponseWriter) error
+}
+
+type ResolveDispute204Response struct {
+}
+
+func (response ResolveDispute204Response) VisitResolveDisputeResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type ResolveDisputedefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ResolveDisputedefaultJSONResponse) VisitResolveDisputeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListEnforcementsRequestObject struct {
+	Params ListEnforcementsParams
+}
+
+type ListEnforcementsResponseObject interface {
+	VisitListEnforcementsResponse(w http.ResponseWriter) error
+}
+
+type ListEnforcements200JSONResponse EnforcementList
+
+func (response ListEnforcements200JSONResponse) VisitListEnforcementsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListEnforcementsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListEnforcementsdefaultJSONResponse) VisitListEnforcementsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApplyEnforcementRequestObject struct {
+	Body *ApplyEnforcementJSONRequestBody
+}
+
+type ApplyEnforcementResponseObject interface {
+	VisitApplyEnforcementResponse(w http.ResponseWriter) error
+}
+
+type ApplyEnforcement201JSONResponse Enforcement
+
+func (response ApplyEnforcement201JSONResponse) VisitApplyEnforcementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApplyEnforcementdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ApplyEnforcementdefaultJSONResponse) VisitApplyEnforcementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LiftEnforcementRequestObject struct {
+	EnforcementId EnforcementId `json:"enforcement_id"`
+}
+
+type LiftEnforcementResponseObject interface {
+	VisitLiftEnforcementResponse(w http.ResponseWriter) error
+}
+
+type LiftEnforcement204Response struct {
+}
+
+func (response LiftEnforcement204Response) VisitLiftEnforcementResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type LiftEnforcementdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response LiftEnforcementdefaultJSONResponse) VisitLiftEnforcementResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListReportsRequestObject struct {
+	Params ListReportsParams
+}
+
+type ListReportsResponseObject interface {
+	VisitListReportsResponse(w http.ResponseWriter) error
+}
+
+type ListReports200JSONResponse ReportList
+
+func (response ListReports200JSONResponse) VisitListReportsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListReportsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListReportsdefaultJSONResponse) VisitListReportsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetReportRequestObject struct {
+	ReportId ReportId `json:"report_id"`
+}
+
+type GetReportResponseObject interface {
+	VisitGetReportResponse(w http.ResponseWriter) error
+}
+
+type GetReport200JSONResponse ReportDetail
+
+func (response GetReport200JSONResponse) VisitGetReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetReportdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetReportdefaultJSONResponse) VisitGetReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReviewReportRequestObject struct {
+	ReportId ReportId `json:"report_id"`
+	Body     *ReviewReportJSONRequestBody
+}
+
+type ReviewReportResponseObject interface {
+	VisitReviewReportResponse(w http.ResponseWriter) error
+}
+
+type ReviewReport204Response struct {
+}
+
+func (response ReviewReport204Response) VisitReviewReportResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type ReviewReportdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ReviewReportdefaultJSONResponse) VisitReviewReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TriageReportRequestObject struct {
+	ReportId ReportId `json:"report_id"`
+	Body     *TriageReportJSONRequestBody
+}
+
+type TriageReportResponseObject interface {
+	VisitTriageReportResponse(w http.ResponseWriter) error
+}
+
+type TriageReport204Response struct {
+}
+
+func (response TriageReport204Response) VisitTriageReportResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type TriageReportdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response TriageReportdefaultJSONResponse) VisitTriageReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRatingsRequestObject struct {
+	Params ListRatingsParams
+}
+
+type ListRatingsResponseObject interface {
+	VisitListRatingsResponse(w http.ResponseWriter) error
+}
+
+type ListRatings200JSONResponse RatingList
+
+func (response ListRatings200JSONResponse) VisitListRatingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRatingsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListRatingsdefaultJSONResponse) VisitListRatingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type NullifyRatingRequestObject struct {
+	RatingId RatingId `json:"rating_id"`
+	Body     *NullifyRatingJSONRequestBody
+}
+
+type NullifyRatingResponseObject interface {
+	VisitNullifyRatingResponse(w http.ResponseWriter) error
+}
+
+type NullifyRating204Response struct {
+}
+
+func (response NullifyRating204Response) VisitNullifyRatingResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type NullifyRatingdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response NullifyRatingdefaultJSONResponse) VisitNullifyRatingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReinstateRatingRequestObject struct {
+	RatingId RatingId `json:"rating_id"`
+}
+
+type ReinstateRatingResponseObject interface {
+	VisitReinstateRatingResponse(w http.ResponseWriter) error
+}
+
+type ReinstateRating204Response struct {
+}
+
+func (response ReinstateRating204Response) VisitReinstateRatingResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type ReinstateRatingdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ReinstateRatingdefaultJSONResponse) VisitReinstateRatingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListVerificationApplicationsRequestObject struct {
 	Params ListVerificationApplicationsParams
 }
@@ -3440,6 +5584,121 @@ type RevokePushTokendefaultJSONResponse struct {
 }
 
 func (response RevokePushTokendefaultJSONResponse) VisitRevokePushTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPendingRatingsRequestObject struct {
+}
+
+type ListPendingRatingsResponseObject interface {
+	VisitListPendingRatingsResponse(w http.ResponseWriter) error
+}
+
+type ListPendingRatings200JSONResponse PendingRatingList
+
+func (response ListPendingRatings200JSONResponse) VisitListPendingRatingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPendingRatingsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListPendingRatingsdefaultJSONResponse) VisitListPendingRatingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitReportRequestObject struct {
+	Body *SubmitReportJSONRequestBody
+}
+
+type SubmitReportResponseObject interface {
+	VisitSubmitReportResponse(w http.ResponseWriter) error
+}
+
+type SubmitReport201JSONResponse FiledCase
+
+func (response SubmitReport201JSONResponse) VisitSubmitReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitReportdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response SubmitReportdefaultJSONResponse) VisitSubmitReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListReportCategoriesRequestObject struct {
+}
+
+type ListReportCategoriesResponseObject interface {
+	VisitListReportCategoriesResponse(w http.ResponseWriter) error
+}
+
+type ListReportCategories200JSONResponse ReportCategoryList
+
+func (response ListReportCategories200JSONResponse) VisitListReportCategoriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListReportCategoriesdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListReportCategoriesdefaultJSONResponse) VisitListReportCategoriesResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -3754,6 +6013,73 @@ type MarkNoShowdefaultJSONResponse struct {
 }
 
 func (response MarkNoShowdefaultJSONResponse) VisitMarkNoShowResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RateRideRequestObject struct {
+	RideId RideId `json:"ride_id"`
+	Body   *RateRideJSONRequestBody
+}
+
+type RateRideResponseObject interface {
+	VisitRateRideResponse(w http.ResponseWriter) error
+}
+
+type RateRide204Response struct {
+}
+
+func (response RateRide204Response) VisitRateRideResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RateRidedefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response RateRidedefaultJSONResponse) VisitRateRideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SkipRatingRequestObject struct {
+	RideId RideId `json:"ride_id"`
+}
+
+type SkipRatingResponseObject interface {
+	VisitSkipRatingResponse(w http.ResponseWriter) error
+}
+
+type SkipRating204Response struct {
+}
+
+func (response SkipRating204Response) VisitSkipRatingResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type SkipRatingdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response SkipRatingdefaultJSONResponse) VisitSkipRatingResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -4257,6 +6583,15 @@ type StrictServerInterface interface {
 	// VerifyStepUp Exchange an authenticator code for a short-lived step-up token
 	// (POST /v1/auth/step-up)
 	VerifyStepUp(ctx context.Context, request VerifyStepUpRequestObject) (VerifyStepUpResponseObject, error)
+	// SubmitDispute Raise a dispute about a ride
+	// (POST /v1/disputes)
+	SubmitDispute(ctx context.Context, request SubmitDisputeRequestObject) (SubmitDisputeResponseObject, error)
+	// ListMyDisputes List disputes this account may see
+	// (GET /v1/disputes/me)
+	ListMyDisputes(ctx context.Context, request ListMyDisputesRequestObject) (ListMyDisputesResponseObject, error)
+	// ListMyCompensations List compensation owed to this account
+	// (GET /v1/disputes/me/compensations)
+	ListMyCompensations(ctx context.Context, request ListMyCompensationsRequestObject) (ListMyCompensationsResponseObject, error)
 	// GetDriverProfile Return the signed-in driver's profile
 	// (GET /v1/drivers/me)
 	GetDriverProfile(ctx context.Context, request GetDriverProfileRequestObject) (GetDriverProfileResponseObject, error)
@@ -4293,6 +6628,51 @@ type StrictServerInterface interface {
 	// RejectOffer Reject an offer
 	// (POST /v1/offers/{offer_id}/reject)
 	RejectOffer(ctx context.Context, request RejectOfferRequestObject) (RejectOfferResponseObject, error)
+	// ListDisputes List disputes in one status
+	// (GET /v1/ops/disputes)
+	ListDisputes(ctx context.Context, request ListDisputesRequestObject) (ListDisputesResponseObject, error)
+	// ListCompensations List compensation in one status
+	// (GET /v1/ops/disputes/compensations)
+	ListCompensations(ctx context.Context, request ListCompensationsRequestObject) (ListCompensationsResponseObject, error)
+	// CancelCompensation Withdraw approved compensation
+	// (POST /v1/ops/disputes/compensations/{compensation_id}/cancel)
+	CancelCompensation(ctx context.Context, request CancelCompensationRequestObject) (CancelCompensationResponseObject, error)
+	// MarkCompensationPaid Record that compensation was paid
+	// (POST /v1/ops/disputes/compensations/{compensation_id}/mark-paid)
+	MarkCompensationPaid(ctx context.Context, request MarkCompensationPaidRequestObject) (MarkCompensationPaidResponseObject, error)
+	// ResolveDispute Rule on a dispute
+	// (POST /v1/ops/disputes/{report_id}/resolve)
+	ResolveDispute(ctx context.Context, request ResolveDisputeRequestObject) (ResolveDisputeResponseObject, error)
+	// ListEnforcements List penalties in one status
+	// (GET /v1/ops/moderation/enforcements)
+	ListEnforcements(ctx context.Context, request ListEnforcementsRequestObject) (ListEnforcementsResponseObject, error)
+	// ApplyEnforcement Apply a penalty directly
+	// (POST /v1/ops/moderation/enforcements)
+	ApplyEnforcement(ctx context.Context, request ApplyEnforcementRequestObject) (ApplyEnforcementResponseObject, error)
+	// LiftEnforcement End a penalty early
+	// (POST /v1/ops/moderation/enforcements/{enforcement_id}/lift)
+	LiftEnforcement(ctx context.Context, request LiftEnforcementRequestObject) (LiftEnforcementResponseObject, error)
+	// ListReports List reports in one status, most severe first
+	// (GET /v1/ops/moderation/reports)
+	ListReports(ctx context.Context, request ListReportsRequestObject) (ListReportsResponseObject, error)
+	// GetReport Load one report including its text
+	// (GET /v1/ops/moderation/reports/{report_id})
+	GetReport(ctx context.Context, request GetReportRequestObject) (GetReportResponseObject, error)
+	// ReviewReport Rule on a report and apply any penalty
+	// (POST /v1/ops/moderation/reports/{report_id}/review)
+	ReviewReport(ctx context.Context, request ReviewReportRequestObject) (ReviewReportResponseObject, error)
+	// TriageReport Claim a report for review
+	// (POST /v1/ops/moderation/reports/{report_id}/triage)
+	TriageReport(ctx context.Context, request TriageReportRequestObject) (TriageReportResponseObject, error)
+	// ListRatings List ratings
+	// (GET /v1/ops/ratings)
+	ListRatings(ctx context.Context, request ListRatingsRequestObject) (ListRatingsResponseObject, error)
+	// NullifyRating Remove a rating from the score
+	// (POST /v1/ops/ratings/{rating_id}/nullify)
+	NullifyRating(ctx context.Context, request NullifyRatingRequestObject) (NullifyRatingResponseObject, error)
+	// ReinstateRating Return a rating to the score
+	// (POST /v1/ops/ratings/{rating_id}/reinstate)
+	ReinstateRating(ctx context.Context, request ReinstateRatingRequestObject) (ReinstateRatingResponseObject, error)
 	// ListVerificationApplications List applications in one status, oldest first
 	// (GET /v1/ops/verification/applications)
 	ListVerificationApplications(ctx context.Context, request ListVerificationApplicationsRequestObject) (ListVerificationApplicationsResponseObject, error)
@@ -4314,6 +6694,15 @@ type StrictServerInterface interface {
 	// RevokePushToken Stop push notifications to this device
 	// (POST /v1/push-tokens/revoke)
 	RevokePushToken(ctx context.Context, request RevokePushTokenRequestObject) (RevokePushTokenResponseObject, error)
+	// ListPendingRatings List ratings the user can still give
+	// (GET /v1/ratings/pending)
+	ListPendingRatings(ctx context.Context, request ListPendingRatingsRequestObject) (ListPendingRatingsResponseObject, error)
+	// SubmitReport Report the other person on a ride
+	// (POST /v1/reports)
+	SubmitReport(ctx context.Context, request SubmitReportRequestObject) (SubmitReportResponseObject, error)
+	// ListReportCategories List what can be reported
+	// (GET /v1/reports/categories)
+	ListReportCategories(ctx context.Context, request ListReportCategoriesRequestObject) (ListReportCategoriesResponseObject, error)
 	// BookRide Book a quoted trip. Repeating the call returns the same ride.
 	// (POST /v1/rides)
 	BookRide(ctx context.Context, request BookRideRequestObject) (BookRideResponseObject, error)
@@ -4338,6 +6727,12 @@ type StrictServerInterface interface {
 	// MarkNoShow Report that the rider did not come after the waiting period
 	// (POST /v1/rides/{ride_id}/no-show)
 	MarkNoShow(ctx context.Context, request MarkNoShowRequestObject) (MarkNoShowResponseObject, error)
+	// RateRide Rate the other person on a completed ride
+	// (POST /v1/rides/{ride_id}/rate)
+	RateRide(ctx context.Context, request RateRideRequestObject) (RateRideResponseObject, error)
+	// SkipRating Decline to rate
+	// (POST /v1/rides/{ride_id}/rate/skip)
+	SkipRating(ctx context.Context, request SkipRatingRequestObject) (SkipRatingResponseObject, error)
 	// StartTrip Start the trip
 	// (POST /v1/rides/{ride_id}/start)
 	StartTrip(ctx context.Context, request StartTripRequestObject) (StartTripResponseObject, error)
@@ -4675,6 +7070,89 @@ func (sh *strictHandler) VerifyStepUp(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// SubmitDispute operation middleware
+func (sh *strictHandler) SubmitDispute(w http.ResponseWriter, r *http.Request) {
+	var request SubmitDisputeRequestObject
+
+	var body SubmitDisputeJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SubmitDispute(ctx, request.(SubmitDisputeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SubmitDispute")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SubmitDisputeResponseObject); ok {
+		if err := validResponse.VisitSubmitDisputeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListMyDisputes operation middleware
+func (sh *strictHandler) ListMyDisputes(w http.ResponseWriter, r *http.Request, params ListMyDisputesParams) {
+	var request ListMyDisputesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListMyDisputes(ctx, request.(ListMyDisputesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListMyDisputes")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListMyDisputesResponseObject); ok {
+		if err := validResponse.VisitListMyDisputesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListMyCompensations operation middleware
+func (sh *strictHandler) ListMyCompensations(w http.ResponseWriter, r *http.Request, params ListMyCompensationsParams) {
+	var request ListMyCompensationsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListMyCompensations(ctx, request.(ListMyCompensationsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListMyCompensations")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListMyCompensationsResponseObject); ok {
+		if err := validResponse.VisitListMyCompensationsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetDriverProfile operation middleware
 func (sh *strictHandler) GetDriverProfile(w http.ResponseWriter, r *http.Request) {
 	var request GetDriverProfileRequestObject
@@ -4985,6 +7463,436 @@ func (sh *strictHandler) RejectOffer(w http.ResponseWriter, r *http.Request, off
 	}
 }
 
+// ListDisputes operation middleware
+func (sh *strictHandler) ListDisputes(w http.ResponseWriter, r *http.Request, params ListDisputesParams) {
+	var request ListDisputesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListDisputes(ctx, request.(ListDisputesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDisputes")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDisputesResponseObject); ok {
+		if err := validResponse.VisitListDisputesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListCompensations operation middleware
+func (sh *strictHandler) ListCompensations(w http.ResponseWriter, r *http.Request, params ListCompensationsParams) {
+	var request ListCompensationsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListCompensations(ctx, request.(ListCompensationsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListCompensations")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListCompensationsResponseObject); ok {
+		if err := validResponse.VisitListCompensationsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CancelCompensation operation middleware
+func (sh *strictHandler) CancelCompensation(w http.ResponseWriter, r *http.Request, compensationId CompensationId) {
+	var request CancelCompensationRequestObject
+
+	request.CompensationId = compensationId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CancelCompensation(ctx, request.(CancelCompensationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CancelCompensation")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CancelCompensationResponseObject); ok {
+		if err := validResponse.VisitCancelCompensationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// MarkCompensationPaid operation middleware
+func (sh *strictHandler) MarkCompensationPaid(w http.ResponseWriter, r *http.Request, compensationId CompensationId) {
+	var request MarkCompensationPaidRequestObject
+
+	request.CompensationId = compensationId
+
+	var body MarkCompensationPaidJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.MarkCompensationPaid(ctx, request.(MarkCompensationPaidRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "MarkCompensationPaid")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(MarkCompensationPaidResponseObject); ok {
+		if err := validResponse.VisitMarkCompensationPaidResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ResolveDispute operation middleware
+func (sh *strictHandler) ResolveDispute(w http.ResponseWriter, r *http.Request, reportId ReportId) {
+	var request ResolveDisputeRequestObject
+
+	request.ReportId = reportId
+
+	var body ResolveDisputeJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ResolveDispute(ctx, request.(ResolveDisputeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ResolveDispute")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ResolveDisputeResponseObject); ok {
+		if err := validResponse.VisitResolveDisputeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListEnforcements operation middleware
+func (sh *strictHandler) ListEnforcements(w http.ResponseWriter, r *http.Request, params ListEnforcementsParams) {
+	var request ListEnforcementsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListEnforcements(ctx, request.(ListEnforcementsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListEnforcements")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListEnforcementsResponseObject); ok {
+		if err := validResponse.VisitListEnforcementsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ApplyEnforcement operation middleware
+func (sh *strictHandler) ApplyEnforcement(w http.ResponseWriter, r *http.Request) {
+	var request ApplyEnforcementRequestObject
+
+	var body ApplyEnforcementJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ApplyEnforcement(ctx, request.(ApplyEnforcementRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ApplyEnforcement")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ApplyEnforcementResponseObject); ok {
+		if err := validResponse.VisitApplyEnforcementResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// LiftEnforcement operation middleware
+func (sh *strictHandler) LiftEnforcement(w http.ResponseWriter, r *http.Request, enforcementId EnforcementId) {
+	var request LiftEnforcementRequestObject
+
+	request.EnforcementId = enforcementId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.LiftEnforcement(ctx, request.(LiftEnforcementRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "LiftEnforcement")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(LiftEnforcementResponseObject); ok {
+		if err := validResponse.VisitLiftEnforcementResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListReports operation middleware
+func (sh *strictHandler) ListReports(w http.ResponseWriter, r *http.Request, params ListReportsParams) {
+	var request ListReportsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListReports(ctx, request.(ListReportsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListReports")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListReportsResponseObject); ok {
+		if err := validResponse.VisitListReportsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetReport operation middleware
+func (sh *strictHandler) GetReport(w http.ResponseWriter, r *http.Request, reportId ReportId) {
+	var request GetReportRequestObject
+
+	request.ReportId = reportId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetReport(ctx, request.(GetReportRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetReport")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetReportResponseObject); ok {
+		if err := validResponse.VisitGetReportResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReviewReport operation middleware
+func (sh *strictHandler) ReviewReport(w http.ResponseWriter, r *http.Request, reportId ReportId) {
+	var request ReviewReportRequestObject
+
+	request.ReportId = reportId
+
+	var body ReviewReportJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReviewReport(ctx, request.(ReviewReportRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReviewReport")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReviewReportResponseObject); ok {
+		if err := validResponse.VisitReviewReportResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// TriageReport operation middleware
+func (sh *strictHandler) TriageReport(w http.ResponseWriter, r *http.Request, reportId ReportId) {
+	var request TriageReportRequestObject
+
+	request.ReportId = reportId
+
+	var body TriageReportJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.TriageReport(ctx, request.(TriageReportRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "TriageReport")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(TriageReportResponseObject); ok {
+		if err := validResponse.VisitTriageReportResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListRatings operation middleware
+func (sh *strictHandler) ListRatings(w http.ResponseWriter, r *http.Request, params ListRatingsParams) {
+	var request ListRatingsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListRatings(ctx, request.(ListRatingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListRatings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListRatingsResponseObject); ok {
+		if err := validResponse.VisitListRatingsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// NullifyRating operation middleware
+func (sh *strictHandler) NullifyRating(w http.ResponseWriter, r *http.Request, ratingId RatingId) {
+	var request NullifyRatingRequestObject
+
+	request.RatingId = ratingId
+
+	var body NullifyRatingJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.NullifyRating(ctx, request.(NullifyRatingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "NullifyRating")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(NullifyRatingResponseObject); ok {
+		if err := validResponse.VisitNullifyRatingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReinstateRating operation middleware
+func (sh *strictHandler) ReinstateRating(w http.ResponseWriter, r *http.Request, ratingId RatingId) {
+	var request ReinstateRatingRequestObject
+
+	request.RatingId = ratingId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReinstateRating(ctx, request.(ReinstateRatingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReinstateRating")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReinstateRatingResponseObject); ok {
+		if err := validResponse.VisitReinstateRatingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListVerificationApplications operation middleware
 func (sh *strictHandler) ListVerificationApplications(w http.ResponseWriter, r *http.Request, params ListVerificationApplicationsParams) {
 	var request ListVerificationApplicationsRequestObject
@@ -5184,6 +8092,85 @@ func (sh *strictHandler) RevokePushToken(w http.ResponseWriter, r *http.Request)
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RevokePushTokenResponseObject); ok {
 		if err := validResponse.VisitRevokePushTokenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListPendingRatings operation middleware
+func (sh *strictHandler) ListPendingRatings(w http.ResponseWriter, r *http.Request) {
+	var request ListPendingRatingsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListPendingRatings(ctx, request.(ListPendingRatingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListPendingRatings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListPendingRatingsResponseObject); ok {
+		if err := validResponse.VisitListPendingRatingsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SubmitReport operation middleware
+func (sh *strictHandler) SubmitReport(w http.ResponseWriter, r *http.Request) {
+	var request SubmitReportRequestObject
+
+	var body SubmitReportJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SubmitReport(ctx, request.(SubmitReportRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SubmitReport")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SubmitReportResponseObject); ok {
+		if err := validResponse.VisitSubmitReportResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListReportCategories operation middleware
+func (sh *strictHandler) ListReportCategories(w http.ResponseWriter, r *http.Request) {
+	var request ListReportCategoriesRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListReportCategories(ctx, request.(ListReportCategoriesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListReportCategories")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListReportCategoriesResponseObject); ok {
+		if err := validResponse.VisitListReportCategoriesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -5416,6 +8403,65 @@ func (sh *strictHandler) MarkNoShow(w http.ResponseWriter, r *http.Request, ride
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(MarkNoShowResponseObject); ok {
 		if err := validResponse.VisitMarkNoShowResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RateRide operation middleware
+func (sh *strictHandler) RateRide(w http.ResponseWriter, r *http.Request, rideId RideId) {
+	var request RateRideRequestObject
+
+	request.RideId = rideId
+
+	var body RateRideJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RateRide(ctx, request.(RateRideRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RateRide")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RateRideResponseObject); ok {
+		if err := validResponse.VisitRateRideResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SkipRating operation middleware
+func (sh *strictHandler) SkipRating(w http.ResponseWriter, r *http.Request, rideId RideId) {
+	var request SkipRatingRequestObject
+
+	request.RideId = rideId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SkipRating(ctx, request.(SkipRatingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SkipRating")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SkipRatingResponseObject); ok {
+		if err := validResponse.VisitSkipRatingResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -29,6 +30,9 @@ func delivery(ctx context.Context, q *store.Queries, rideID uuid.UUID) (store.Ge
 }
 
 func startGate(ctx context.Context, q *store.Queries, ride store.Ride, _ time.Time) error {
+	if ride.ProductType == productShared {
+		return requireOnBoard(ctx, q, ride.ID)
+	}
 	row, isSend, err := delivery(ctx, q, ride.ID)
 	if err != nil || !isSend {
 		return err
@@ -39,7 +43,34 @@ func startGate(ctx context.Context, q *store.Queries, ride store.Ride, _ time.Ti
 	return nil
 }
 
+// requireOnBoard stops a shared trip starting with nobody in the vehicle.
+func requireOnBoard(ctx context.Context, q *store.Queries, rideID uuid.UUID) error {
+	members, err := q.ListSharedMembers(ctx, rideID)
+	if err != nil {
+		return fmt.Errorf("list members: %w", err)
+	}
+	if !slices.ContainsFunc(members, func(m store.ListSharedMembersRow) bool { return m.Status == "picked_up" }) {
+		return ErrMemberNotOnBoard
+	}
+	return nil
+}
+
+// requireAllDelivered stops a shared trip ending while anyone is still on it.
+func requireAllDelivered(ctx context.Context, q *store.Queries, rideID uuid.UUID) error {
+	members, err := q.ListSharedMembers(ctx, rideID)
+	if err != nil {
+		return fmt.Errorf("list members: %w", err)
+	}
+	if slices.ContainsFunc(members, func(m store.ListSharedMembersRow) bool { return memberActive(m.Status) }) {
+		return ErrMembersPending
+	}
+	return nil
+}
+
 func completeGate(ctx context.Context, q *store.Queries, ride store.Ride, now time.Time) error {
+	if ride.ProductType == productShared {
+		return requireAllDelivered(ctx, q, ride.ID)
+	}
 	row, isSend, err := delivery(ctx, q, ride.ID)
 	if err != nil || !isSend {
 		return err

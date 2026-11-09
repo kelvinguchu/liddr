@@ -54,7 +54,7 @@ type DestinationChange struct {
 }
 
 func checkDestinationAllowed(ride store.Ride, now time.Time) error {
-	if ride.Status != StatusInProgress || ride.StartedAt == nil || ride.DriverID == nil {
+	if ride.Status != StatusInProgress || ride.StartedAt == nil || ride.DriverID == nil || ride.ProductType == productShared {
 		return ErrInvalidTransition
 	}
 	if now.Sub(*ride.StartedAt) > destinationWindow {

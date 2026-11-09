@@ -318,7 +318,7 @@ func (q *Queries) ListDriverCandidates(ctx context.Context, arg ListDriverCandid
 }
 
 const listOpenOffersForDriver = `-- name: ListOpenOffersForDriver :many
-SELECT o.id, o.ride_id, o.distance_m, o.expires_at, r.pickup_lat, r.pickup_lng, r.fare_kes
+SELECT o.id, o.ride_id, o.distance_m, o.expires_at, r.pickup_lat, r.pickup_lng, COALESCE((SELECT sum(m.fare_kes)::integer FROM shared_members AS m WHERE m.ride_id = r.id AND m.status NOT IN ('cancelled', 'no_show')), r.fare_kes)::integer AS fare_kes
 FROM ride_offers AS o
 JOIN rides AS r ON r.id = o.ride_id
 WHERE o.driver_id = $1 AND o.status = 'offered' AND o.expires_at > $2

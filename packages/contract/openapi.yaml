@@ -2005,6 +2005,105 @@ paths:
         default:
           $ref: "#/components/responses/Problem"
 
+  /v1/rides/{ride_id}/shared:
+    get:
+      operationId: getSharedRide
+      summary: Show a shared ride to one of its parties
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SharedRide"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/shared/members/{member_id}/cancel:
+    post:
+      operationId: cancelSharedMember
+      summary: Leave a shared ride
+      security:
+        - bearerAuth: [rider]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+        - {name: member_id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SharedCancel"
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/shared/members/{member_id}/arrive-pickup:
+    post:
+      operationId: arriveSharedMember
+      summary: Record reaching a passenger's pickup
+      security:
+        - bearerAuth: [driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+        - {name: member_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/shared/members/{member_id}/picked-up:
+    post:
+      operationId: pickUpSharedMember
+      summary: Record a passenger getting in
+      security:
+        - bearerAuth: [driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+        - {name: member_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/shared/members/{member_id}/dropped-off:
+    post:
+      operationId: dropOffSharedMember
+      summary: Record a passenger arriving
+      security:
+        - bearerAuth: [driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+        - {name: member_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/shared/members/{member_id}/no-show:
+    post:
+      operationId: noShowSharedMember
+      summary: Remove a passenger who never came
+      security:
+        - bearerAuth: [driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+        - {name: member_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
 components:
   parameters:
     ReportId:
@@ -2214,6 +2313,9 @@ components:
           $ref: "#/components/schemas/Coordinates"
         dropoff:
           $ref: "#/components/schemas/Coordinates"
+        product_type:
+          type: string
+          enum: [solo, shared]
 
     Quote:
       type: object
@@ -2243,6 +2345,10 @@ components:
         discount_kes:
           type: integer
           format: int32
+        solo_fare_kes:
+          type: integer
+          format: int32
+          description: What the trip would cost alone, on a shared quote.
         surge_bps:
           type: integer
           format: int32
@@ -3398,3 +3504,41 @@ components:
         payments:
           type: array
           items: {$ref: "#/components/schemas/SubscriptionPayment"}
+
+    SharedCancel:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: {type: string}
+    SharedMember:
+      type: object
+      additionalProperties: false
+      required: [id, status, is_self]
+      properties:
+        id: {type: string, format: uuid}
+        status: {type: string}
+        is_self: {type: boolean}
+        fare_kes: {type: integer, format: int32}
+    SharedStop:
+      type: object
+      additionalProperties: false
+      required: [member_id, kind, point]
+      properties:
+        member_id: {type: string, format: uuid}
+        kind: {type: string, enum: [pickup, dropoff]}
+        point: {$ref: "#/components/schemas/Coordinates"}
+    SharedRide:
+      type: object
+      additionalProperties: false
+      required: [ride_id, status, members, stops]
+      properties:
+        ride_id: {type: string, format: uuid}
+        status: {type: string}
+        members:
+          type: array
+          items: {$ref: "#/components/schemas/SharedMember"}
+        stops:
+          type: array
+          items: {$ref: "#/components/schemas/SharedStop"}
+        earnings_kes: {type: integer, format: int32}

@@ -106,16 +106,24 @@ func (s *Service) Resolve(ctx context.Context, id uuid.UUID, r Resolution) error
 		if err != nil {
 			return fmt.Errorf("load ride: %w", err)
 		}
-		// Riders pay their driver directly, so a driver was never charged a fare.
+		// A driver was never charged a fare. On a shared trip each passenger has
+		// their own, and their refund is capped at that.
+		fare := ride.FareKes
 		if *report.ReporterID != ride.RiderID {
-			return ErrNotRefundable
+			fare, err = q.GetSharedMemberFare(ctx, store.GetSharedMemberFareParams{RideID: ride.ID, RiderID: *report.ReporterID})
+			if errors.Is(err, pgx.ErrNoRows) {
+				return ErrNotRefundable
+			}
+			if err != nil {
+				return fmt.Errorf("load passenger fare: %w", err)
+			}
 		}
-		amount, err := amountDue(r.Outcome, r.AmountKES, ride.FareKes)
+		amount, err := amountDue(r.Outcome, r.AmountKES, fare)
 		if err != nil {
 			return err
 		}
 		_, err = q.InsertCompensation(ctx, store.InsertCompensationParams{
-			ID: uuid.New(), ReportID: id, RideID: ride.ID, BeneficiaryID: ride.RiderID, CounterpartyID: new(report.ReportedID),
+			ID: uuid.New(), ReportID: id, RideID: ride.ID, BeneficiaryID: *report.ReporterID, CounterpartyID: new(report.ReportedID),
 			ActorID: new(r.Actor), CompensationType: r.Outcome, AmountKes: amount, ReasonText: r.Summary, Now: now,
 		})
 		if err != nil {

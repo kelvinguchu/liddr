@@ -151,7 +151,11 @@ func (s *Service) Submit(ctx context.Context, sub Submission) (Filed, error) {
 		}
 		// Someone with no connection to the ride is refused by SubmitInTx, without
 		// first being told what state a stranger's ride is in.
-		if ride.RiderID == sub.RequesterID || (ride.DriverID != nil && *ride.DriverID == sub.RequesterID) {
+		member, err := q.IsSharedMember(ctx, store.IsSharedMemberParams{RideID: ride.ID, RiderID: sub.RequesterID})
+		if err != nil {
+			return fmt.Errorf("check passenger: %w", err)
+		}
+		if member || ride.RiderID == sub.RequesterID || (ride.DriverID != nil && *ride.DriverID == sub.RequesterID) {
 			if err := eligible(ride, sub.Type, now); err != nil {
 				return err
 			}

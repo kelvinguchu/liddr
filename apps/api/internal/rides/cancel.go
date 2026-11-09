@@ -2,10 +2,13 @@ package rides
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"slices"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/kelvinguchu/liddr/apps/api/internal/store"
 )
@@ -37,6 +40,10 @@ func (s *Service) Cancel(ctx context.Context, rideID, actorID uuid.UUID, reason 
 		ride, err := lockRide(ctx, q, rideID)
 		if err != nil {
 			return err
+		}
+
+		if ride.ProductType == productShared && (ride.DriverID == nil || *ride.DriverID != actorID) {
+			return s.cancelSharedByRider(ctx, q, ride, actorID, reason)
 		}
 
 		var side string
@@ -95,7 +102,7 @@ func (s *Service) MarkNoShow(ctx context.Context, rideID, driverID uuid.UUID) (R
 		if ride.Status == StatusCancelled && ride.CancelReason != nil && *ride.CancelReason == reasonRiderNoShow {
 			return nil
 		}
-		if ride.Status != StatusArrived || ride.ArrivedAt == nil {
+		if ride.ProductType == productShared || ride.Status != StatusArrived || ride.ArrivedAt == nil {
 			return ErrInvalidTransition
 		}
 		if err := checkSenderCancel(ctx, q, ride); err != nil {
@@ -125,7 +132,8 @@ func cancelLocked(ctx context.Context, q *store.Queries, ride store.Ride, actorI
 	if err := WithdrawOffers(ctx, q, ride.ID, now); err != nil {
 		return err
 	}
-	return Transition(ctx, q, Change{
+	// Transition tells every passenger still on the trip, so they end after it.
+	err := Transition(ctx, q, Change{
 		RideID: ride.ID,
 		From:   ride.Status,
 		To:     StatusCancelled,
@@ -134,4 +142,33 @@ func cancelLocked(ctx context.Context, q *store.Queries, ride store.Ride, actorI
 		Fields: store.SetRideStatusParams{CancelledAt: new(now), CancelledBy: new(side), CancelReason: new(reason)},
 		At:     now,
 	})
+	if err != nil {
+		return err
+	}
+	if err := q.CancelActiveMembers(ctx, store.CancelActiveMembersParams{Now: new(now), RideID: ride.ID}); err != nil {
+		return fmt.Errorf("end passengers: %w", err)
+	}
+	return nil
+}
+
+// cancelSharedByRider takes the caller off a shared trip. The others carry on.
+func (s *Service) cancelSharedByRider(ctx context.Context, q *store.Queries, ride store.Ride, riderID uuid.UUID, reason string) error {
+	if ride.Status == StatusCancelled {
+		return nil
+	}
+	if !slices.Contains(riderCancelReasons, reason) {
+		return ErrInvalidReason
+	}
+	row, err := q.GetSharedMemberByRider(ctx, store.GetSharedMemberByRiderParams{RideID: ride.ID, RiderID: riderID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrRideNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("load member: %w", err)
+	}
+	member, err := lockMember(ctx, q, ride.ID, row.ID)
+	if err != nil {
+		return err
+	}
+	return s.cancelMemberLocked(ctx, q, ride, member, riderID, reason, s.now())
 }

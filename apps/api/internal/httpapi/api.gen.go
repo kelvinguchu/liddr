@@ -439,6 +439,24 @@ func (e PushTokenRegistrationPlatform) Valid() bool {
 	}
 }
 
+// Defines values for QuoteRequestProductType.
+const (
+	Shared QuoteRequestProductType = "shared"
+	Solo   QuoteRequestProductType = "solo"
+)
+
+// Valid indicates whether the value is a known member of the QuoteRequestProductType enum.
+func (e QuoteRequestProductType) Valid() bool {
+	switch e {
+	case Shared:
+		return true
+	case Solo:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ReportReviewRequestDecision.
 const (
 	ReportReviewRequestDecisionDismiss             ReportReviewRequestDecision = "dismiss"
@@ -550,6 +568,24 @@ func (e Role) Valid() bool {
 	case RoleOps:
 		return true
 	case RoleRider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SharedStopKind.
+const (
+	SharedStopKindDropoff SharedStopKind = "dropoff"
+	SharedStopKindPickup  SharedStopKind = "pickup"
+)
+
+// Valid indicates whether the value is a known member of the SharedStopKind enum.
+func (e SharedStopKind) Valid() bool {
+	switch e {
+	case SharedStopKindDropoff:
+		return true
+	case SharedStopKindPickup:
 		return true
 	default:
 		return false
@@ -1270,18 +1306,25 @@ type Quote struct {
 	// Polyline Encoded route for display.
 	Polyline string `json:"polyline"`
 
+	// SoloFareKes What the trip would cost alone, on a shared quote.
+	SoloFareKes *int32 `json:"solo_fare_kes,omitempty"`
+
 	// SurgeBps Demand multiplier in basis points. 10000 means no surge.
 	SurgeBps int32 `json:"surge_bps"`
 }
 
 // QuoteRequest defines model for QuoteRequest.
 type QuoteRequest struct {
-	Dropoff Coordinates `json:"dropoff"`
-	Pickup  Coordinates `json:"pickup"`
+	Dropoff     Coordinates              `json:"dropoff"`
+	Pickup      Coordinates              `json:"pickup"`
+	ProductType *QuoteRequestProductType `json:"product_type,omitempty"`
 
 	// VehicleCategory Example: motorbike
 	VehicleCategory string `json:"vehicle_category"`
 }
+
+// QuoteRequestProductType defines model for QuoteRequest.ProductType.
+type QuoteRequestProductType string
 
 // Rating defines model for Rating.
 type Rating struct {
@@ -1469,6 +1512,38 @@ type Session struct {
 type SetDriverCategoryRequest struct {
 	VehicleCategory string `json:"vehicle_category"`
 }
+
+// SharedCancel defines model for SharedCancel.
+type SharedCancel struct {
+	Reason string `json:"reason"`
+}
+
+// SharedMember defines model for SharedMember.
+type SharedMember struct {
+	FareKes *int32             `json:"fare_kes,omitempty"`
+	Id      openapi_types.UUID `json:"id"`
+	IsSelf  bool               `json:"is_self"`
+	Status  string             `json:"status"`
+}
+
+// SharedRide defines model for SharedRide.
+type SharedRide struct {
+	EarningsKes *int32             `json:"earnings_kes,omitempty"`
+	Members     []SharedMember     `json:"members"`
+	RideId      openapi_types.UUID `json:"ride_id"`
+	Status      string             `json:"status"`
+	Stops       []SharedStop       `json:"stops"`
+}
+
+// SharedStop defines model for SharedStop.
+type SharedStop struct {
+	Kind     SharedStopKind     `json:"kind"`
+	MemberId openapi_types.UUID `json:"member_id"`
+	Point    Coordinates        `json:"point"`
+}
+
+// SharedStopKind defines model for SharedStop.Kind.
+type SharedStopKind string
 
 // SignedDownload defines model for SignedDownload.
 type SignedDownload struct {
@@ -1869,6 +1944,9 @@ type ReportRideMessageJSONRequestBody = MessageReport
 // RateRideJSONRequestBody defines body for RateRide for application/json ContentType.
 type RateRideJSONRequestBody = RatingSubmission
 
+// CancelSharedMemberJSONRequestBody defines body for CancelSharedMember for application/json ContentType.
+type CancelSharedMemberJSONRequestBody = SharedCancel
+
 // BookDeliveryJSONRequestBody defines body for BookDelivery for application/json ContentType.
 type BookDeliveryJSONRequestBody = DeliveryRequest
 
@@ -2153,6 +2231,24 @@ type ServerInterface interface {
 	// ReassignRide Find another driver when this one is not coming
 	// (POST /v1/rides/{ride_id}/reassign)
 	ReassignRide(w http.ResponseWriter, r *http.Request, rideId RideId)
+	// GetSharedRide Show a shared ride to one of its parties
+	// (GET /v1/rides/{ride_id}/shared)
+	GetSharedRide(w http.ResponseWriter, r *http.Request, rideId RideId)
+	// ArriveSharedMember Record reaching a passenger's pickup
+	// (POST /v1/rides/{ride_id}/shared/members/{member_id}/arrive-pickup)
+	ArriveSharedMember(w http.ResponseWriter, r *http.Request, rideId RideId, memberId openapi_types.UUID)
+	// CancelSharedMember Leave a shared ride
+	// (POST /v1/rides/{ride_id}/shared/members/{member_id}/cancel)
+	CancelSharedMember(w http.ResponseWriter, r *http.Request, rideId RideId, memberId openapi_types.UUID)
+	// DropOffSharedMember Record a passenger arriving
+	// (POST /v1/rides/{ride_id}/shared/members/{member_id}/dropped-off)
+	DropOffSharedMember(w http.ResponseWriter, r *http.Request, rideId RideId, memberId openapi_types.UUID)
+	// NoShowSharedMember Remove a passenger who never came
+	// (POST /v1/rides/{ride_id}/shared/members/{member_id}/no-show)
+	NoShowSharedMember(w http.ResponseWriter, r *http.Request, rideId RideId, memberId openapi_types.UUID)
+	// PickUpSharedMember Record a passenger getting in
+	// (POST /v1/rides/{ride_id}/shared/members/{member_id}/picked-up)
+	PickUpSharedMember(w http.ResponseWriter, r *http.Request, rideId RideId, memberId openapi_types.UUID)
 	// StartTrip Start the trip
 	// (POST /v1/rides/{ride_id}/start)
 	StartTrip(w http.ResponseWriter, r *http.Request, rideId RideId)
@@ -4883,6 +4979,243 @@ func (siw *ServerInterfaceWrapper) ReassignRide(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// GetSharedRide operation middleware
+func (siw *ServerInterfaceWrapper) GetSharedRide(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "ride_id" -------------
+	var rideId RideId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ride_id", r.PathValue("ride_id"), &rideId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ride_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider", "driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSharedRide(w, r, rideId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ArriveSharedMember operation middleware
+func (siw *ServerInterfaceWrapper) ArriveSharedMember(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "ride_id" -------------
+	var rideId RideId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ride_id", r.PathValue("ride_id"), &rideId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ride_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "member_id" -------------
+	var memberId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "member_id", r.PathValue("member_id"), &memberId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "member_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ArriveSharedMember(w, r, rideId, memberId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CancelSharedMember operation middleware
+func (siw *ServerInterfaceWrapper) CancelSharedMember(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "ride_id" -------------
+	var rideId RideId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ride_id", r.PathValue("ride_id"), &rideId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ride_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "member_id" -------------
+	var memberId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "member_id", r.PathValue("member_id"), &memberId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "member_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CancelSharedMember(w, r, rideId, memberId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DropOffSharedMember operation middleware
+func (siw *ServerInterfaceWrapper) DropOffSharedMember(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "ride_id" -------------
+	var rideId RideId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ride_id", r.PathValue("ride_id"), &rideId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ride_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "member_id" -------------
+	var memberId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "member_id", r.PathValue("member_id"), &memberId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "member_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DropOffSharedMember(w, r, rideId, memberId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// NoShowSharedMember operation middleware
+func (siw *ServerInterfaceWrapper) NoShowSharedMember(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "ride_id" -------------
+	var rideId RideId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ride_id", r.PathValue("ride_id"), &rideId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ride_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "member_id" -------------
+	var memberId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "member_id", r.PathValue("member_id"), &memberId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "member_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.NoShowSharedMember(w, r, rideId, memberId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PickUpSharedMember operation middleware
+func (siw *ServerInterfaceWrapper) PickUpSharedMember(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "ride_id" -------------
+	var rideId RideId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ride_id", r.PathValue("ride_id"), &rideId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ride_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "member_id" -------------
+	var memberId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "member_id", r.PathValue("member_id"), &memberId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "member_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PickUpSharedMember(w, r, rideId, memberId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // StartTrip operation middleware
 func (siw *ServerInterfaceWrapper) StartTrip(w http.ResponseWriter, r *http.Request) {
 
@@ -5549,6 +5882,12 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/ops/subscriptions/drivers/{user_id}", wrapper.GetDriverSubscriptionForOps)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/ops/subscriptions/payments/{checkout_request_id}", wrapper.GetPaymentForOps)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/ops/subscriptions/payments/{checkout_request_id}/recheck", wrapper.RecheckPayment)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/rides/{ride_id}/shared", wrapper.GetSharedRide)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides/{ride_id}/shared/members/{member_id}/cancel", wrapper.CancelSharedMember)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides/{ride_id}/shared/members/{member_id}/arrive-pickup", wrapper.ArriveSharedMember)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides/{ride_id}/shared/members/{member_id}/picked-up", wrapper.PickUpSharedMember)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides/{ride_id}/shared/members/{member_id}/dropped-off", wrapper.DropOffSharedMember)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides/{ride_id}/shared/members/{member_id}/no-show", wrapper.NoShowSharedMember)
 
 	return m
 }
@@ -8710,6 +9049,216 @@ func (response ReassignRidedefaultJSONResponse) VisitReassignRideResponse(w http
 	return err
 }
 
+type GetSharedRideRequestObject struct {
+	RideId RideId `json:"ride_id"`
+}
+
+type GetSharedRideResponseObject interface {
+	VisitGetSharedRideResponse(w http.ResponseWriter) error
+}
+
+type GetSharedRide200JSONResponse SharedRide
+
+func (response GetSharedRide200JSONResponse) VisitGetSharedRideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSharedRidedefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetSharedRidedefaultJSONResponse) VisitGetSharedRideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArriveSharedMemberRequestObject struct {
+	RideId   RideId             `json:"ride_id"`
+	MemberId openapi_types.UUID `json:"member_id"`
+}
+
+type ArriveSharedMemberResponseObject interface {
+	VisitArriveSharedMemberResponse(w http.ResponseWriter) error
+}
+
+type ArriveSharedMember204Response struct {
+}
+
+func (response ArriveSharedMember204Response) VisitArriveSharedMemberResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type ArriveSharedMemberdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ArriveSharedMemberdefaultJSONResponse) VisitArriveSharedMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelSharedMemberRequestObject struct {
+	RideId   RideId             `json:"ride_id"`
+	MemberId openapi_types.UUID `json:"member_id"`
+	Body     *CancelSharedMemberJSONRequestBody
+}
+
+type CancelSharedMemberResponseObject interface {
+	VisitCancelSharedMemberResponse(w http.ResponseWriter) error
+}
+
+type CancelSharedMember204Response struct {
+}
+
+func (response CancelSharedMember204Response) VisitCancelSharedMemberResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type CancelSharedMemberdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response CancelSharedMemberdefaultJSONResponse) VisitCancelSharedMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DropOffSharedMemberRequestObject struct {
+	RideId   RideId             `json:"ride_id"`
+	MemberId openapi_types.UUID `json:"member_id"`
+}
+
+type DropOffSharedMemberResponseObject interface {
+	VisitDropOffSharedMemberResponse(w http.ResponseWriter) error
+}
+
+type DropOffSharedMember204Response struct {
+}
+
+func (response DropOffSharedMember204Response) VisitDropOffSharedMemberResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DropOffSharedMemberdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response DropOffSharedMemberdefaultJSONResponse) VisitDropOffSharedMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type NoShowSharedMemberRequestObject struct {
+	RideId   RideId             `json:"ride_id"`
+	MemberId openapi_types.UUID `json:"member_id"`
+}
+
+type NoShowSharedMemberResponseObject interface {
+	VisitNoShowSharedMemberResponse(w http.ResponseWriter) error
+}
+
+type NoShowSharedMember204Response struct {
+}
+
+func (response NoShowSharedMember204Response) VisitNoShowSharedMemberResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type NoShowSharedMemberdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response NoShowSharedMemberdefaultJSONResponse) VisitNoShowSharedMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PickUpSharedMemberRequestObject struct {
+	RideId   RideId             `json:"ride_id"`
+	MemberId openapi_types.UUID `json:"member_id"`
+}
+
+type PickUpSharedMemberResponseObject interface {
+	VisitPickUpSharedMemberResponse(w http.ResponseWriter) error
+}
+
+type PickUpSharedMember204Response struct {
+}
+
+func (response PickUpSharedMember204Response) VisitPickUpSharedMemberResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type PickUpSharedMemberdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response PickUpSharedMemberdefaultJSONResponse) VisitPickUpSharedMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type StartTripRequestObject struct {
 	RideId RideId `json:"ride_id"`
 }
@@ -9646,6 +10195,24 @@ type StrictServerInterface interface {
 	// ReassignRide Find another driver when this one is not coming
 	// (POST /v1/rides/{ride_id}/reassign)
 	ReassignRide(ctx context.Context, request ReassignRideRequestObject) (ReassignRideResponseObject, error)
+	// GetSharedRide Show a shared ride to one of its parties
+	// (GET /v1/rides/{ride_id}/shared)
+	GetSharedRide(ctx context.Context, request GetSharedRideRequestObject) (GetSharedRideResponseObject, error)
+	// ArriveSharedMember Record reaching a passenger's pickup
+	// (POST /v1/rides/{ride_id}/shared/members/{member_id}/arrive-pickup)
+	ArriveSharedMember(ctx context.Context, request ArriveSharedMemberRequestObject) (ArriveSharedMemberResponseObject, error)
+	// CancelSharedMember Leave a shared ride
+	// (POST /v1/rides/{ride_id}/shared/members/{member_id}/cancel)
+	CancelSharedMember(ctx context.Context, request CancelSharedMemberRequestObject) (CancelSharedMemberResponseObject, error)
+	// DropOffSharedMember Record a passenger arriving
+	// (POST /v1/rides/{ride_id}/shared/members/{member_id}/dropped-off)
+	DropOffSharedMember(ctx context.Context, request DropOffSharedMemberRequestObject) (DropOffSharedMemberResponseObject, error)
+	// NoShowSharedMember Remove a passenger who never came
+	// (POST /v1/rides/{ride_id}/shared/members/{member_id}/no-show)
+	NoShowSharedMember(ctx context.Context, request NoShowSharedMemberRequestObject) (NoShowSharedMemberResponseObject, error)
+	// PickUpSharedMember Record a passenger getting in
+	// (POST /v1/rides/{ride_id}/shared/members/{member_id}/picked-up)
+	PickUpSharedMember(ctx context.Context, request PickUpSharedMemberRequestObject) (PickUpSharedMemberResponseObject, error)
 	// StartTrip Start the trip
 	// (POST /v1/rides/{ride_id}/start)
 	StartTrip(ctx context.Context, request StartTripRequestObject) (StartTripResponseObject, error)
@@ -12092,6 +12659,174 @@ func (sh *strictHandler) ReassignRide(w http.ResponseWriter, r *http.Request, ri
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ReassignRideResponseObject); ok {
 		if err := validResponse.VisitReassignRideResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetSharedRide operation middleware
+func (sh *strictHandler) GetSharedRide(w http.ResponseWriter, r *http.Request, rideId RideId) {
+	var request GetSharedRideRequestObject
+
+	request.RideId = rideId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSharedRide(ctx, request.(GetSharedRideRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSharedRide")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSharedRideResponseObject); ok {
+		if err := validResponse.VisitGetSharedRideResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ArriveSharedMember operation middleware
+func (sh *strictHandler) ArriveSharedMember(w http.ResponseWriter, r *http.Request, rideId RideId, memberId openapi_types.UUID) {
+	var request ArriveSharedMemberRequestObject
+
+	request.RideId = rideId
+	request.MemberId = memberId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ArriveSharedMember(ctx, request.(ArriveSharedMemberRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ArriveSharedMember")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ArriveSharedMemberResponseObject); ok {
+		if err := validResponse.VisitArriveSharedMemberResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CancelSharedMember operation middleware
+func (sh *strictHandler) CancelSharedMember(w http.ResponseWriter, r *http.Request, rideId RideId, memberId openapi_types.UUID) {
+	var request CancelSharedMemberRequestObject
+
+	request.RideId = rideId
+	request.MemberId = memberId
+
+	var body CancelSharedMemberJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CancelSharedMember(ctx, request.(CancelSharedMemberRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CancelSharedMember")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CancelSharedMemberResponseObject); ok {
+		if err := validResponse.VisitCancelSharedMemberResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DropOffSharedMember operation middleware
+func (sh *strictHandler) DropOffSharedMember(w http.ResponseWriter, r *http.Request, rideId RideId, memberId openapi_types.UUID) {
+	var request DropOffSharedMemberRequestObject
+
+	request.RideId = rideId
+	request.MemberId = memberId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DropOffSharedMember(ctx, request.(DropOffSharedMemberRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DropOffSharedMember")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DropOffSharedMemberResponseObject); ok {
+		if err := validResponse.VisitDropOffSharedMemberResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// NoShowSharedMember operation middleware
+func (sh *strictHandler) NoShowSharedMember(w http.ResponseWriter, r *http.Request, rideId RideId, memberId openapi_types.UUID) {
+	var request NoShowSharedMemberRequestObject
+
+	request.RideId = rideId
+	request.MemberId = memberId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.NoShowSharedMember(ctx, request.(NoShowSharedMemberRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "NoShowSharedMember")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(NoShowSharedMemberResponseObject); ok {
+		if err := validResponse.VisitNoShowSharedMemberResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PickUpSharedMember operation middleware
+func (sh *strictHandler) PickUpSharedMember(w http.ResponseWriter, r *http.Request, rideId RideId, memberId openapi_types.UUID) {
+	var request PickUpSharedMemberRequestObject
+
+	request.RideId = rideId
+	request.MemberId = memberId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PickUpSharedMember(ctx, request.(PickUpSharedMemberRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PickUpSharedMember")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PickUpSharedMemberResponseObject); ok {
+		if err := validResponse.VisitPickUpSharedMemberResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

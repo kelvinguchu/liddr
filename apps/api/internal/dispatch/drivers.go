@@ -164,7 +164,18 @@ func (s *Service) shareLocation(ctx context.Context, driverID uuid.UUID, point g
 	if err != nil {
 		return fmt.Errorf("find active ride: %w", err)
 	}
-	return events.Publish(ctx, s.queries, events.Event{Type: events.TypeDriverLocation, RideID: new(ride.ID), Lat: new(point.Lat), Lng: new(point.Lng)}, ride.RiderID)
+	// On a shared trip, only passengers still on it get the feed.
+	to, err := s.queries.ListActiveMemberRiders(ctx, ride.ID)
+	if err != nil {
+		return fmt.Errorf("list passengers: %w", err)
+	}
+	if len(to) == 0 && ride.ProductType != "shared" {
+		to = []uuid.UUID{ride.RiderID}
+	}
+	if len(to) == 0 {
+		return nil
+	}
+	return events.Publish(ctx, s.queries, events.Event{Type: events.TypeDriverLocation, RideID: new(ride.ID), Lat: new(point.Lat), Lng: new(point.Lng)}, to...)
 }
 
 // UpdateLocation stores the driver's position using a server timestamp. Location

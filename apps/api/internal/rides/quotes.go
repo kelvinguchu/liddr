@@ -29,6 +29,8 @@ type QuoteRequest struct {
 	Category string
 	Pickup   geo.Point
 	Dropoff  geo.Point
+	// Shared asks for a per-passenger price on a pooled trip.
+	Shared bool
 }
 
 // Quote is a priced trip.
@@ -39,6 +41,8 @@ type Quote struct {
 	DurationS int32
 	Polyline  string
 	ExpiresAt time.Time
+	// SoloFareKES is what the trip would cost alone, on a shared quote.
+	SoloFareKES *int32
 }
 
 // CreateQuote prices a trip. The lifetime is fixed here because a rider who
@@ -53,6 +57,10 @@ func (s *Service) CreateQuote(ctx context.Context, req QuoteRequest) (Quote, err
 	}
 	if err != nil {
 		return Quote{}, fmt.Errorf("load category: %w", err)
+	}
+
+	if req.Shared && (category.Capacity < sharedMaxMembers || category.Slug == "motorbike" || category.Slug == "electric_motorbike") {
+		return Quote{}, ErrSharedNotAvailable
 	}
 
 	// Checked first because every quote costs a paid Google request.
@@ -79,16 +87,22 @@ func (s *Service) CreateQuote(ctx context.Context, req QuoteRequest) (Quote, err
 	if err != nil {
 		return Quote{}, err
 	}
-	fare := PriceTrip(Rates{
+	rates := Rates{
 		Slug:         category.Slug,
 		BaseFeeCents: category.BaseFeeCents,
 		PerKmCents:   category.PricePerKmCents,
 		PerMinCents:  category.PricePerMinCents,
 		MinFareCents: category.MinFareCents,
 		DiscountBps:  category.DiscountBps,
-	}, route.DistanceM, route.DurationS, surge)
+	}
+	fare := PriceTrip(rates, route.DistanceM, route.DurationS, surge)
+	product, solo := "solo", (*int32)(nil)
+	if req.Shared {
+		product, solo = productShared, new(fare.FinalKES)
+		fare = PriceShared(fare, rates)
+	}
 
-	quote := Quote{ID: uuid.New(), Fare: fare, DistanceM: route.DistanceM, DurationS: route.DurationS, Polyline: route.Polyline, ExpiresAt: now.Add(quoteTTL)}
+	quote := Quote{ID: uuid.New(), Fare: fare, DistanceM: route.DistanceM, DurationS: route.DurationS, Polyline: route.Polyline, ExpiresAt: now.Add(quoteTTL), SoloFareKES: solo}
 	err = s.queries.InsertQuote(ctx, store.InsertQuoteParams{
 		ID:                quote.ID,
 		RiderID:           req.RiderID,
@@ -107,6 +121,8 @@ func (s *Service) CreateQuote(ctx context.Context, req QuoteRequest) (Quote, err
 		FinalFareKes:      fare.FinalKES,
 		ExpiresAt:         quote.ExpiresAt,
 		CreatedAt:         now,
+		ProductType:       product,
+		SoloFareKes:       solo,
 	})
 	if err != nil {
 		return Quote{}, fmt.Errorf("insert quote: %w", err)

@@ -1,6 +1,6 @@
 -- name: GetActiveCategoryBySlug :one
 SELECT id, slug, base_fee_cents, price_per_km_cents, price_per_min_cents, min_fare_cents,
-    discount_bps, search_radius_m
+    discount_bps, search_radius_m, capacity
 FROM vehicle_categories
 WHERE slug = sqlc.arg(slug) AND is_active;
 
@@ -39,18 +39,18 @@ WHERE status = 'searching'
 INSERT INTO ride_quotes (
     id, rider_id, vehicle_category_id, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng,
     distance_m, duration_s, polyline, surge_bps, subtotal_cents, base_fare_kes, discount_kes,
-    final_fare_kes, expires_at, created_at
+    final_fare_kes, expires_at, created_at, product_type, solo_fare_kes
 ) VALUES (
     sqlc.arg(id), sqlc.arg(rider_id), sqlc.arg(vehicle_category_id), sqlc.arg(pickup_lat),
     sqlc.arg(pickup_lng), sqlc.arg(dropoff_lat), sqlc.arg(dropoff_lng), sqlc.arg(distance_m),
     sqlc.arg(duration_s), sqlc.arg(polyline), sqlc.arg(surge_bps), sqlc.arg(subtotal_cents),
     sqlc.arg(base_fare_kes), sqlc.arg(discount_kes), sqlc.arg(final_fare_kes),
-    sqlc.arg(expires_at), sqlc.arg(created_at)
+    sqlc.arg(expires_at), sqlc.arg(created_at), sqlc.arg(product_type), sqlc.arg(solo_fare_kes)
 );
 
 -- name: GetQuote :one
 SELECT q.id, q.rider_id, q.vehicle_category_id, q.pickup_lat, q.pickup_lng, q.dropoff_lat,
-    q.dropoff_lng, q.final_fare_kes, q.expires_at, c.is_active AS category_active
+    q.dropoff_lng, q.final_fare_kes, q.expires_at, q.product_type, c.is_active AS category_active
 FROM ride_quotes AS q
 JOIN vehicle_categories AS c ON c.id = q.vehicle_category_id
 WHERE q.id = sqlc.arg(id);
@@ -59,11 +59,14 @@ WHERE q.id = sqlc.arg(id);
 SELECT id FROM rides WHERE quote_id = sqlc.arg(quote_id);
 
 -- name: RiderHasActiveRide :one
-SELECT EXISTS (
-    SELECT 1 FROM rides
-    WHERE rider_id = sqlc.arg(rider_id)
-        AND status IN ('searching', 'accepted', 'driver_arriving', 'arrived', 'in_progress')
-);
+SELECT (EXISTS (
+    SELECT 1 FROM rides AS r
+    WHERE r.rider_id = sqlc.arg(rider_id)
+        AND r.status IN ('searching', 'accepted', 'driver_arriving', 'arrived', 'in_progress')
+) OR EXISTS (
+    SELECT 1 FROM shared_members AS m
+    WHERE m.rider_id = sqlc.arg(rider_id) AND m.status IN ('requested', 'assigned', 'pickup_pending', 'picked_up')
+))::boolean;
 
 -- name: CountRecentRides :one
 SELECT count(*) FROM rides
@@ -72,12 +75,12 @@ WHERE rider_id = sqlc.arg(rider_id) AND requested_at > sqlc.arg(since);
 -- name: InsertRide :exec
 INSERT INTO rides (
     id, rider_id, quote_id, vehicle_category_id, status, pickup_lat, pickup_lng, dropoff_lat,
-    dropoff_lng, fare_kes, search_expires_at, next_dispatch_at, requested_at
+    dropoff_lng, fare_kes, search_expires_at, next_dispatch_at, requested_at, product_type
 ) VALUES (
     sqlc.arg(id), sqlc.arg(rider_id), sqlc.arg(quote_id), sqlc.arg(vehicle_category_id),
     'searching', sqlc.arg(pickup_lat), sqlc.arg(pickup_lng), sqlc.arg(dropoff_lat),
     sqlc.arg(dropoff_lng), sqlc.arg(fare_kes), sqlc.arg(search_expires_at),
-    sqlc.arg(next_dispatch_at), sqlc.arg(requested_at)
+    sqlc.arg(next_dispatch_at), sqlc.arg(requested_at), sqlc.arg(product_type)
 );
 
 -- name: InsertRideEvent :exec
@@ -216,7 +219,7 @@ SELECT from_status, to_status, reason, occurred_at FROM ride_events WHERE ride_i
 INSERT INTO ride_integrity_events (ride_id, subject_id, subject_role, violation_type, reason_code, chargeable, waiver_code, occurred_at)
 VALUES (sqlc.arg(ride_id), sqlc.arg(subject_id), sqlc.arg(subject_role), sqlc.arg(violation_type), sqlc.arg(reason_code),
     sqlc.arg(chargeable), sqlc.arg(waiver_code), sqlc.arg(now))
-ON CONFLICT (ride_id) DO NOTHING;
+ON CONFLICT (ride_id, subject_id) DO NOTHING;
 
 -- name: CountChargeableEvents :one
 SELECT count(*) FROM ride_integrity_events

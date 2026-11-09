@@ -55,6 +55,7 @@ func (a *API) CreateQuote(ctx context.Context, req CreateQuoteRequestObject) (Cr
 		Category: req.Body.VehicleCategory,
 		Pickup:   toPoint(req.Body.Pickup),
 		Dropoff:  toPoint(req.Body.Dropoff),
+		Shared:   req.Body.ProductType != nil && string(*req.Body.ProductType) == "shared",
 	})
 	if err != nil {
 		return nil, err
@@ -64,6 +65,7 @@ func (a *API) CreateQuote(ctx context.Context, req CreateQuoteRequestObject) (Cr
 		FareKes:     quote.Fare.FinalKES,
 		BaseFareKes: quote.Fare.BaseFareKES,
 		DiscountKes: quote.Fare.DiscountKES,
+		SoloFareKes: quote.SoloFareKES,
 		SurgeBps:    quote.Fare.SurgeBps,
 		DistanceM:   quote.DistanceM,
 		DurationS:   quote.DurationS,

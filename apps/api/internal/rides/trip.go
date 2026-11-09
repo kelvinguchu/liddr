@@ -82,11 +82,43 @@ func Transition(ctx context.Context, q *store.Queries, change Change) error {
 		}
 	}
 
+	if err := syncMembers(ctx, q, change, participants.DriverID); err != nil {
+		return err
+	}
+	members, err := q.ListActiveMemberRiders(ctx, change.RideID)
+	if err != nil {
+		return fmt.Errorf("list passengers: %w", err)
+	}
 	to := []uuid.UUID{participants.RiderID}
+	for _, member := range members {
+		if !slices.Contains(to, member) {
+			to = append(to, member)
+		}
+	}
 	if participants.DriverID != nil {
 		to = append(to, *participants.DriverID)
 	}
 	return events.Notify(ctx, q, events.Event{Type: events.TypeRideStatus, RideID: new(change.RideID), Status: change.To}, to...)
+}
+
+// syncMembers keeps passengers in step with their trip. It does nothing on a
+// solo ride, which has no member rows.
+func syncMembers(ctx context.Context, q *store.Queries, change Change, driverID *uuid.UUID) error {
+	var err error
+	switch change.To {
+	case StatusAccepted:
+		err = q.SetMembersAssigned(ctx, change.RideID)
+	case StatusSearching:
+		err = q.SetMembersRequested(ctx, change.RideID)
+	case StatusCompleted:
+		if driverID != nil {
+			err = q.InsertMemberRatingActions(ctx, store.InsertMemberRatingActionsParams{DriverID: *driverID, DueAt: change.At.Add(ratingWindow), RideID: change.RideID})
+		}
+	}
+	if err != nil {
+		return fmt.Errorf("sync passengers: %w", err)
+	}
+	return nil
 }
 
 // WithdrawOffers closes a ride's open offers and tells each driver.

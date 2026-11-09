@@ -185,6 +185,16 @@ func (s *Service) SubmitInTx(ctx context.Context, q *store.Queries, sub Submissi
 		return Filed{}, fmt.Errorf("load ride: %w", err)
 	}
 	reported, reportedIsDriver, err := otherParty(ride, sub.ReporterID)
+	if errors.Is(err, ErrNotParticipant) && ride.DriverID != nil {
+		// A passenger who joined a shared trip is not the ride's main rider.
+		member, memberErr := q.IsSharedMember(ctx, store.IsSharedMemberParams{RideID: ride.ID, RiderID: sub.ReporterID})
+		if memberErr != nil {
+			return Filed{}, fmt.Errorf("check passenger: %w", memberErr)
+		}
+		if member {
+			reported, reportedIsDriver, err = *ride.DriverID, true, nil
+		}
+	}
 	if err != nil {
 		return Filed{}, err
 	}

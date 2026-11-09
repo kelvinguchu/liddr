@@ -12,20 +12,21 @@ import (
 )
 
 const getActiveRideForDriver = `-- name: GetActiveRideForDriver :one
-SELECT id, rider_id FROM rides
+SELECT id, rider_id, product_type FROM rides
 WHERE driver_id = $1
     AND status IN ('accepted', 'driver_arriving', 'arrived', 'in_progress')
 `
 
 type GetActiveRideForDriverRow struct {
-	ID      uuid.UUID
-	RiderID uuid.UUID
+	ID          uuid.UUID
+	RiderID     uuid.UUID
+	ProductType string
 }
 
 func (q *Queries) GetActiveRideForDriver(ctx context.Context, driverID *uuid.UUID) (GetActiveRideForDriverRow, error) {
 	row := q.db.QueryRow(ctx, getActiveRideForDriver, driverID)
 	var i GetActiveRideForDriverRow
-	err := row.Scan(&i.ID, &i.RiderID)
+	err := row.Scan(&i.ID, &i.RiderID, &i.ProductType)
 	return i, err
 }
 

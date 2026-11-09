@@ -116,7 +116,8 @@ func (s *Service) applyDriverStep(ctx context.Context, rideID, driverID uuid.UUI
 			}
 		}
 		var distanceM *int32
-		if step.fence != nil {
+		// Each passenger's stop on a shared trip was fenced when they were dropped.
+		if step.fence != nil && (step.to != StatusCompleted || ride.ProductType != productShared) {
 			target, radiusM, farErr := step.fence(ride)
 			distance, err := checkFence(ctx, q, driverID, target, radiusM, farErr, now)
 			if err != nil {

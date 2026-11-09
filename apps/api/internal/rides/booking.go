@@ -56,6 +56,14 @@ func (s *Service) book(ctx context.Context, riderID, quoteID uuid.UUID, record D
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return fmt.Errorf("find ride for quote: %w", err)
 		}
+		joined, err := q.GetRideIDByMemberQuote(ctx, quoteID)
+		if err == nil {
+			rideID = joined
+			return nil
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("find membership for quote: %w", err)
+		}
 
 		isSend, err := q.IsSendQuote(ctx, quoteID)
 		if err != nil {
@@ -76,6 +84,17 @@ func (s *Service) book(ctx context.Context, riderID, quoteID uuid.UUID, record D
 			return err
 		}
 
+		if quote.ProductType == productShared {
+			existing, didJoin, err := s.tryJoin(ctx, q, quote, riderID, now)
+			if err != nil {
+				return err
+			}
+			if didJoin {
+				rideID = existing
+				return nil
+			}
+		}
+
 		rideID = uuid.New()
 		err = q.InsertRide(ctx, store.InsertRideParams{
 			ID:                rideID,
@@ -90,6 +109,7 @@ func (s *Service) book(ctx context.Context, riderID, quoteID uuid.UUID, record D
 			SearchExpiresAt:   now.Add(searchTimeout),
 			NextDispatchAt:    new(now),
 			RequestedAt:       now,
+			ProductType:       quote.ProductType,
 		})
 		if err != nil {
 			return fmt.Errorf("insert ride: %w", err)
@@ -105,6 +125,9 @@ func (s *Service) book(ctx context.Context, riderID, quoteID uuid.UUID, record D
 		}
 		if record != nil {
 			return record(ctx, q, rideID, now)
+		}
+		if quote.ProductType == productShared {
+			return insertMember(ctx, q, rideID, quote, riderID, now)
 		}
 		return nil
 	})

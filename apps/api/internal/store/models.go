@@ -233,6 +233,7 @@ type Ride struct {
 	PickupDistanceMAtAccept *int32
 	PickupEtaSAtAccept      *int32
 	ReassignCount           int32
+	ProductType             string
 }
 
 type RideDestinationChange struct {
@@ -320,6 +321,8 @@ type RideQuote struct {
 	FinalFareKes      int32
 	ExpiresAt         time.Time
 	CreatedAt         time.Time
+	ProductType       string
+	SoloFareKes       *int32
 }
 
 type RideRating struct {
@@ -372,6 +375,24 @@ type SendProofUpload struct {
 	ExpiresAt   time.Time
 	ConsumedAt  *time.Time
 	CreatedAt   time.Time
+}
+
+type SharedMember struct {
+	ID              uuid.UUID
+	RideID          uuid.UUID
+	RiderID         uuid.UUID
+	QuoteID         uuid.UUID
+	Status          string
+	FareKes         int32
+	PickupLat       float64
+	PickupLng       float64
+	DropoffLat      float64
+	DropoffLng      float64
+	RequestedAt     time.Time
+	PickupArrivedAt *time.Time
+	PickedUpAt      *time.Time
+	DroppedOffAt    *time.Time
+	EndedAt         *time.Time
 }
 
 type Subscription struct {

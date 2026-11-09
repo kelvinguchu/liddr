@@ -40,6 +40,11 @@ var (
 	ErrRecipientPending     = errors.New("waiting for the recipient to confirm")
 	ErrPackageCollected     = errors.New("package has already been collected")
 
+	ErrMemberNotFound      = errors.New("passenger not found")
+	ErrNotShared           = errors.New("ride is not a shared ride")
+	ErrMembersPending      = errors.New("passengers are still on the trip")
+	ErrMemberNotOnBoard    = errors.New("no passenger has been picked up")
+	ErrSharedNotAvailable  = errors.New("shared rides are not available for this vehicle")
 	ErrBookingRestricted   = errors.New("bookings are paused after repeated cancellations")
 	ErrReassignNotAllowed  = errors.New("driver shows no sign of trouble")
 	ErrDestinationWindow   = errors.New("trip started too long ago to change destination")
@@ -116,12 +121,25 @@ func (s *Service) Get(ctx context.Context, rideID, actorID uuid.UUID) (Ride, err
 		return Ride{}, fmt.Errorf("load ride: %w", err)
 	}
 	isDriver := row.DriverID != nil && *row.DriverID == actorID
-	if row.RiderID != actorID && !isDriver {
+	ride := toRide(row)
+	sees := row.RiderID == actorID
+	if row.ProductType == productShared && !isDriver {
+		member, err := s.queries.GetSharedMemberByRider(ctx, store.GetSharedMemberByRiderParams{RideID: rideID, RiderID: actorID})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Ride{}, ErrRideNotFound
+		}
+		if err != nil {
+			return Ride{}, fmt.Errorf("load member: %w", err)
+		}
+		// Each passenger sees their own trip and fare, and the driver only while
+		// they are still on it.
+		ride.Pickup, ride.Dropoff, ride.FareKES = geo.Point{Lat: member.PickupLat, Lng: member.PickupLng}, geo.Point{Lat: member.DropoffLat, Lng: member.DropoffLng}, member.FareKes
+		sees = memberActive(member.Status)
+	} else if row.RiderID != actorID && !isDriver {
 		return Ride{}, ErrRideNotFound
 	}
 
-	ride := toRide(row)
-	if row.RiderID == actorID && row.DriverID != nil && isDriverEnRoute(row.Status) {
+	if sees && row.DriverID != nil && isDriverEnRoute(row.Status) {
 		location, err := s.queries.GetDriverLocation(ctx, *row.DriverID)
 		switch {
 		case err == nil:

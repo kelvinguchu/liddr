@@ -19,8 +19,8 @@ const (
 	integrityWindow      = 7 * 24 * time.Hour
 	strikeThreshold      = 5
 	strikeEscalation     = 8
-	riderRestrictDays    = 7
-	riderEscalationDays  = 14
+	riderRestrictDays    = 1
+	riderEscalationDays  = 7
 	driverSuspendDays    = 1
 	driverEscalationDays = 3
 	freeCancelGrace      = 120 * time.Second

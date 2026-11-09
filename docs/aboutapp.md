@@ -734,8 +734,9 @@ Cancellations are free on Liddr — for both passengers and drivers. As an early
 18.1 Passenger Cancellation
 •	Passengers can cancel at any time before IN_PROGRESS state — no charge
 •	Cancellation reason is optionally collected from passenger for analytics — helps identify systemic issues like drivers not moving
-•	Passengers with more than 5 cancellations in 7 days receive an in-app warning
-•	Passengers exceeding 15 cancellations in 30 days are temporarily suspended — abuse prevention without money
+•	A cancellation counts against the passenger only if it is chargeable. It is not chargeable when no driver has been assigned, within 2 minutes of a driver accepting, for a safety concern or emergency, or when the evidence shows the driver was late, had stopped sending a location, was not making progress, or was too far away
+•	5 chargeable cancellations or no-shows in 7 days pause the passenger's bookings for 24 hours — abuse prevention without money
+•	8 chargeable cancellations or no-shows in 7 days pause the passenger's bookings for 7 days
 •	Cancellation data is tracked per passenger and surfaces in ops dashboard for pattern review
 
 18.2 Driver Cancellation
@@ -750,7 +751,7 @@ Cancellations are free on Liddr — for both passengers and drivers. As an early
 •	System sends passenger a push notification and SMS warning at the 2-minute mark
 •	If passenger does not respond or arrive within 5 minutes, ride transitions to NO_SHOW_PASSENGER automatically
 •	No financial penalty at launch — driver is freed immediately to accept a new ride
-•	Passenger account flagged — repeated no-shows trigger a warning then suspension
+•	Each no-show counts toward the booking pause limits in 18.1
 •	Future consideration: once platform has scale and trust, introduce a nominal no-show fee as driver compensation
 
 18.4 Driver No-Show / Ghost Driver

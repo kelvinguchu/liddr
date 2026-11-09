@@ -75,27 +75,40 @@ func (h *harness) seedStrikes(t *testing.T, subject uuid.UUID, role string, n in
 	}
 }
 
-func TestFifthStrikePausesARidersBookingsOnce(t *testing.T) {
-	h := newHarness(t)
-	rider := h.newUser(t, "rider")
-	h.seedStrikes(t, rider, "rider", 4)
-	ride, _, driver := h.acceptedRide(t)
-	h.exec(t, `UPDATE rides SET rider_id = $1 WHERE id = $2`, rider, ride.ID)
-	h.clock.Advance(150 * time.Second)
-	h.moveDriver(t, driver, near(100))
-	if _, err := h.rides.Cancel(t.Context(), ride.ID, rider, "rider_changed_mind"); err != nil {
-		t.Fatalf("Cancel: %v", err)
+func TestRepeatedCancellationsPauseARidersBookings(t *testing.T) {
+	tests := []struct {
+		name  string
+		prior int64
+		pause time.Duration
+	}{
+		{name: "fifth strike pauses for a day", prior: 4, pause: 24 * time.Hour},
+		{name: "eighth strike pauses for a week", prior: 7, pause: 7 * 24 * time.Hour},
 	}
-	standing, err := h.rides.Standing(t.Context(), rider)
-	if err != nil || standing.RiderStrikes != 5 || standing.BookingRestricted == nil {
-		t.Fatalf("Standing = %+v, %v", standing, err)
-	}
-	if _, err := h.rides.Book(t.Context(), rider, h.quote(t, rider).ID); !errors.Is(err, rides.ErrBookingRestricted) {
-		t.Errorf("Book while restricted = %v", err)
-	}
-	h.clock.Advance(7*24*time.Hour + time.Minute)
-	if _, err := h.rides.Book(t.Context(), rider, h.quote(t, rider).ID); err != nil {
-		t.Errorf("Book after the restriction = %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newHarness(t)
+			rider := h.newUser(t, "rider")
+			h.seedStrikes(t, rider, "rider", int(tt.prior))
+			ride, _, driver := h.acceptedRide(t)
+			h.exec(t, `UPDATE rides SET rider_id = $1 WHERE id = $2`, rider, ride.ID)
+			h.clock.Advance(150 * time.Second)
+			h.moveDriver(t, driver, near(100))
+			if _, err := h.rides.Cancel(t.Context(), ride.ID, rider, "rider_changed_mind"); err != nil {
+				t.Fatalf("Cancel: %v", err)
+			}
+			standing, err := h.rides.Standing(t.Context(), rider)
+			if err != nil || standing.RiderStrikes != tt.prior+1 || standing.BookingRestricted == nil {
+				t.Fatalf("Standing = %+v, %v", standing, err)
+			}
+			h.clock.Advance(tt.pause - time.Minute)
+			if _, err := h.rides.Book(t.Context(), rider, h.quote(t, rider).ID); !errors.Is(err, rides.ErrBookingRestricted) {
+				t.Errorf("Book a minute before the pause ends = %v", err)
+			}
+			h.clock.Advance(2 * time.Minute)
+			if _, err := h.rides.Book(t.Context(), rider, h.quote(t, rider).ID); err != nil {
+				t.Errorf("Book a minute after the pause ends = %v", err)
+			}
+		})
 	}
 }
 

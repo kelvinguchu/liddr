@@ -104,7 +104,7 @@ SET revoked_at = sqlc.arg(now), revoked_reason = sqlc.arg(reason)
 WHERE family_id = sqlc.arg(family_id) AND revoked_at IS NULL;
 
 -- name: AuthenticateAccessToken :one
-SELECT s.id AS session_id, s.family_id, s.user_id, u.account_status, u.phone,
+SELECT s.id AS session_id, s.family_id, s.user_id, u.account_status, COALESCE(u.phone, '')::text AS phone,
     EXISTS (
         SELECT 1 FROM totp_credentials AS t
         WHERE t.user_id = s.user_id AND t.confirmed_at IS NOT NULL

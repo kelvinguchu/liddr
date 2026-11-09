@@ -115,7 +115,7 @@ type GetStaffUserByPhoneRow struct {
 	AccountStatus string
 }
 
-func (q *Queries) GetStaffUserByPhone(ctx context.Context, phone string) (GetStaffUserByPhoneRow, error) {
+func (q *Queries) GetStaffUserByPhone(ctx context.Context, phone *string) (GetStaffUserByPhoneRow, error) {
 	row := q.db.QueryRow(ctx, getStaffUserByPhone, phone)
 	var i GetStaffUserByPhoneRow
 	err := row.Scan(&i.ID, &i.AccountStatus)

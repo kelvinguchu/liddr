@@ -14,7 +14,7 @@ import (
 )
 
 const authenticateAccessToken = `-- name: AuthenticateAccessToken :one
-SELECT s.id AS session_id, s.family_id, s.user_id, u.account_status, u.phone,
+SELECT s.id AS session_id, s.family_id, s.user_id, u.account_status, COALESCE(u.phone, '')::text AS phone,
     EXISTS (
         SELECT 1 FROM totp_credentials AS t
         WHERE t.user_id = s.user_id AND t.confirmed_at IS NOT NULL
@@ -501,7 +501,7 @@ type UpsertUserByPhoneRow struct {
 	Created       bool
 }
 
-func (q *Queries) UpsertUserByPhone(ctx context.Context, phone string) (UpsertUserByPhoneRow, error) {
+func (q *Queries) UpsertUserByPhone(ctx context.Context, phone *string) (UpsertUserByPhoneRow, error) {
 	row := q.db.QueryRow(ctx, upsertUserByPhone, phone)
 	var i UpsertUserByPhoneRow
 	err := row.Scan(&i.ID, &i.AccountStatus, &i.Created)

@@ -3,7 +3,7 @@ INSERT INTO audit_events (action, user_id, request_id, ip, created_at)
 VALUES (sqlc.arg(action), sqlc.arg(user_id), 'system', '0.0.0.0', sqlc.arg(created_at));
 
 -- name: GetDriverForPayment :one
-SELECT d.user_id, d.verification_status, d.vehicle_category_id, c.weekly_subscription_kes, u.phone
+SELECT d.user_id, d.verification_status, d.vehicle_category_id, c.weekly_subscription_kes, COALESCE(u.phone, '')::text AS phone
 FROM drivers AS d
 JOIN vehicle_categories AS c ON c.id = d.vehicle_category_id
 JOIN users AS u ON u.id = d.user_id
@@ -144,3 +144,8 @@ FROM subscription_payments
 WHERE driver_id = sqlc.arg(driver_id)
 ORDER BY requested_at DESC
 LIMIT 50;
+
+-- name: GetPaymentByCheckout :one
+SELECT id, driver_id, channel, status, amount_kes, phone, receipt, requested_at, paid_at, checkout_request_id
+FROM subscription_payments
+WHERE checkout_request_id = sqlc.arg(checkout_request_id);

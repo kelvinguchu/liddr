@@ -24,6 +24,7 @@ import (
 	"github.com/kelvinguchu/liddr/apps/api/internal/moderation"
 	"github.com/kelvinguchu/liddr/apps/api/internal/ratings"
 	"github.com/kelvinguchu/liddr/apps/api/internal/realtime"
+	"github.com/kelvinguchu/liddr/apps/api/internal/retention"
 	"github.com/kelvinguchu/liddr/apps/api/internal/rides"
 	"github.com/kelvinguchu/liddr/apps/api/internal/store"
 )
@@ -168,6 +169,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	workers.Go(func() { inbox.Run(workerCtx) })
 	workers.Go(func() { moderator.Run(workerCtx, logger) })
 	workers.Go(func() { bookings.RunWatchdog(workerCtx, logger) })
+	workers.Go(func() { retention.NewSweeper(store.New(pool), time.Now, logger).Run(workerCtx) })
 	defer workers.Wait()
 	defer stopWorkers()
 

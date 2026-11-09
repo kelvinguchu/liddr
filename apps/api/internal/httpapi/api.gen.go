@@ -908,6 +908,19 @@ type DriverProfileSubscriptionStatus string
 // DriverProfileVerificationStatus defines model for DriverProfile.VerificationStatus.
 type DriverProfileVerificationStatus string
 
+// DriverSubscriptionDetail defines model for DriverSubscriptionDetail.
+type DriverSubscriptionDetail struct {
+	AmountKes int32                 `json:"amount_kes"`
+	Payments  []SubscriptionPayment `json:"payments"`
+	Reference string                `json:"reference"`
+	Status    string                `json:"status"`
+}
+
+// EmailOtpRequest defines model for EmailOtpRequest.
+type EmailOtpRequest struct {
+	Email string `json:"email"`
+}
+
 // Enforcement defines model for Enforcement.
 type Enforcement struct {
 	Action     string              `json:"action"`
@@ -966,6 +979,11 @@ type FiledCase struct {
 // FiledMessageReport defines model for FiledMessageReport.
 type FiledMessageReport struct {
 	ReportId openapi_types.UUID `json:"report_id"`
+}
+
+// GoogleSignIn defines model for GoogleSignIn.
+type GoogleSignIn struct {
+	IdToken string `json:"id_token"`
 }
 
 // Health defines model for Health.
@@ -1118,6 +1136,19 @@ type OtpVerification struct {
 
 	// Code Example: 123456
 	Code string `json:"code"`
+}
+
+// PaymentDetail defines model for PaymentDetail.
+type PaymentDetail struct {
+	AmountKes   int32              `json:"amount_kes"`
+	Channel     string             `json:"channel"`
+	DriverId    openapi_types.UUID `json:"driver_id"`
+	Id          openapi_types.UUID `json:"id"`
+	PaidAt      *time.Time         `json:"paid_at,omitempty"`
+	PhoneMasked string             `json:"phone_masked"`
+	Receipt     *string            `json:"receipt,omitempty"`
+	RequestedAt time.Time          `json:"requested_at"`
+	Status      string             `json:"status"`
 }
 
 // PaymentMode defines model for PaymentMode.
@@ -1739,6 +1770,15 @@ type ListRideMessagesParams struct {
 	Limit    *Limit `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// RequestEmailOtpJSONRequestBody defines body for RequestEmailOtp for application/json ContentType.
+type RequestEmailOtpJSONRequestBody = EmailOtpRequest
+
+// VerifyEmailOtpJSONRequestBody defines body for VerifyEmailOtp for application/json ContentType.
+type VerifyEmailOtpJSONRequestBody = OtpVerification
+
+// SignInWithGoogleJSONRequestBody defines body for SignInWithGoogle for application/json ContentType.
+type SignInWithGoogleJSONRequestBody = GoogleSignIn
+
 // LogoutJSONRequestBody defines body for Logout for application/json ContentType.
 type LogoutJSONRequestBody = RefreshRequest
 
@@ -1867,6 +1907,15 @@ type ServerInterface interface {
 	// GetReadiness Report whether the instance can serve traffic
 	// (GET /readyz)
 	GetReadiness(w http.ResponseWriter, r *http.Request)
+	// RequestEmailOtp Send a sign-in code to an email address
+	// (POST /v1/auth/email/request)
+	RequestEmailOtp(w http.ResponseWriter, r *http.Request)
+	// VerifyEmailOtp Exchange an email code for a session
+	// (POST /v1/auth/email/verify)
+	VerifyEmailOtp(w http.ResponseWriter, r *http.Request)
+	// SignInWithGoogle Exchange a Google ID token for a session
+	// (POST /v1/auth/google)
+	SignInWithGoogle(w http.ResponseWriter, r *http.Request)
 	// Logout End the device's session. Succeeds even if already ended.
 	// (POST /v1/auth/logout)
 	Logout(w http.ResponseWriter, r *http.Request)
@@ -1990,6 +2039,15 @@ type ServerInterface interface {
 	// DownloadDeliveryProof Get a five-minute link to a proof photo
 	// (POST /v1/ops/send/rides/{ride_id}/proofs/{proof_kind}/download)
 	DownloadDeliveryProof(w http.ResponseWriter, r *http.Request, rideId RideId, proofKind DownloadDeliveryProofParamsProofKind)
+	// GetDriverSubscriptionForOps Show a driver's week and payments
+	// (GET /v1/ops/subscriptions/drivers/{user_id})
+	GetDriverSubscriptionForOps(w http.ResponseWriter, r *http.Request, userId openapi_types.UUID)
+	// GetPaymentForOps Find a payment by M-Pesa reference
+	// (GET /v1/ops/subscriptions/payments/{checkout_request_id})
+	GetPaymentForOps(w http.ResponseWriter, r *http.Request, checkoutRequestId string)
+	// RecheckPayment Ask M-Pesa again about a payment
+	// (POST /v1/ops/subscriptions/payments/{checkout_request_id}/recheck)
+	RecheckPayment(w http.ResponseWriter, r *http.Request, checkoutRequestId string)
 	// ListVerificationApplications List applications in one status, oldest first
 	// (GET /v1/ops/verification/applications)
 	ListVerificationApplications(w http.ResponseWriter, r *http.Request, params ListVerificationApplicationsParams)
@@ -2179,6 +2237,48 @@ func (siw *ServerInterfaceWrapper) GetReadiness(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetReadiness(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RequestEmailOtp operation middleware
+func (siw *ServerInterfaceWrapper) RequestEmailOtp(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RequestEmailOtp(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// VerifyEmailOtp operation middleware
+func (siw *ServerInterfaceWrapper) VerifyEmailOtp(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.VerifyEmailOtp(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SignInWithGoogle operation middleware
+func (siw *ServerInterfaceWrapper) SignInWithGoogle(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SignInWithGoogle(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3513,6 +3613,102 @@ func (siw *ServerInterfaceWrapper) DownloadDeliveryProof(w http.ResponseWriter, 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.DownloadDeliveryProof(w, r, rideId, proofKind)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDriverSubscriptionForOps operation middleware
+func (siw *ServerInterfaceWrapper) GetDriverSubscriptionForOps(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "user_id" -------------
+	var userId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", r.PathValue("user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDriverSubscriptionForOps(w, r, userId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetPaymentForOps operation middleware
+func (siw *ServerInterfaceWrapper) GetPaymentForOps(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "checkout_request_id" -------------
+	var checkoutRequestId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "checkout_request_id", r.PathValue("checkout_request_id"), &checkoutRequestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "checkout_request_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPaymentForOps(w, r, checkoutRequestId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RecheckPayment operation middleware
+func (siw *ServerInterfaceWrapper) RecheckPayment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "checkout_request_id" -------------
+	var checkoutRequestId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "checkout_request_id", r.PathValue("checkout_request_id"), &checkoutRequestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "checkout_request_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin", "mfa:step-up"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RecheckPayment(w, r, checkoutRequestId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -5347,6 +5543,12 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/rides/{ride_id}/events", wrapper.ListRideEvents)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/rides/integrity/me", wrapper.GetMyIntegrity)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/ops/rides/integrity/users/{user_id}", wrapper.GetUserIntegrity)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/auth/email/request", wrapper.RequestEmailOtp)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/auth/email/verify", wrapper.VerifyEmailOtp)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/auth/google", wrapper.SignInWithGoogle)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/ops/subscriptions/drivers/{user_id}", wrapper.GetDriverSubscriptionForOps)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/ops/subscriptions/payments/{checkout_request_id}", wrapper.GetPaymentForOps)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/ops/subscriptions/payments/{checkout_request_id}/recheck", wrapper.RecheckPayment)
 
 	return m
 }
@@ -5405,6 +5607,123 @@ func (response GetReadiness503JSONResponse) VisitGetReadinessResponse(w http.Res
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RequestEmailOtpRequestObject struct {
+	Body *RequestEmailOtpJSONRequestBody
+}
+
+type RequestEmailOtpResponseObject interface {
+	VisitRequestEmailOtpResponse(w http.ResponseWriter) error
+}
+
+type RequestEmailOtp201JSONResponse OtpChallenge
+
+func (response RequestEmailOtp201JSONResponse) VisitRequestEmailOtpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RequestEmailOtpdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response RequestEmailOtpdefaultJSONResponse) VisitRequestEmailOtpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifyEmailOtpRequestObject struct {
+	Body *VerifyEmailOtpJSONRequestBody
+}
+
+type VerifyEmailOtpResponseObject interface {
+	VisitVerifyEmailOtpResponse(w http.ResponseWriter) error
+}
+
+type VerifyEmailOtp200JSONResponse Session
+
+func (response VerifyEmailOtp200JSONResponse) VisitVerifyEmailOtpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type VerifyEmailOtpdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response VerifyEmailOtpdefaultJSONResponse) VisitVerifyEmailOtpResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SignInWithGoogleRequestObject struct {
+	Body *SignInWithGoogleJSONRequestBody
+}
+
+type SignInWithGoogleResponseObject interface {
+	VisitSignInWithGoogleResponse(w http.ResponseWriter) error
+}
+
+type SignInWithGoogle200JSONResponse Session
+
+func (response SignInWithGoogle200JSONResponse) VisitSignInWithGoogleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SignInWithGoogledefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response SignInWithGoogledefaultJSONResponse) VisitSignInWithGoogleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -6947,6 +7266,123 @@ type DownloadDeliveryProofdefaultJSONResponse struct {
 }
 
 func (response DownloadDeliveryProofdefaultJSONResponse) VisitDownloadDeliveryProofResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDriverSubscriptionForOpsRequestObject struct {
+	UserId openapi_types.UUID `json:"user_id"`
+}
+
+type GetDriverSubscriptionForOpsResponseObject interface {
+	VisitGetDriverSubscriptionForOpsResponse(w http.ResponseWriter) error
+}
+
+type GetDriverSubscriptionForOps200JSONResponse DriverSubscriptionDetail
+
+func (response GetDriverSubscriptionForOps200JSONResponse) VisitGetDriverSubscriptionForOpsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDriverSubscriptionForOpsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetDriverSubscriptionForOpsdefaultJSONResponse) VisitGetDriverSubscriptionForOpsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPaymentForOpsRequestObject struct {
+	CheckoutRequestId string `json:"checkout_request_id"`
+}
+
+type GetPaymentForOpsResponseObject interface {
+	VisitGetPaymentForOpsResponse(w http.ResponseWriter) error
+}
+
+type GetPaymentForOps200JSONResponse PaymentDetail
+
+func (response GetPaymentForOps200JSONResponse) VisitGetPaymentForOpsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPaymentForOpsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetPaymentForOpsdefaultJSONResponse) VisitGetPaymentForOpsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecheckPaymentRequestObject struct {
+	CheckoutRequestId string `json:"checkout_request_id"`
+}
+
+type RecheckPaymentResponseObject interface {
+	VisitRecheckPaymentResponse(w http.ResponseWriter) error
+}
+
+type RecheckPayment200JSONResponse PaymentDetail
+
+func (response RecheckPayment200JSONResponse) VisitRecheckPaymentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecheckPaymentdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response RecheckPaymentdefaultJSONResponse) VisitRecheckPaymentResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -8964,6 +9400,15 @@ type StrictServerInterface interface {
 	// GetReadiness Report whether the instance can serve traffic
 	// (GET /readyz)
 	GetReadiness(ctx context.Context, request GetReadinessRequestObject) (GetReadinessResponseObject, error)
+	// RequestEmailOtp Send a sign-in code to an email address
+	// (POST /v1/auth/email/request)
+	RequestEmailOtp(ctx context.Context, request RequestEmailOtpRequestObject) (RequestEmailOtpResponseObject, error)
+	// VerifyEmailOtp Exchange an email code for a session
+	// (POST /v1/auth/email/verify)
+	VerifyEmailOtp(ctx context.Context, request VerifyEmailOtpRequestObject) (VerifyEmailOtpResponseObject, error)
+	// SignInWithGoogle Exchange a Google ID token for a session
+	// (POST /v1/auth/google)
+	SignInWithGoogle(ctx context.Context, request SignInWithGoogleRequestObject) (SignInWithGoogleResponseObject, error)
 	// Logout End the device's session. Succeeds even if already ended.
 	// (POST /v1/auth/logout)
 	Logout(ctx context.Context, request LogoutRequestObject) (LogoutResponseObject, error)
@@ -9087,6 +9532,15 @@ type StrictServerInterface interface {
 	// DownloadDeliveryProof Get a five-minute link to a proof photo
 	// (POST /v1/ops/send/rides/{ride_id}/proofs/{proof_kind}/download)
 	DownloadDeliveryProof(ctx context.Context, request DownloadDeliveryProofRequestObject) (DownloadDeliveryProofResponseObject, error)
+	// GetDriverSubscriptionForOps Show a driver's week and payments
+	// (GET /v1/ops/subscriptions/drivers/{user_id})
+	GetDriverSubscriptionForOps(ctx context.Context, request GetDriverSubscriptionForOpsRequestObject) (GetDriverSubscriptionForOpsResponseObject, error)
+	// GetPaymentForOps Find a payment by M-Pesa reference
+	// (GET /v1/ops/subscriptions/payments/{checkout_request_id})
+	GetPaymentForOps(ctx context.Context, request GetPaymentForOpsRequestObject) (GetPaymentForOpsResponseObject, error)
+	// RecheckPayment Ask M-Pesa again about a payment
+	// (POST /v1/ops/subscriptions/payments/{checkout_request_id}/recheck)
+	RecheckPayment(ctx context.Context, request RecheckPaymentRequestObject) (RecheckPaymentResponseObject, error)
 	// ListVerificationApplications List applications in one status, oldest first
 	// (GET /v1/ops/verification/applications)
 	ListVerificationApplications(ctx context.Context, request ListVerificationApplicationsRequestObject) (ListVerificationApplicationsResponseObject, error)
@@ -9328,6 +9782,99 @@ func (sh *strictHandler) GetReadiness(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetReadinessResponseObject); ok {
 		if err := validResponse.VisitGetReadinessResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RequestEmailOtp operation middleware
+func (sh *strictHandler) RequestEmailOtp(w http.ResponseWriter, r *http.Request) {
+	var request RequestEmailOtpRequestObject
+
+	var body RequestEmailOtpJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RequestEmailOtp(ctx, request.(RequestEmailOtpRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RequestEmailOtp")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RequestEmailOtpResponseObject); ok {
+		if err := validResponse.VisitRequestEmailOtpResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// VerifyEmailOtp operation middleware
+func (sh *strictHandler) VerifyEmailOtp(w http.ResponseWriter, r *http.Request) {
+	var request VerifyEmailOtpRequestObject
+
+	var body VerifyEmailOtpJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.VerifyEmailOtp(ctx, request.(VerifyEmailOtpRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "VerifyEmailOtp")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(VerifyEmailOtpResponseObject); ok {
+		if err := validResponse.VisitVerifyEmailOtpResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SignInWithGoogle operation middleware
+func (sh *strictHandler) SignInWithGoogle(w http.ResponseWriter, r *http.Request) {
+	var request SignInWithGoogleRequestObject
+
+	var body SignInWithGoogleJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SignInWithGoogle(ctx, request.(SignInWithGoogleRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SignInWithGoogle")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SignInWithGoogleResponseObject); ok {
+		if err := validResponse.VisitSignInWithGoogleResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -10471,6 +11018,84 @@ func (sh *strictHandler) DownloadDeliveryProof(w http.ResponseWriter, r *http.Re
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(DownloadDeliveryProofResponseObject); ok {
 		if err := validResponse.VisitDownloadDeliveryProofResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetDriverSubscriptionForOps operation middleware
+func (sh *strictHandler) GetDriverSubscriptionForOps(w http.ResponseWriter, r *http.Request, userId openapi_types.UUID) {
+	var request GetDriverSubscriptionForOpsRequestObject
+
+	request.UserId = userId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDriverSubscriptionForOps(ctx, request.(GetDriverSubscriptionForOpsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDriverSubscriptionForOps")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDriverSubscriptionForOpsResponseObject); ok {
+		if err := validResponse.VisitGetDriverSubscriptionForOpsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetPaymentForOps operation middleware
+func (sh *strictHandler) GetPaymentForOps(w http.ResponseWriter, r *http.Request, checkoutRequestId string) {
+	var request GetPaymentForOpsRequestObject
+
+	request.CheckoutRequestId = checkoutRequestId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPaymentForOps(ctx, request.(GetPaymentForOpsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPaymentForOps")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetPaymentForOpsResponseObject); ok {
+		if err := validResponse.VisitGetPaymentForOpsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RecheckPayment operation middleware
+func (sh *strictHandler) RecheckPayment(w http.ResponseWriter, r *http.Request, checkoutRequestId string) {
+	var request RecheckPaymentRequestObject
+
+	request.CheckoutRequestId = checkoutRequestId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RecheckPayment(ctx, request.(RecheckPaymentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RecheckPayment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RecheckPaymentResponseObject); ok {
+		if err := validResponse.VisitRecheckPaymentResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -245,7 +245,7 @@ func (s *Service) GrantRole(ctx context.Context, rawPhone string, role Role) err
 	}
 	now := s.now()
 	return store.InTx(ctx, s.pool, func(q *store.Queries) error {
-		user, err := q.UpsertUserByPhone(ctx, phone)
+		user, err := q.UpsertUserByPhone(ctx, new(phone))
 		if err != nil {
 			return fmt.Errorf("upsert user: %w", err)
 		}

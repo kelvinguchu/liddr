@@ -114,7 +114,14 @@ func TestDriverIsSuspendedOnceNotOnEveryLaterCancel(t *testing.T) {
 	if err := h.pool.QueryRow(t.Context(), `SELECT account_status FROM users WHERE id = $1`, driver).Scan(&status); err != nil || status != "suspended" {
 		t.Errorf("account = %s, %v", status, err)
 	}
-	h.seedStrikes(t, driver, "driver", 1)
+	// A real sixth cancellation, on a ride handed straight to this driver.
+	h.exec(t, `UPDATE users SET account_status = 'active' WHERE id = $1`, driver)
+	next, _, seeded := h.acceptedRide(t)
+	h.exec(t, `UPDATE rides SET driver_id = $1 WHERE id = $2`, driver, next.ID)
+	h.exec(t, `UPDATE drivers SET is_online = false WHERE user_id = $1`, seeded)
+	if _, err := h.rides.Cancel(t.Context(), next.ID, driver, "cannot_contact_rider"); err != nil {
+		t.Fatalf("sixth Cancel: %v", err)
+	}
 	var more int
 	if err := h.pool.QueryRow(t.Context(), `SELECT count(*) FROM user_enforcements WHERE user_id = $1`, driver).Scan(&more); err != nil || more != 1 {
 		t.Errorf("enforcements after a sixth strike = %d, %v", more, err)

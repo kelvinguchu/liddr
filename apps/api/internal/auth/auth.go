@@ -65,7 +65,10 @@ type Config struct {
 	SMS     SMSSender
 	HMACKey []byte
 	Box     *sealing.Box
-	Now     func() time.Time
+	// Email and Google are nil when those sign-in methods are not configured.
+	Email  EmailSender
+	Google *GoogleVerifier
+	Now    func() time.Time
 }
 
 // Service implements sign-in and session management.
@@ -75,6 +78,8 @@ type Service struct {
 	sms     SMSSender
 	hasher  hasher
 	box     *sealing.Box
+	email   EmailSender
+	google  *GoogleVerifier
 	now     func() time.Time
 }
 
@@ -86,6 +91,8 @@ func NewService(cfg Config) *Service {
 		sms:     cfg.SMS,
 		hasher:  hasher{key: cfg.HMACKey},
 		box:     cfg.Box,
+		email:   cfg.Email,
+		google:  cfg.Google,
 		now:     cfg.Now,
 	}
 }

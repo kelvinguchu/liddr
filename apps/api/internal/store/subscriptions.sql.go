@@ -137,7 +137,7 @@ func (q *Queries) ExpireLapsedSubscriptions(ctx context.Context, arg ExpireLapse
 }
 
 const getDriverForPayment = `-- name: GetDriverForPayment :one
-SELECT d.user_id, d.verification_status, d.vehicle_category_id, c.weekly_subscription_kes, u.phone
+SELECT d.user_id, d.verification_status, d.vehicle_category_id, c.weekly_subscription_kes, COALESCE(u.phone, '')::text AS phone
 FROM drivers AS d
 JOIN vehicle_categories AS c ON c.id = d.vehicle_category_id
 JOIN users AS u ON u.id = d.user_id
@@ -162,6 +162,43 @@ func (q *Queries) GetDriverForPayment(ctx context.Context, userID uuid.UUID) (Ge
 		&i.VehicleCategoryID,
 		&i.WeeklySubscriptionKes,
 		&i.Phone,
+	)
+	return i, err
+}
+
+const getPaymentByCheckout = `-- name: GetPaymentByCheckout :one
+SELECT id, driver_id, channel, status, amount_kes, phone, receipt, requested_at, paid_at, checkout_request_id
+FROM subscription_payments
+WHERE checkout_request_id = $1
+`
+
+type GetPaymentByCheckoutRow struct {
+	ID                uuid.UUID
+	DriverID          uuid.UUID
+	Channel           string
+	Status            string
+	AmountKes         int32
+	Phone             *string
+	Receipt           *string
+	RequestedAt       time.Time
+	PaidAt            *time.Time
+	CheckoutRequestID *string
+}
+
+func (q *Queries) GetPaymentByCheckout(ctx context.Context, checkoutRequestID *string) (GetPaymentByCheckoutRow, error) {
+	row := q.db.QueryRow(ctx, getPaymentByCheckout, checkoutRequestID)
+	var i GetPaymentByCheckoutRow
+	err := row.Scan(
+		&i.ID,
+		&i.DriverID,
+		&i.Channel,
+		&i.Status,
+		&i.AmountKes,
+		&i.Phone,
+		&i.Receipt,
+		&i.RequestedAt,
+		&i.PaidAt,
+		&i.CheckoutRequestID,
 	)
 	return i, err
 }

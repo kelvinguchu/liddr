@@ -115,5 +115,3 @@ UPDATE users SET account_status = sqlc.arg(status), updated_at = sqlc.arg(now) W
 -- name: TakeDriverOffline :exec
 UPDATE drivers SET is_online = false, updated_at = sqlc.arg(now) WHERE user_id = sqlc.arg(user_id);
 
--- name: GetUserPhone :one
-SELECT phone FROM users WHERE id = sqlc.arg(id);

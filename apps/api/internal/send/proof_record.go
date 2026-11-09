@@ -60,7 +60,7 @@ func (s *Service) RecordDropoffProof(ctx context.Context, rideID, driverID, uplo
 		if err := q.RecordDropoffProof(ctx, store.RecordDropoffProofParams{Key: new(upload.StorageKey), Now: new(now), RideID: rideID}); err != nil {
 			return fmt.Errorf("record proof: %w", err)
 		}
-		recipient, err := q.FindUserIDByPhone(ctx, row.RecipientPhone)
+		recipient, err := q.FindUserIDByPhone(ctx, new(row.RecipientPhone))
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil // No account: the driver's wait and photo are enough.
 		}
@@ -90,7 +90,7 @@ func (s *Service) ConfirmReceipt(ctx context.Context, rideID uuid.UUID, phone st
 		if err != nil {
 			return fmt.Errorf("load delivery: %w", err)
 		}
-		if row.RecipientPhone != phone {
+		if phone == "" || row.RecipientPhone != phone {
 			return ErrNotFound
 		}
 		if row.DropoffProofAt == nil {

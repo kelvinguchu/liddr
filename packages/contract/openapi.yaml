@@ -1888,6 +1888,123 @@ paths:
         default:
           $ref: "#/components/responses/Problem"
 
+  /v1/auth/email/request:
+    post:
+      operationId: requestEmailOtp
+      summary: Send a sign-in code to an email address
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmailOtpRequest"
+      responses:
+        "201":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OtpChallenge"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/auth/email/verify:
+    post:
+      operationId: verifyEmailOtp
+      summary: Exchange an email code for a session
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OtpVerification"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/auth/google:
+    post:
+      operationId: signInWithGoogle
+      summary: Exchange a Google ID token for a session
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GoogleSignIn"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/subscriptions/drivers/{user_id}:
+    get:
+      operationId: getDriverSubscriptionForOps
+      summary: Show a driver's week and payments
+      security: 
+        - bearerAuth: [ops, admin]
+      parameters:
+        - {name: user_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DriverSubscriptionDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/subscriptions/payments/{checkout_request_id}:
+    get:
+      operationId: getPaymentForOps
+      summary: Find a payment by M-Pesa reference
+      security: 
+        - bearerAuth: [ops, admin]
+      parameters:
+        - {name: checkout_request_id, in: path, required: true, schema: {type: string, maxLength: 100}}
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/subscriptions/payments/{checkout_request_id}/recheck:
+    post:
+      operationId: recheckPayment
+      summary: Ask M-Pesa again about a payment
+      security: 
+        - bearerAuth: [ops, admin, "mfa:step-up"]
+      parameters:
+        - {name: checkout_request_id, in: path, required: true, schema: {type: string, maxLength: 100}}
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+
 components:
   parameters:
     ReportId:
@@ -3243,3 +3360,41 @@ components:
         recent:
           type: array
           items: {$ref: "#/components/schemas/IntegrityEvent"}
+
+    EmailOtpRequest:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        email: {type: string, maxLength: 254}
+    GoogleSignIn:
+      type: object
+      additionalProperties: false
+      required: [id_token]
+      properties:
+        id_token: {type: string, maxLength: 8192}
+    PaymentDetail:
+      type: object
+      additionalProperties: false
+      required: [id, driver_id, channel, status, amount_kes, phone_masked, requested_at]
+      properties:
+        id: {type: string, format: uuid}
+        driver_id: {type: string, format: uuid}
+        channel: {type: string}
+        status: {type: string}
+        amount_kes: {type: integer, format: int32}
+        phone_masked: {type: string}
+        receipt: {type: string}
+        requested_at: {type: string, format: date-time}
+        paid_at: {type: string, format: date-time}
+    DriverSubscriptionDetail:
+      type: object
+      additionalProperties: false
+      required: [status, amount_kes, reference, payments]
+      properties:
+        status: {type: string}
+        amount_kes: {type: integer, format: int32}
+        reference: {type: string}
+        payments:
+          type: array
+          items: {$ref: "#/components/schemas/SubscriptionPayment"}

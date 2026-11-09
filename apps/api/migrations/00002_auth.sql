@@ -57,7 +57,8 @@ CREATE TABLE auth_sessions (
 CREATE INDEX auth_sessions_family ON auth_sessions (family_id);
 CREATE INDEX auth_sessions_user ON auth_sessions (user_id);
 
--- ip is sensitive. Rows can be deleted 90 days after created_at.
+-- ip is sensitive. Rows can be deleted a year after created_at, which is long
+-- enough to answer a complaint about a staff action.
 CREATE TABLE audit_events (
     id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     action text NOT NULL,

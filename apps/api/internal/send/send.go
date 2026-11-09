@@ -46,6 +46,7 @@ var (
 	ErrPickupProofFirst = errors.New("pickup proof is required first")
 	ErrAlreadyConfirmed = errors.New("recipient already confirmed")
 	ErrRateLimited      = errors.New("too many uploads")
+	ErrPhoneRequired    = errors.New("sender has no verified phone")
 )
 
 // BlockedError reports an item that cannot be sent.
@@ -168,6 +169,9 @@ func (s *Service) Book(ctx context.Context, r Request) (rides.Ride, error) {
 	if err := r.validate(); err != nil {
 		return rides.Ride{}, err
 	}
+	if r.SenderPhone == "" {
+		return rides.Ride{}, ErrPhoneRequired
+	}
 	recipient, err := auth.NormalizePhone(r.RecipientRaw)
 	if err != nil {
 		return rides.Ride{}, ErrInvalidPhone
@@ -221,7 +225,7 @@ func (s *Service) Get(ctx context.Context, rideID, userID uuid.UUID, phone strin
 		return View{}, fmt.Errorf("load delivery: %w", err)
 	}
 	isDriver := row.DriverID != nil && *row.DriverID == userID
-	if row.RiderID != userID && !isDriver && row.RecipientPhone != phone {
+	if row.RiderID != userID && !isDriver && (phone == "" || row.RecipientPhone != phone) {
 		return View{}, ErrNotFound
 	}
 	out := View{

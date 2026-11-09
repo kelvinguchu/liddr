@@ -190,7 +190,7 @@ func (q *Queries) ExpireDocuments(ctx context.Context, arg ExpireDocumentsParams
 
 const getApplication = `-- name: GetApplication :one
 SELECT a.id, a.driver_id, a.status, a.decided_at, a.decision_reason, a.created_at,
-    d.verification_status AS driver_status, d.plate_number, u.phone
+    d.verification_status AS driver_status, d.plate_number, COALESCE(u.phone, '')::text AS phone
 FROM verification_applications AS a
 JOIN drivers AS d ON d.user_id = a.driver_id
 JOIN users AS u ON u.id = a.driver_id
@@ -639,7 +639,7 @@ func (q *Queries) LastDocumentVersion(ctx context.Context, arg LastDocumentVersi
 
 const listApplications = `-- name: ListApplications :many
 SELECT a.id, a.driver_id, a.status, a.decided_at, a.decision_reason, a.created_at,
-    d.verification_status AS driver_status, d.plate_number, u.phone
+    d.verification_status AS driver_status, d.plate_number, COALESCE(u.phone, '')::text AS phone
 FROM verification_applications AS a
 JOIN drivers AS d ON d.user_id = a.driver_id
 JOIN users AS u ON u.id = a.driver_id

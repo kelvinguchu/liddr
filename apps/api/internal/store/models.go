@@ -35,6 +35,14 @@ type AuthChallenge struct {
 	CreatedAt        time.Time
 }
 
+type AuthIdentity struct {
+	Provider   string
+	Subject    string
+	UserID     uuid.UUID
+	CreatedAt  time.Time
+	LastUsedAt time.Time
+}
+
 type AuthSession struct {
 	ID               uuid.UUID
 	FamilyID         uuid.UUID
@@ -83,6 +91,18 @@ type DriverLocation struct {
 	Lat        float64
 	Lng        float64
 	CapturedAt time.Time
+}
+
+type EmailChallenge struct {
+	ID               uuid.UUID
+	Email            string
+	CodeHash         []byte
+	IpHash           []byte
+	Attempts         int32
+	ExpiresAt        time.Time
+	ClosedAt         *time.Time
+	DeliveryFailedAt *time.Time
+	CreatedAt        time.Time
 }
 
 type MpesaUnmatchedCallback struct {
@@ -402,13 +422,14 @@ type TotpCredential struct {
 
 type User struct {
 	ID                     uuid.UUID
-	Phone                  string
+	Phone                  *string
 	AccountStatus          string
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
 	RatingCenti            *int32
 	RatingCount            int32
 	BookingRestrictedUntil *time.Time
+	Email                  *string
 }
 
 type UserEnforcement struct {

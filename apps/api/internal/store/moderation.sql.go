@@ -308,17 +308,6 @@ func (q *Queries) GetRideParties(ctx context.Context, id uuid.UUID) (GetRidePart
 	return i, err
 }
 
-const getUserPhone = `-- name: GetUserPhone :one
-SELECT phone FROM users WHERE id = $1
-`
-
-func (q *Queries) GetUserPhone(ctx context.Context, id uuid.UUID) (string, error) {
-	row := q.db.QueryRow(ctx, getUserPhone, id)
-	var phone string
-	err := row.Scan(&phone)
-	return phone, err
-}
-
 const insertEnforcement = `-- name: InsertEnforcement :one
 INSERT INTO user_enforcements (id, user_id, report_id, actor_id, action, status, scope, reason_code, reason_text, starts_at, ends_at, created_at)
 VALUES ($1, $2, $3, $4, $5, 'active', $6,

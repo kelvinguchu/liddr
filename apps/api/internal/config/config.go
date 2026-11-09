@@ -2,7 +2,6 @@
 package config
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -69,6 +68,9 @@ type Config struct {
 	OpsAllowedNets   []netip.Prefix
 	Documents        Documents
 	Push             Push
+	Email            Email
+	GoogleClientIDs  []string
+	GoogleCertsURL   string
 	SMS              SMS
 	GoogleMapsKey    Secret
 	GoogleRoutesURL  string
@@ -83,25 +85,6 @@ func LoadDatabaseURL(getenv func(string) string) (Secret, error) {
 		return "", errors.New("DATABASE_URL is required")
 	}
 	return url, nil
-}
-
-// Push configures Firebase. An empty ProjectID leaves notifications in the app
-// inbox, and the server logs that at startup.
-type Push struct {
-	ProjectID      string
-	ServiceAccount Secret
-	BaseURL        string
-	TokenURL       string
-}
-
-// Documents configures driver document storage. An empty Bucket means uploads
-// are unavailable: the server starts, and upload routes report that they cannot
-// serve. Once a bucket is set, the scanner and credentials are mandatory.
-type Documents struct {
-	Bucket         string
-	BaseURL        string
-	ServiceAccount Secret
-	ClamAVAddr     string
 }
 
 // Load validates the environment and reports every problem at once. Errors
@@ -208,6 +191,17 @@ func Load(getenv func(string) string) (Config, error) {
 		errs = append(errs, errors.New("FCM_SERVICE_ACCOUNT_JSON is required with FCM_PROJECT_ID"))
 	}
 
+	cfg.Email = Email{URL: withDefault(getenv("RESEND_API_URL"), "https://api.resend.com/emails"), APIKey: Secret(getenv("RESEND_API_KEY")), From: getenv("OTP_EMAIL_FROM")}
+	if cfg.Email.APIKey != "" && cfg.Email.From == "" {
+		errs = append(errs, errors.New("OTP_EMAIL_FROM is required with RESEND_API_KEY"))
+	}
+	cfg.GoogleCertsURL = withDefault(getenv("GOOGLE_CERTS_URL"), "https://www.googleapis.com/oauth2/v3/certs")
+	for id := range strings.SplitSeq(getenv("GOOGLE_CLIENT_IDS"), ",") {
+		if id = strings.TrimSpace(id); id != "" {
+			cfg.GoogleClientIDs = append(cfg.GoogleClientIDs, id)
+		}
+	}
+
 	hops, err := strconv.Atoi(withDefault(getenv("TRUSTED_PROXY_HOPS"), "0"))
 	if err != nil || hops < 0 {
 		errs = append(errs, errors.New("TRUSTED_PROXY_HOPS must be a non-negative integer"))
@@ -229,39 +223,4 @@ func Load(getenv func(string) string) (Config, error) {
 		return Config{}, err
 	}
 	return cfg, nil
-}
-
-// decodeDataKey expects standard base64 for exactly 32 random bytes.
-func decodeDataKey(encoded string, errs *[]error) Secret {
-	if encoded == "" {
-		return ""
-	}
-	key, err := base64.StdEncoding.DecodeString(encoded)
-	if err != nil || len(key) != dataKeyBytes {
-		*errs = append(*errs, fmt.Errorf("DATA_ENCRYPTION_KEY must be base64 for %d bytes", dataKeyBytes))
-		return ""
-	}
-	return Secret(key)
-}
-
-func mpesaBaseURL(environment string) string {
-	if environment == "production" {
-		return "https://api.safaricom.co.ke"
-	}
-	return "https://sandbox.safaricom.co.ke"
-}
-
-func parseDuration(getenv func(string) string, name, fallback string) (time.Duration, error) {
-	d, err := time.ParseDuration(withDefault(getenv(name), fallback))
-	if err != nil || d < 0 {
-		return 0, fmt.Errorf("%s must be a non-negative duration", name)
-	}
-	return d, nil
-}
-
-func withDefault(value, fallback string) string {
-	if value == "" {
-		return fallback
-	}
-	return value
 }

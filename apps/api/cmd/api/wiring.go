@@ -10,6 +10,7 @@ import (
 
 	"github.com/kelvinguchu/liddr/apps/api/internal/auth"
 	"github.com/kelvinguchu/liddr/apps/api/internal/config"
+	"github.com/kelvinguchu/liddr/apps/api/internal/email"
 	"github.com/kelvinguchu/liddr/apps/api/internal/malware"
 	"github.com/kelvinguchu/liddr/apps/api/internal/notifications"
 	"github.com/kelvinguchu/liddr/apps/api/internal/payments"
@@ -29,6 +30,16 @@ func newAuth(cfg config.Config, pool *pgxpool.Pool) (*auth.Service, error) {
 	if err != nil {
 		return nil, err
 	}
+	// A nil pointer in a non-nil interface would look configured, so the sender
+	// stays a nil interface unless a key is present.
+	var sender auth.EmailSender
+	if cfg.Email.APIKey != "" {
+		sender = email.New(email.Config{URL: cfg.Email.URL, APIKey: cfg.Email.APIKey.Reveal(), From: cfg.Email.From})
+	}
+	var google *auth.GoogleVerifier
+	if len(cfg.GoogleClientIDs) > 0 {
+		google = auth.NewGoogleVerifier(cfg.GoogleCertsURL, cfg.GoogleClientIDs, time.Now)
+	}
 	return auth.NewService(auth.Config{
 		Pool: pool,
 		SMS: sms.NewClient(sms.Config{
@@ -40,6 +51,8 @@ func newAuth(cfg config.Config, pool *pgxpool.Pool) (*auth.Service, error) {
 		}),
 		HMACKey: []byte(cfg.AuthHMACKey.Reveal()),
 		Box:     box,
+		Email:   sender,
+		Google:  google,
 		Now:     time.Now,
 	}), nil
 }

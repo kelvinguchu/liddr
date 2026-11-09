@@ -223,7 +223,7 @@ type account struct {
 // staff sign-in never creates one, because staff roles are granted by operators.
 func resolveAccount(ctx context.Context, q *store.Queries, phone, requestedRole string) (account, error) {
 	if requestedRole == string(RoleStaff) {
-		staff, err := q.GetStaffUserByPhone(ctx, phone)
+		staff, err := q.GetStaffUserByPhone(ctx, new(phone))
 		if errors.Is(err, pgx.ErrNoRows) {
 			return account{}, store.Reject(ErrNotStaff)
 		}
@@ -232,7 +232,7 @@ func resolveAccount(ctx context.Context, q *store.Queries, phone, requestedRole 
 		}
 		return account{id: staff.ID, status: staff.AccountStatus}, nil
 	}
-	user, err := q.UpsertUserByPhone(ctx, phone)
+	user, err := q.UpsertUserByPhone(ctx, new(phone))
 	if err != nil {
 		return account{}, fmt.Errorf("upsert user: %w", err)
 	}

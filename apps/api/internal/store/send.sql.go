@@ -49,7 +49,7 @@ const findUserIDByPhone = `-- name: FindUserIDByPhone :one
 SELECT id FROM users WHERE phone = $1
 `
 
-func (q *Queries) FindUserIDByPhone(ctx context.Context, phone string) (uuid.UUID, error) {
+func (q *Queries) FindUserIDByPhone(ctx context.Context, phone *string) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, findUserIDByPhone, phone)
 	var id uuid.UUID
 	err := row.Scan(&id)

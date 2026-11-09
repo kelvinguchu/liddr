@@ -129,6 +129,7 @@ var problems = []problem{
 	{rides.ErrDropoffProofRequired, http.StatusConflict, "DROPOFF_PROOF_REQUIRED", "Photograph the delivered package first."},
 	{rides.ErrRecipientPending, http.StatusConflict, "RECIPIENT_PENDING", "Waiting for the recipient. You can finish after ten minutes."},
 	{rides.ErrPackageCollected, http.StatusConflict, "PACKAGE_COLLECTED", "The package has already been collected."},
+	{rides.ErrBookingRestricted, http.StatusForbidden, "BOOKING_RESTRICTED", "Bookings are paused after repeated cancellations."},
 	{rides.ErrReassignNotAllowed, http.StatusConflict, "REASSIGN_NOT_AVAILABLE", "Your driver is on the way. You can cancel if your plans changed."},
 	{rides.ErrDestinationWindow, http.StatusConflict, "DESTINATION_WINDOW_CLOSED", "This trip started too long ago to change destination."},
 	{rides.ErrSameDestination, http.StatusBadRequest, "SAME_DESTINATION", "That is already your destination."},

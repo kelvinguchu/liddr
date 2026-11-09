@@ -62,12 +62,21 @@ func (s *Service) Cancel(ctx context.Context, rideID, actorID uuid.UUID, reason 
 		if !slices.Contains(reasons, reason) {
 			return ErrInvalidReason
 		}
+		now := s.now()
 		if side == "rider" {
 			if err := checkSenderCancel(ctx, q, ride); err != nil {
 				return err
 			}
+			if err := s.recordRiderCancel(ctx, q, ride, reason, now); err != nil {
+				return err
+			}
+		} else {
+			err := s.applyStrike(ctx, q, strike{ride: ride.ID, subject: actorID, role: roleDriver, kind: "cancellation", reason: reason, verdict: classifyDriverCancel(reason), now: now})
+			if err != nil {
+				return err
+			}
 		}
-		return cancelLocked(ctx, q, ride, actorID, side, reason, s.now())
+		return cancelLocked(ctx, q, ride, actorID, side, reason, now)
 	})
 	if err != nil {
 		return Ride{}, err
@@ -98,6 +107,10 @@ func (s *Service) MarkNoShow(ctx context.Context, rideID, driverID uuid.UUID) (R
 		}
 		target, radiusM, farErr := pickupFence(ride)
 		if _, err := checkFence(ctx, q, driverID, target, radiusM, farErr, now); err != nil {
+			return err
+		}
+		err = s.applyStrike(ctx, q, strike{ride: ride.ID, subject: ride.RiderID, role: roleRider, kind: "no_show", reason: reasonRiderNoShow, verdict: verdict{chargeable: true}, now: now})
+		if err != nil {
 			return err
 		}
 		return cancelLocked(ctx, q, ride, driverID, "driver", reasonRiderNoShow, now)

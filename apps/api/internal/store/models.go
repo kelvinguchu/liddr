@@ -243,6 +243,18 @@ type RideEvent struct {
 	OccurredAt  time.Time
 }
 
+type RideIntegrityEvent struct {
+	ID            int64
+	RideID        uuid.UUID
+	SubjectID     uuid.UUID
+	SubjectRole   string
+	ViolationType string
+	ReasonCode    string
+	Chargeable    bool
+	WaiverCode    *string
+	OccurredAt    time.Time
+}
+
 type RideMessage struct {
 	Seq                  int64
 	ID                   uuid.UUID
@@ -389,13 +401,14 @@ type TotpCredential struct {
 }
 
 type User struct {
-	ID            uuid.UUID
-	Phone         string
-	AccountStatus string
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-	RatingCenti   *int32
-	RatingCount   int32
+	ID                     uuid.UUID
+	Phone                  string
+	AccountStatus          string
+	CreatedAt              time.Time
+	UpdatedAt              time.Time
+	RatingCenti            *int32
+	RatingCount            int32
+	BookingRestrictedUntil *time.Time
 }
 
 type UserEnforcement struct {

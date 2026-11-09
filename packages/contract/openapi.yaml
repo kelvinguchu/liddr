@@ -1854,6 +1854,40 @@ paths:
         default:
           $ref: "#/components/responses/Problem"
 
+  /v1/rides/integrity/me:
+    get:
+      operationId: getMyIntegrity
+      summary: Report this account's cancellation record
+      security:
+        - bearerAuth: [rider, driver]
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntegrityStanding"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/rides/integrity/users/{user_id}:
+    get:
+      operationId: getUserIntegrity
+      summary: Report one account's recent strikes
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - {name: user_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntegrityDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+
 components:
   parameters:
     ReportId:
@@ -3180,3 +3214,32 @@ components:
         data:
           type: array
           items: {$ref: "#/components/schemas/RideTimelineEntry"}
+
+    IntegrityStanding:
+      type: object
+      additionalProperties: false
+      required: [rider_strikes, driver_strikes, threshold]
+      properties:
+        rider_strikes: {type: integer, format: int64}
+        driver_strikes: {type: integer, format: int64}
+        threshold: {type: integer, format: int32}
+        booking_restricted_until: {type: string, format: date-time}
+    IntegrityEvent:
+      type: object
+      additionalProperties: false
+      required: [ride_id, role, kind, reason, occurred_at]
+      properties:
+        ride_id: {type: string, format: uuid}
+        role: {type: string}
+        kind: {type: string}
+        reason: {type: string}
+        occurred_at: {type: string, format: date-time}
+    IntegrityDetail:
+      type: object
+      additionalProperties: false
+      required: [standing, recent]
+      properties:
+        standing: {$ref: "#/components/schemas/IntegrityStanding"}
+        recent:
+          type: array
+          items: {$ref: "#/components/schemas/IntegrityEvent"}

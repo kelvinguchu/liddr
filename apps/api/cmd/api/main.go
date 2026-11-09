@@ -106,9 +106,10 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	}
 	moderator := moderation.NewService(moderation.Config{Pool: pool, Now: time.Now})
 	bookings := rides.NewService(rides.Config{
-		Pool:   pool,
-		Routes: maps.NewClient(cfg.GoogleRoutesURL, cfg.GoogleMapsKey.Reveal()),
-		Now:    time.Now,
+		Pool:       pool,
+		Routes:     maps.NewClient(cfg.GoogleRoutesURL, cfg.GoogleMapsKey.Reveal()),
+		Moderation: moderator,
+		Now:        time.Now,
 	})
 	delivery, err := newSend(cfg, pool, bookings)
 	if err != nil {

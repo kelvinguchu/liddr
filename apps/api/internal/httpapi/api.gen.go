@@ -976,6 +976,29 @@ type Health struct {
 // HealthStatus defines model for Health.Status.
 type HealthStatus string
 
+// IntegrityDetail defines model for IntegrityDetail.
+type IntegrityDetail struct {
+	Recent   []IntegrityEvent  `json:"recent"`
+	Standing IntegrityStanding `json:"standing"`
+}
+
+// IntegrityEvent defines model for IntegrityEvent.
+type IntegrityEvent struct {
+	Kind       string             `json:"kind"`
+	OccurredAt time.Time          `json:"occurred_at"`
+	Reason     string             `json:"reason"`
+	RideId     openapi_types.UUID `json:"ride_id"`
+	Role       string             `json:"role"`
+}
+
+// IntegrityStanding defines model for IntegrityStanding.
+type IntegrityStanding struct {
+	BookingRestrictedUntil *time.Time `json:"booking_restricted_until,omitempty"`
+	DriverStrikes          int64      `json:"driver_strikes"`
+	RiderStrikes           int64      `json:"rider_strikes"`
+	Threshold              int32      `json:"threshold"`
+}
+
 // MarkPaidRequest defines model for MarkPaidRequest.
 type MarkPaidRequest struct {
 	Channel   MarkPaidRequestChannel `json:"channel"`
@@ -1955,6 +1978,9 @@ type ServerInterface interface {
 	// ReinstateRating Return a rating to the score
 	// (POST /v1/ops/ratings/{rating_id}/reinstate)
 	ReinstateRating(w http.ResponseWriter, r *http.Request, ratingId RatingId)
+	// GetUserIntegrity Report one account's recent strikes
+	// (GET /v1/ops/rides/integrity/users/{user_id})
+	GetUserIntegrity(w http.ResponseWriter, r *http.Request, userId openapi_types.UUID)
 	// ListProhibitedItems List item screening rules
 	// (GET /v1/ops/send/prohibited-items)
 	ListProhibitedItems(w http.ResponseWriter, r *http.Request)
@@ -2000,6 +2026,9 @@ type ServerInterface interface {
 	// ListRideHistory List past and current trips
 	// (GET /v1/rides/history)
 	ListRideHistory(w http.ResponseWriter, r *http.Request, params ListRideHistoryParams)
+	// GetMyIntegrity Report this account's cancellation record
+	// (GET /v1/rides/integrity/me)
+	GetMyIntegrity(w http.ResponseWriter, r *http.Request)
 	// ListQuickActions List canned chat messages
 	// (GET /v1/rides/messages/quick-actions)
 	ListQuickActions(w http.ResponseWriter, r *http.Request)
@@ -3380,6 +3409,38 @@ func (siw *ServerInterfaceWrapper) ReinstateRating(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
+// GetUserIntegrity operation middleware
+func (siw *ServerInterfaceWrapper) GetUserIntegrity(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "user_id" -------------
+	var userId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", r.PathValue("user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetUserIntegrity(w, r, userId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListProhibitedItems operation middleware
 func (siw *ServerInterfaceWrapper) ListProhibitedItems(w http.ResponseWriter, r *http.Request) {
 
@@ -3843,6 +3904,26 @@ func (siw *ServerInterfaceWrapper) ListRideHistory(w http.ResponseWriter, r *htt
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListRideHistory(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMyIntegrity operation middleware
+func (siw *ServerInterfaceWrapper) GetMyIntegrity(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider", "driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMyIntegrity(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -5264,6 +5345,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides/{ride_id}/destination-changes/{change_id}/reject", wrapper.RejectDestinationChange)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/rides/history", wrapper.ListRideHistory)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/rides/{ride_id}/events", wrapper.ListRideEvents)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/rides/integrity/me", wrapper.GetMyIntegrity)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/ops/rides/integrity/users/{user_id}", wrapper.GetUserIntegrity)
 
 	return m
 }
@@ -6725,6 +6808,45 @@ func (response ReinstateRatingdefaultJSONResponse) VisitReinstateRatingResponse(
 	return err
 }
 
+type GetUserIntegrityRequestObject struct {
+	UserId openapi_types.UUID `json:"user_id"`
+}
+
+type GetUserIntegrityResponseObject interface {
+	VisitGetUserIntegrityResponse(w http.ResponseWriter) error
+}
+
+type GetUserIntegrity200JSONResponse IntegrityDetail
+
+func (response GetUserIntegrity200JSONResponse) VisitGetUserIntegrityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetUserIntegritydefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetUserIntegritydefaultJSONResponse) VisitGetUserIntegrityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListProhibitedItemsRequestObject struct {
 }
 
@@ -7269,6 +7391,44 @@ type ListRideHistorydefaultJSONResponse struct {
 }
 
 func (response ListRideHistorydefaultJSONResponse) VisitListRideHistoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMyIntegrityRequestObject struct {
+}
+
+type GetMyIntegrityResponseObject interface {
+	VisitGetMyIntegrityResponse(w http.ResponseWriter) error
+}
+
+type GetMyIntegrity200JSONResponse IntegrityStanding
+
+func (response GetMyIntegrity200JSONResponse) VisitGetMyIntegrityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMyIntegritydefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetMyIntegritydefaultJSONResponse) VisitGetMyIntegrityResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -8915,6 +9075,9 @@ type StrictServerInterface interface {
 	// ReinstateRating Return a rating to the score
 	// (POST /v1/ops/ratings/{rating_id}/reinstate)
 	ReinstateRating(ctx context.Context, request ReinstateRatingRequestObject) (ReinstateRatingResponseObject, error)
+	// GetUserIntegrity Report one account's recent strikes
+	// (GET /v1/ops/rides/integrity/users/{user_id})
+	GetUserIntegrity(ctx context.Context, request GetUserIntegrityRequestObject) (GetUserIntegrityResponseObject, error)
 	// ListProhibitedItems List item screening rules
 	// (GET /v1/ops/send/prohibited-items)
 	ListProhibitedItems(ctx context.Context, request ListProhibitedItemsRequestObject) (ListProhibitedItemsResponseObject, error)
@@ -8960,6 +9123,9 @@ type StrictServerInterface interface {
 	// ListRideHistory List past and current trips
 	// (GET /v1/rides/history)
 	ListRideHistory(ctx context.Context, request ListRideHistoryRequestObject) (ListRideHistoryResponseObject, error)
+	// GetMyIntegrity Report this account's cancellation record
+	// (GET /v1/rides/integrity/me)
+	GetMyIntegrity(ctx context.Context, request GetMyIntegrityRequestObject) (GetMyIntegrityResponseObject, error)
 	// ListQuickActions List canned chat messages
 	// (GET /v1/rides/messages/quick-actions)
 	ListQuickActions(ctx context.Context, request ListQuickActionsRequestObject) (ListQuickActionsResponseObject, error)
@@ -10204,6 +10370,32 @@ func (sh *strictHandler) ReinstateRating(w http.ResponseWriter, r *http.Request,
 	}
 }
 
+// GetUserIntegrity operation middleware
+func (sh *strictHandler) GetUserIntegrity(w http.ResponseWriter, r *http.Request, userId openapi_types.UUID) {
+	var request GetUserIntegrityRequestObject
+
+	request.UserId = userId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetUserIntegrity(ctx, request.(GetUserIntegrityRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetUserIntegrity")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetUserIntegrityResponseObject); ok {
+		if err := validResponse.VisitGetUserIntegrityResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListProhibitedItems operation middleware
 func (sh *strictHandler) ListProhibitedItems(w http.ResponseWriter, r *http.Request) {
 	var request ListProhibitedItemsRequestObject
@@ -10621,6 +10813,30 @@ func (sh *strictHandler) ListRideHistory(w http.ResponseWriter, r *http.Request,
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListRideHistoryResponseObject); ok {
 		if err := validResponse.VisitListRideHistoryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetMyIntegrity operation middleware
+func (sh *strictHandler) GetMyIntegrity(w http.ResponseWriter, r *http.Request) {
+	var request GetMyIntegrityRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetMyIntegrity(ctx, request.(GetMyIntegrityRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMyIntegrity")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetMyIntegrityResponseObject); ok {
+		if err := validResponse.VisitGetMyIntegrityResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

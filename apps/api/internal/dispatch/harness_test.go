@@ -15,6 +15,7 @@ import (
 	"github.com/kelvinguchu/liddr/apps/api/internal/dispatch"
 	"github.com/kelvinguchu/liddr/apps/api/internal/geo"
 	"github.com/kelvinguchu/liddr/apps/api/internal/maps"
+	"github.com/kelvinguchu/liddr/apps/api/internal/moderation"
 	"github.com/kelvinguchu/liddr/apps/api/internal/rides"
 	"github.com/kelvinguchu/liddr/apps/api/internal/testdb"
 )
@@ -66,7 +67,7 @@ func newHarness(t *testing.T) *harness {
 	// 09:00 UTC is midday in Nairobi on a Monday, when there is no time surge.
 	c := &clock{now: time.Date(2026, 11, 9, 9, 0, 0, 0, time.UTC)}
 	return &harness{
-		rides:      rides.NewService(rides.Config{Pool: pool, Routes: maps.NewClient(google.URL, "key"), Now: c.Now}),
+		rides:      rides.NewService(rides.Config{Pool: pool, Routes: maps.NewClient(google.URL, "key"), Moderation: moderation.NewService(moderation.Config{Pool: pool, Now: c.Now}), Now: c.Now}),
 		dispatch:   dispatch.NewService(dispatch.Config{Pool: pool, Now: c.Now}),
 		pool:       pool,
 		clock:      c,

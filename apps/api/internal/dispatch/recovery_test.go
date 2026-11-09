@@ -91,6 +91,19 @@ func TestWatchdog(t *testing.T) {
 			t.Errorf("status = %s", got)
 		}
 	})
+	t.Run("leaves a long pickup alone while the driver is closing in", func(t *testing.T) {
+		h := newHarness(t)
+		ride, _, driver := h.acceptedRide(t)
+		h.exec(t, `UPDATE rides SET pickup_distance_m_at_accept = 6000, pickup_eta_s_at_accept = 1100 WHERE id = $1`, ride.ID)
+		h.clock.Advance(450 * time.Second)
+		h.moveDriver(t, driver, near(3000))
+		if err := h.rides.CheckPickups(t.Context()); err != nil {
+			t.Fatalf("CheckPickups: %v", err)
+		}
+		if got := h.status(t, ride.ID); got != rides.StatusAccepted {
+			t.Errorf("a driver on the way was replaced: %s", got)
+		}
+	})
 	t.Run("finds another driver and records no rider as the actor", func(t *testing.T) {
 		h := newHarness(t)
 		ride, _, _ := h.acceptedRide(t)
@@ -222,6 +235,15 @@ func TestDestinationChangeRules(t *testing.T) {
 	if _, err := h.rides.RequestDestination(t.Context(), rides.DestinationRequest{RideID: ride.ID, RiderID: rider, Dropoff: elsewhere, Reason: "other"}); !errors.Is(err, rides.ErrDestinationLimit) {
 		t.Errorf("third request = %v", err)
 	}
+}
+
+func TestAnUnansweredRequestDoesNotBlockTheRider(t *testing.T) {
+	h := newHarness(t)
+	ride, rider, driver := h.tripUnderWay(t)
+	h.askDestination(t, ride.ID, rider)
+	h.clock.Advance(181 * time.Second)
+	h.moveDriver(t, driver, near(600))
+	h.askDestination(t, ride.ID, rider)
 }
 
 func TestDestinationCannotChangeBeforeTheTripOrOnADelivery(t *testing.T) {

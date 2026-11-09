@@ -211,3 +211,26 @@ LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);
 
 -- name: ListRideEvents :many
 SELECT from_status, to_status, reason, occurred_at FROM ride_events WHERE ride_id = sqlc.arg(ride_id) ORDER BY occurred_at, id;
+
+-- name: InsertIntegrityEvent :exec
+INSERT INTO ride_integrity_events (ride_id, subject_id, subject_role, violation_type, reason_code, chargeable, waiver_code, occurred_at)
+VALUES (sqlc.arg(ride_id), sqlc.arg(subject_id), sqlc.arg(subject_role), sqlc.arg(violation_type), sqlc.arg(reason_code),
+    sqlc.arg(chargeable), sqlc.arg(waiver_code), sqlc.arg(now))
+ON CONFLICT (ride_id) DO NOTHING;
+
+-- name: CountChargeableEvents :one
+SELECT count(*) FROM ride_integrity_events
+WHERE subject_id = sqlc.arg(subject_id) AND subject_role = sqlc.arg(subject_role) AND chargeable AND occurred_at >= sqlc.arg(since);
+
+-- name: ListChargeableEvents :many
+SELECT ride_id, subject_role, violation_type, reason_code, occurred_at FROM ride_integrity_events
+WHERE subject_id = sqlc.arg(subject_id) AND chargeable AND occurred_at >= sqlc.arg(since)
+ORDER BY occurred_at DESC
+LIMIT sqlc.arg(row_limit);
+
+-- A restriction is only ever extended, so a short one cannot cut a long one short.
+-- name: RestrictBooking :exec
+UPDATE users SET booking_restricted_until = GREATEST(booking_restricted_until, sqlc.arg(until)) WHERE id = sqlc.arg(id);
+
+-- name: GetBookingRestriction :one
+SELECT booking_restricted_until FROM users WHERE id = sqlc.arg(id);

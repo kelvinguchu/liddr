@@ -133,3 +133,37 @@ func (a *API) ListRideEvents(ctx context.Context, req ListRideEventsRequestObjec
 	}
 	return ListRideEvents200JSONResponse{Data: data}, nil
 }
+
+func toStanding(s rides.IntegrityStanding) IntegrityStanding {
+	return IntegrityStanding{RiderStrikes: s.RiderStrikes, DriverStrikes: s.DriverStrikes, Threshold: s.Threshold, BookingRestrictedUntil: s.BookingRestricted}
+}
+
+// GetMyIntegrity reports the caller's cancellation record.
+func (a *API) GetMyIntegrity(ctx context.Context, _ GetMyIntegrityRequestObject) (GetMyIntegrityResponseObject, error) {
+	actor, err := actorID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	standing, err := a.deps.Rides.Standing(ctx, actor)
+	if err != nil {
+		return nil, err
+	}
+	return GetMyIntegrity200JSONResponse(toStanding(standing)), nil
+}
+
+// GetUserIntegrity reports one account's strikes to staff.
+func (a *API) GetUserIntegrity(ctx context.Context, req GetUserIntegrityRequestObject) (GetUserIntegrityResponseObject, error) {
+	standing, err := a.deps.Rides.Standing(ctx, req.UserId)
+	if err != nil {
+		return nil, err
+	}
+	events, err := a.deps.Rides.RecentStrikes(ctx, req.UserId)
+	if err != nil {
+		return nil, err
+	}
+	recent := make([]IntegrityEvent, len(events))
+	for i, e := range events {
+		recent[i] = IntegrityEvent{RideId: e.RideID, Role: e.Role, Kind: e.Kind, Reason: e.Reason, OccurredAt: e.OccurredAt}
+	}
+	return GetUserIntegrity200JSONResponse{Standing: toStanding(standing), Recent: recent}, nil
+}

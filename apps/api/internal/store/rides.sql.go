@@ -76,6 +76,24 @@ func (q *Queries) CountAvailableDrivers(ctx context.Context, arg CountAvailableD
 	return count, err
 }
 
+const countChargeableEvents = `-- name: CountChargeableEvents :one
+SELECT count(*) FROM ride_integrity_events
+WHERE subject_id = $1 AND subject_role = $2 AND chargeable AND occurred_at >= $3
+`
+
+type CountChargeableEventsParams struct {
+	SubjectID   uuid.UUID
+	SubjectRole string
+	Since       time.Time
+}
+
+func (q *Queries) CountChargeableEvents(ctx context.Context, arg CountChargeableEventsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countChargeableEvents, arg.SubjectID, arg.SubjectRole, arg.Since)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countDestinationChanges = `-- name: CountDestinationChanges :one
 SELECT count(*) FROM ride_destination_changes WHERE ride_id = $1
 `
@@ -225,6 +243,17 @@ func (q *Queries) GetActiveCategoryBySlug(ctx context.Context, slug string) (Get
 		&i.SearchRadiusM,
 	)
 	return i, err
+}
+
+const getBookingRestriction = `-- name: GetBookingRestriction :one
+SELECT booking_restricted_until FROM users WHERE id = $1
+`
+
+func (q *Queries) GetBookingRestriction(ctx context.Context, id uuid.UUID) (*time.Time, error) {
+	row := q.db.QueryRow(ctx, getBookingRestriction, id)
+	var booking_restricted_until *time.Time
+	err := row.Scan(&booking_restricted_until)
+	return booking_restricted_until, err
 }
 
 const getCategoryRates = `-- name: GetCategoryRates :one
@@ -591,6 +620,38 @@ func (q *Queries) InsertDestinationChange(ctx context.Context, arg InsertDestina
 	return err
 }
 
+const insertIntegrityEvent = `-- name: InsertIntegrityEvent :exec
+INSERT INTO ride_integrity_events (ride_id, subject_id, subject_role, violation_type, reason_code, chargeable, waiver_code, occurred_at)
+VALUES ($1, $2, $3, $4, $5,
+    $6, $7, $8)
+ON CONFLICT (ride_id) DO NOTHING
+`
+
+type InsertIntegrityEventParams struct {
+	RideID        uuid.UUID
+	SubjectID     uuid.UUID
+	SubjectRole   string
+	ViolationType string
+	ReasonCode    string
+	Chargeable    bool
+	WaiverCode    *string
+	Now           time.Time
+}
+
+func (q *Queries) InsertIntegrityEvent(ctx context.Context, arg InsertIntegrityEventParams) error {
+	_, err := q.db.Exec(ctx, insertIntegrityEvent,
+		arg.RideID,
+		arg.SubjectID,
+		arg.SubjectRole,
+		arg.ViolationType,
+		arg.ReasonCode,
+		arg.Chargeable,
+		arg.WaiverCode,
+		arg.Now,
+	)
+	return err
+}
+
 const insertQuote = `-- name: InsertQuote :exec
 INSERT INTO ride_quotes (
     id, rider_id, vehicle_category_id, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng,
@@ -731,6 +792,53 @@ func (q *Queries) LatestDestinationChangeAt(ctx context.Context, rideID uuid.UUI
 	var requested_at time.Time
 	err := row.Scan(&requested_at)
 	return requested_at, err
+}
+
+const listChargeableEvents = `-- name: ListChargeableEvents :many
+SELECT ride_id, subject_role, violation_type, reason_code, occurred_at FROM ride_integrity_events
+WHERE subject_id = $1 AND chargeable AND occurred_at >= $2
+ORDER BY occurred_at DESC
+LIMIT $3
+`
+
+type ListChargeableEventsParams struct {
+	SubjectID uuid.UUID
+	Since     time.Time
+	RowLimit  int32
+}
+
+type ListChargeableEventsRow struct {
+	RideID        uuid.UUID
+	SubjectRole   string
+	ViolationType string
+	ReasonCode    string
+	OccurredAt    time.Time
+}
+
+func (q *Queries) ListChargeableEvents(ctx context.Context, arg ListChargeableEventsParams) ([]ListChargeableEventsRow, error) {
+	rows, err := q.db.Query(ctx, listChargeableEvents, arg.SubjectID, arg.Since, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListChargeableEventsRow{}
+	for rows.Next() {
+		var i ListChargeableEventsRow
+		if err := rows.Scan(
+			&i.RideID,
+			&i.SubjectRole,
+			&i.ViolationType,
+			&i.ReasonCode,
+			&i.OccurredAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listDestinationChanges = `-- name: ListDestinationChanges :many
@@ -1000,6 +1108,21 @@ type ResetRideForDispatchParams struct {
 
 func (q *Queries) ResetRideForDispatch(ctx context.Context, arg ResetRideForDispatchParams) error {
 	_, err := q.db.Exec(ctx, resetRideForDispatch, arg.Now, arg.SearchExpiresAt, arg.ID)
+	return err
+}
+
+const restrictBooking = `-- name: RestrictBooking :exec
+UPDATE users SET booking_restricted_until = GREATEST(booking_restricted_until, $1) WHERE id = $2
+`
+
+type RestrictBookingParams struct {
+	Until *time.Time
+	ID    uuid.UUID
+}
+
+// A restriction is only ever extended, so a short one cannot cut a long one short.
+func (q *Queries) RestrictBooking(ctx context.Context, arg RestrictBookingParams) error {
+	_, err := q.db.Exec(ctx, restrictBooking, arg.Until, arg.ID)
 	return err
 }
 

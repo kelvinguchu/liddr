@@ -12,6 +12,7 @@ import (
 
 	"github.com/kelvinguchu/liddr/apps/api/internal/geo"
 	"github.com/kelvinguchu/liddr/apps/api/internal/maps"
+	"github.com/kelvinguchu/liddr/apps/api/internal/moderation"
 	"github.com/kelvinguchu/liddr/apps/api/internal/store"
 )
 
@@ -39,6 +40,7 @@ var (
 	ErrRecipientPending     = errors.New("waiting for the recipient to confirm")
 	ErrPackageCollected     = errors.New("package has already been collected")
 
+	ErrBookingRestricted   = errors.New("bookings are paused after repeated cancellations")
 	ErrReassignNotAllowed  = errors.New("driver shows no sign of trouble")
 	ErrDestinationWindow   = errors.New("trip started too long ago to change destination")
 	ErrSameDestination     = errors.New("that is already the destination")
@@ -57,20 +59,23 @@ type RouteFinder interface {
 type Config struct {
 	Pool   *pgxpool.Pool
 	Routes RouteFinder
-	Now    func() time.Time
+	// Moderation applies suspensions for repeated cancellations.
+	Moderation *moderation.Service
+	Now        func() time.Time
 }
 
 // Service implements quoting, booking and the trip lifecycle.
 type Service struct {
-	pool    *pgxpool.Pool
-	queries *store.Queries
-	routes  RouteFinder
-	now     func() time.Time
+	pool       *pgxpool.Pool
+	queries    *store.Queries
+	routes     RouteFinder
+	now        func() time.Time
+	moderation *moderation.Service
 }
 
 // NewService returns a Service using cfg.
 func NewService(cfg Config) *Service {
-	return &Service{pool: cfg.Pool, queries: store.New(cfg.Pool), routes: cfg.Routes, now: cfg.Now}
+	return &Service{pool: cfg.Pool, queries: store.New(cfg.Pool), routes: cfg.Routes, moderation: cfg.Moderation, now: cfg.Now}
 }
 
 // Ride is a ride as shown to one of its participants.

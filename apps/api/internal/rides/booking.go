@@ -115,6 +115,13 @@ func (s *Service) book(ctx context.Context, riderID, quoteID uuid.UUID, record D
 }
 
 func checkBookingAllowed(ctx context.Context, q *store.Queries, riderID uuid.UUID, now time.Time) error {
+	restricted, err := q.GetBookingRestriction(ctx, riderID)
+	if err != nil {
+		return fmt.Errorf("load booking restriction: %w", err)
+	}
+	if restricted != nil && now.Before(*restricted) {
+		return ErrBookingRestricted
+	}
 	active, err := q.RiderHasActiveRide(ctx, riderID)
 	if err != nil {
 		return fmt.Errorf("check active ride: %w", err)

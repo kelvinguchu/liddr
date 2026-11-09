@@ -40,6 +40,7 @@ var (
 	ErrRecipientPending     = errors.New("waiting for the recipient to confirm")
 	ErrPackageCollected     = errors.New("package has already been collected")
 
+	ErrUserNotFound        = errors.New("account not found")
 	ErrMemberNotFound      = errors.New("passenger not found")
 	ErrNotShared           = errors.New("ride is not a shared ride")
 	ErrMembersPending      = errors.New("passengers are still on the trip")

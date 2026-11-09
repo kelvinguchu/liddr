@@ -1,7 +1,6 @@
 package dispatch
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -104,6 +103,7 @@ func schedule(ctx context.Context, q *store.Queries, rideID uuid.UUID, at time.T
 type candidate struct {
 	driverID  uuid.UUID
 	distanceM int32
+	rating    float64
 }
 
 func sendWave(ctx context.Context, q *store.Queries, ride store.ClaimDueRideRow, now time.Time) error {
@@ -126,10 +126,10 @@ func sendWave(ctx context.Context, q *store.Queries, ride store.ClaimDueRideRow,
 	for _, row := range rows {
 		distance := geo.DistanceM(pickup, geo.Point{Lat: row.Lat, Lng: row.Lng})
 		if distance <= radiusM {
-			candidates = append(candidates, candidate{driverID: row.DriverID, distanceM: int32(distance)})
+			candidates = append(candidates, candidate{driverID: row.DriverID, distanceM: int32(distance), rating: ratingScore(row.RatingCenti, row.RatingCount)})
 		}
 	}
-	slices.SortFunc(candidates, func(a, b candidate) int { return cmp.Compare(a.distanceM, b.distanceM) })
+	slices.SortFunc(candidates, compareCandidates)
 
 	sent := 0
 	expiresAt := now.Add(offerTTL)

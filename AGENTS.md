@@ -3,7 +3,7 @@
 Ride-hailing and delivery platform for Kenya: Go API, Postgres, Redis, WebSockets, background jobs, M-Pesa, and an Android app.
 
 Layout: `go.work` at the root, the Go API in `apps/api`, the Android app in `apps/android`, and the old Elixir backend in `legacy/api`.
-Product rules: `docs/aboutapp.md` and the policy docs in `docs/`. Status: sign-in, solo rides, dispatch, M-Pesa subscriptions and live updates are ported. Other domains are still only in `legacy/api`. Treat `legacy/api` as a business-rule reference, not as design or proof of correctness.
+Product rules: `docs/aboutapp.md` and the policy docs in `docs/`. Status: the API domains in `legacy/api` are ported to Go. Android still needs updating to the new contract. Treat `legacy/api` as a business-rule reference, not as design or proof of correctness.
 
 ## Priorities
 
@@ -34,6 +34,7 @@ make check                                # formatting, lint, vet, tests with -r
 make generate                             # after editing the contract, queries or migrations
 make install-lint                         # pinned golangci-lint
 make seed-test-prices                     # KES 10-30 subscriptions for real-money tests; test databases only
+go run ./cmd/api grant-role 07XXXXXXXX ops  # the only way to create ops or admin accounts
 go test ./internal/rides -run 'TestComplete/final_fare'
 go test -fuzz=FuzzParseSTKCallback -fuzztime=30s ./internal/payments
 govulncheck ./...                         # gate CI on text mode; -json always exits 0
@@ -62,7 +63,10 @@ internal/dispatch  driver availability and location, offers, the dispatch worker
 internal/events    realtime events, published through Postgres notifications
 internal/geo, maps coordinates and Google Routes
 internal/payments  M-Pesa client and callback parsers
-internal/subscriptions, send, disputes, verification, moderation, ratings
+internal/subscriptions, send, disputes, verification, moderation, ratings, messages
+internal/notifications, push, email   inbox, Firebase, Resend
+internal/storage, malware, sealing    signed URLs, ClamAV, column encryption
+internal/retention                    deletes data when its retention period ends
 internal/store     sqlc output and transaction helper
 migrations/  queries/  testdata/
 ```

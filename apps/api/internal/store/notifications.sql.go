@@ -211,6 +211,54 @@ func (q *Queries) ListNotifications(ctx context.Context, arg ListNotificationsPa
 	return items, nil
 }
 
+const listRideNotifications = `-- name: ListRideNotifications :many
+SELECT id, user_id, event_type, status, push_status, push_attempts, acked_at, created_at
+FROM notifications
+WHERE ride_id = $1
+ORDER BY created_at DESC
+LIMIT 200
+`
+
+type ListRideNotificationsRow struct {
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	EventType    string
+	Status       *string
+	PushStatus   string
+	PushAttempts int32
+	AckedAt      *time.Time
+	CreatedAt    time.Time
+}
+
+func (q *Queries) ListRideNotifications(ctx context.Context, rideID *uuid.UUID) ([]ListRideNotificationsRow, error) {
+	rows, err := q.db.Query(ctx, listRideNotifications, rideID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListRideNotificationsRow{}
+	for rows.Next() {
+		var i ListRideNotificationsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.EventType,
+			&i.Status,
+			&i.PushStatus,
+			&i.PushAttempts,
+			&i.AckedAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const revokeFamilyPushTokens = `-- name: RevokeFamilyPushTokens :exec
 UPDATE push_tokens SET revoked_at = $1 WHERE family_id = $2 AND revoked_at IS NULL
 `

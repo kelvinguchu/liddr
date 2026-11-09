@@ -71,7 +71,7 @@ SET next_dispatch_at = sqlc.arg(next_dispatch_at), dispatch_wave = sqlc.arg(disp
 WHERE id = sqlc.arg(id);
 
 -- name: ListDriverCandidates :many
-SELECT l.driver_id, l.lat, l.lng
+SELECT l.driver_id, l.lat, l.lng, u.rating_centi, u.rating_count
 FROM driver_locations AS l
 JOIN drivers AS d ON d.user_id = l.driver_id
 JOIN users AS u ON u.id = d.user_id

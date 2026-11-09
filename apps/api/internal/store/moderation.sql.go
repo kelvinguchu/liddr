@@ -50,6 +50,18 @@ func (q *Queries) ClaimDueEnforcements(ctx context.Context, arg ClaimDueEnforcem
 	return items, nil
 }
 
+const countOverdueSuspensions = `-- name: CountOverdueSuspensions :one
+SELECT count(*) FROM user_enforcements
+WHERE status = 'active' AND action = 'temporary_suspension' AND ends_at <= $1
+`
+
+func (q *Queries) CountOverdueSuspensions(ctx context.Context, now *time.Time) (int64, error) {
+	row := q.db.QueryRow(ctx, countOverdueSuspensions, now)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countReportsSince = `-- name: CountReportsSince :one
 SELECT count(*) FROM reports WHERE reporter_id = $1 AND created_at > $2
 `
@@ -64,6 +76,36 @@ func (q *Queries) CountReportsSince(ctx context.Context, arg CountReportsSincePa
 	var count int64
 	err := row.Scan(&count)
 	return count, err
+}
+
+const enforcementCounts = `-- name: EnforcementCounts :many
+SELECT action, status, count(*)::bigint AS total FROM user_enforcements GROUP BY action, status ORDER BY action, status
+`
+
+type EnforcementCountsRow struct {
+	Action string
+	Status string
+	Total  int64
+}
+
+func (q *Queries) EnforcementCounts(ctx context.Context) ([]EnforcementCountsRow, error) {
+	rows, err := q.db.Query(ctx, enforcementCounts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []EnforcementCountsRow{}
+	for rows.Next() {
+		var i EnforcementCountsRow
+		if err := rows.Scan(&i.Action, &i.Status, &i.Total); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const finishEnforcement = `-- name: FinishEnforcement :exec

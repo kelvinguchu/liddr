@@ -69,3 +69,10 @@ UPDATE push_tokens SET revoked_at = sqlc.arg(now) WHERE id = sqlc.arg(id);
 SELECT id, token FROM push_tokens
 WHERE user_id = sqlc.arg(user_id) AND revoked_at IS NULL
 ORDER BY last_seen_at DESC;
+
+-- name: ListRideNotifications :many
+SELECT id, user_id, event_type, status, push_status, push_attempts, acked_at, created_at
+FROM notifications
+WHERE ride_id = sqlc.arg(ride_id)
+ORDER BY created_at DESC
+LIMIT 200;

@@ -176,6 +176,9 @@ func (s *Service) Standing(ctx context.Context, userID uuid.UUID) (IntegrityStan
 		return IntegrityStanding{}, fmt.Errorf("count driver events: %w", err)
 	}
 	until, err := s.queries.GetBookingRestriction(ctx, userID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return IntegrityStanding{}, ErrUserNotFound
+	}
 	if err != nil {
 		return IntegrityStanding{}, fmt.Errorf("load restriction: %w", err)
 	}

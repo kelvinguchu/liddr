@@ -94,6 +94,22 @@ func (s *Service) ReviewDocument(ctx context.Context, documentID uuid.UUID, deci
 	})
 }
 
+// BulkResult is the outcome for one document in a batch.
+type BulkResult struct {
+	DocumentID uuid.UUID
+	Err        error
+}
+
+// ReviewDocuments applies one decision to many documents. Each is its own
+// transaction, so one that cannot be reviewed does not undo the rest.
+func (s *Service) ReviewDocuments(ctx context.Context, ids []uuid.UUID, decision string, reason *string, actor Actor) []BulkResult {
+	out := make([]BulkResult, len(ids))
+	for i, id := range ids {
+		out[i] = BulkResult{DocumentID: id, Err: s.ReviewDocument(ctx, id, decision, reason, actor)}
+	}
+	return out
+}
+
 // sendBack returns the driver's open application for corrections.
 func (s *Service) sendBack(ctx context.Context, q *store.Queries, driverID uuid.UUID, now time.Time) error {
 	open, err := q.GetOpenApplication(ctx, driverID)

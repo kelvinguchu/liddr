@@ -90,6 +90,31 @@ func (s *Service) List(ctx context.Context, userID uuid.UUID, includeAcked bool,
 	return out, nil
 }
 
+// Delivery is one notification as staff see it when diagnosing a ride.
+type Delivery struct {
+	ID         uuid.UUID
+	UserID     uuid.UUID
+	EventType  string
+	Status     *string
+	PushStatus string
+	Attempts   int32
+	AckedAt    *time.Time
+	CreatedAt  time.Time
+}
+
+// ForRide lists what was sent about a ride.
+func (s *Service) ForRide(ctx context.Context, rideID uuid.UUID) ([]Delivery, error) {
+	rows, err := s.queries.ListRideNotifications(ctx, new(rideID))
+	if err != nil {
+		return nil, fmt.Errorf("list deliveries: %w", err)
+	}
+	out := make([]Delivery, len(rows))
+	for i, r := range rows {
+		out[i] = Delivery{ID: r.ID, UserID: r.UserID, EventType: r.EventType, Status: r.Status, PushStatus: r.PushStatus, Attempts: r.PushAttempts, AckedAt: r.AckedAt, CreatedAt: r.CreatedAt}
+	}
+	return out, nil
+}
+
 // UnreadCount returns how many notifications are unacknowledged.
 func (s *Service) UnreadCount(ctx context.Context, userID uuid.UUID) (int64, error) {
 	count, err := s.queries.CountUnackedNotifications(ctx, userID)

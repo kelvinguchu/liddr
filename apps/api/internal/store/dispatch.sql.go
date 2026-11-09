@@ -248,7 +248,7 @@ func (q *Queries) InsertOffer(ctx context.Context, arg InsertOfferParams) (int64
 }
 
 const listDriverCandidates = `-- name: ListDriverCandidates :many
-SELECT l.driver_id, l.lat, l.lng
+SELECT l.driver_id, l.lat, l.lng, u.rating_centi, u.rating_count
 FROM driver_locations AS l
 JOIN drivers AS d ON d.user_id = l.driver_id
 JOIN users AS u ON u.id = d.user_id
@@ -284,9 +284,11 @@ type ListDriverCandidatesParams struct {
 }
 
 type ListDriverCandidatesRow struct {
-	DriverID uuid.UUID
-	Lat      float64
-	Lng      float64
+	DriverID    uuid.UUID
+	Lat         float64
+	Lng         float64
+	RatingCenti *int32
+	RatingCount int32
 }
 
 func (q *Queries) ListDriverCandidates(ctx context.Context, arg ListDriverCandidatesParams) ([]ListDriverCandidatesRow, error) {
@@ -306,7 +308,13 @@ func (q *Queries) ListDriverCandidates(ctx context.Context, arg ListDriverCandid
 	items := []ListDriverCandidatesRow{}
 	for rows.Next() {
 		var i ListDriverCandidatesRow
-		if err := rows.Scan(&i.DriverID, &i.Lat, &i.Lng); err != nil {
+		if err := rows.Scan(
+			&i.DriverID,
+			&i.Lat,
+			&i.Lng,
+			&i.RatingCenti,
+			&i.RatingCount,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

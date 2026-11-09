@@ -23,7 +23,8 @@ INSERT INTO subscriptions (
 ON CONFLICT (driver_id, week_start) DO NOTHING;
 
 -- name: GetSubscriptionForWeek :one
-SELECT * FROM subscriptions
+SELECT id, driver_id, vehicle_category_id, week_start, week_end, amount_kes, status, reference, activated_at, expired_at, created_at
+FROM subscriptions
 WHERE driver_id = sqlc.arg(driver_id) AND week_start = sqlc.arg(week_start)
 FOR UPDATE;
 
@@ -33,10 +34,12 @@ SET amount_kes = sqlc.arg(amount_kes), vehicle_category_id = sqlc.arg(vehicle_ca
 WHERE id = sqlc.arg(id) AND status = 'pending';
 
 -- name: GetSubscriptionByIDForUpdate :one
-SELECT * FROM subscriptions WHERE id = sqlc.arg(id) FOR UPDATE;
+SELECT id, driver_id, vehicle_category_id, week_start, week_end, amount_kes, status, reference, activated_at, expired_at, created_at
+FROM subscriptions WHERE id = sqlc.arg(id) FOR UPDATE;
 
 -- name: GetSubscriptionByReference :one
-SELECT * FROM subscriptions WHERE reference = sqlc.arg(reference);
+SELECT id, driver_id, vehicle_category_id, week_start, week_end, amount_kes, status, reference, activated_at, expired_at, created_at
+FROM subscriptions WHERE reference = sqlc.arg(reference);
 
 -- name: CountRecentPayments :one
 SELECT count(*) FROM subscription_payments

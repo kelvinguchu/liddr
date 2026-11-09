@@ -212,6 +212,29 @@ func (s *Service) ListEnforcements(ctx context.Context, status string, limit, of
 	return out, nil
 }
 
+// EnforcementMetric is how many penalties are in one state.
+type EnforcementMetric struct {
+	Action, Status string
+	Total          int64
+}
+
+// Metrics summarizes penalties, and how many suspensions are overdue to end.
+func (s *Service) Metrics(ctx context.Context) ([]EnforcementMetric, int64, error) {
+	rows, err := s.queries.EnforcementCounts(ctx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("count enforcements: %w", err)
+	}
+	overdue, err := s.queries.CountOverdueSuspensions(ctx, new(s.now()))
+	if err != nil {
+		return nil, 0, fmt.Errorf("count overdue: %w", err)
+	}
+	out := make([]EnforcementMetric, len(rows))
+	for i, r := range rows {
+		out[i] = EnforcementMetric{Action: r.Action, Status: r.Status, Total: r.Total}
+	}
+	return out, overdue, nil
+}
+
 // ExpireDue ends suspensions whose time has come.
 func (s *Service) ExpireDue(ctx context.Context) error {
 	now := s.now()

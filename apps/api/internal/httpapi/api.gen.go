@@ -22,6 +22,48 @@ const (
 	BearerAuthScopes bearerAuthContextKey = "bearerAuth.Scopes"
 )
 
+// Defines values for AuthMethodsMethods.
+const (
+	EmailOtp AuthMethodsMethods = "email_otp"
+	Google   AuthMethodsMethods = "google"
+	PhoneOtp AuthMethodsMethods = "phone_otp"
+)
+
+// Valid indicates whether the value is a known member of the AuthMethodsMethods enum.
+func (e AuthMethodsMethods) Valid() bool {
+	switch e {
+	case EmailOtp:
+		return true
+	case Google:
+		return true
+	case PhoneOtp:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BulkReviewRequestDecision.
+const (
+	BulkReviewRequestDecisionApprove             BulkReviewRequestDecision = "approve"
+	BulkReviewRequestDecisionReject              BulkReviewRequestDecision = "reject"
+	BulkReviewRequestDecisionRequestResubmission BulkReviewRequestDecision = "request_resubmission"
+)
+
+// Valid indicates whether the value is a known member of the BulkReviewRequestDecision enum.
+func (e BulkReviewRequestDecision) Valid() bool {
+	switch e {
+	case BulkReviewRequestDecisionApprove:
+		return true
+	case BulkReviewRequestDecisionReject:
+		return true
+	case BulkReviewRequestDecisionRequestResubmission:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DeliveryRequestItemSize.
 const (
 	Large  DeliveryRequestItemSize = "large"
@@ -492,22 +534,22 @@ func (e ReportReviewRequestDecision) Valid() bool {
 
 // Defines values for ReviewRequestDecision.
 const (
-	Approve             ReviewRequestDecision = "approve"
-	Reject              ReviewRequestDecision = "reject"
-	RequestResubmission ReviewRequestDecision = "request_resubmission"
-	Suspend             ReviewRequestDecision = "suspend"
+	ReviewRequestDecisionApprove             ReviewRequestDecision = "approve"
+	ReviewRequestDecisionReject              ReviewRequestDecision = "reject"
+	ReviewRequestDecisionRequestResubmission ReviewRequestDecision = "request_resubmission"
+	ReviewRequestDecisionSuspend             ReviewRequestDecision = "suspend"
 )
 
 // Valid indicates whether the value is a known member of the ReviewRequestDecision enum.
 func (e ReviewRequestDecision) Valid() bool {
 	switch e {
-	case Approve:
+	case ReviewRequestDecisionApprove:
 		return true
-	case Reject:
+	case ReviewRequestDecisionReject:
 		return true
-	case RequestResubmission:
+	case ReviewRequestDecisionRequestResubmission:
 		return true
-	case Suspend:
+	case ReviewRequestDecisionSuspend:
 		return true
 	default:
 		return false
@@ -769,9 +811,39 @@ func (e ListRideHistoryParamsAs) Valid() bool {
 	}
 }
 
+// AuthMethods defines model for AuthMethods.
+type AuthMethods struct {
+	Methods []AuthMethodsMethods `json:"methods"`
+}
+
+// AuthMethodsMethods defines model for AuthMethods.Methods.
+type AuthMethodsMethods string
+
 // BookRideRequest defines model for BookRideRequest.
 type BookRideRequest struct {
 	QuoteId openapi_types.UUID `json:"quote_id"`
+}
+
+// BulkReviewRequest defines model for BulkReviewRequest.
+type BulkReviewRequest struct {
+	Decision    BulkReviewRequestDecision `json:"decision"`
+	DocumentIds []openapi_types.UUID      `json:"document_ids"`
+	Reason      *string                   `json:"reason,omitempty"`
+}
+
+// BulkReviewRequestDecision defines model for BulkReviewRequest.Decision.
+type BulkReviewRequestDecision string
+
+// BulkReviewResult defines model for BulkReviewResult.
+type BulkReviewResult struct {
+	Code       *string            `json:"code,omitempty"`
+	DocumentId openapi_types.UUID `json:"document_id"`
+	Ok         bool               `json:"ok"`
+}
+
+// BulkReviewResults defines model for BulkReviewResults.
+type BulkReviewResults struct {
+	Data []BulkReviewResult `json:"data"`
 }
 
 // CancelRideRequest defines model for CancelRideRequest.
@@ -973,6 +1045,19 @@ type Enforcement struct {
 // EnforcementList defines model for EnforcementList.
 type EnforcementList struct {
 	Data []Enforcement `json:"data"`
+}
+
+// EnforcementMetric defines model for EnforcementMetric.
+type EnforcementMetric struct {
+	Action string `json:"action"`
+	Status string `json:"status"`
+	Total  int64  `json:"total"`
+}
+
+// EnforcementMetrics defines model for EnforcementMetrics.
+type EnforcementMetrics struct {
+	Data               []EnforcementMetric `json:"data"`
+	OverdueSuspensions int64               `json:"overdue_suspensions"`
 }
 
 // EnforcementRequest defines model for EnforcementRequest.
@@ -1341,6 +1426,13 @@ type Rating struct {
 	SubmittedAt     time.Time          `json:"submitted_at"`
 }
 
+// RatingGuardrail defines model for RatingGuardrail.
+type RatingGuardrail struct {
+	Minimum    int64 `json:"minimum"`
+	Recent     int64 `json:"recent"`
+	WindowDays int32 `json:"window_days"`
+}
+
 // RatingList defines model for RatingList.
 type RatingList struct {
 	Data []Rating `json:"data"`
@@ -1443,6 +1535,23 @@ type Ride struct {
 	Pickup         Coordinates        `json:"pickup"`
 	RequestedAt    time.Time          `json:"requested_at"`
 	Status         RideStatus         `json:"status"`
+}
+
+// RideDeliveries defines model for RideDeliveries.
+type RideDeliveries struct {
+	Data []RideDelivery `json:"data"`
+}
+
+// RideDelivery defines model for RideDelivery.
+type RideDelivery struct {
+	AckedAt    *time.Time         `json:"acked_at,omitempty"`
+	Attempts   int32              `json:"attempts"`
+	CreatedAt  time.Time          `json:"created_at"`
+	EventType  string             `json:"event_type"`
+	Id         openapi_types.UUID `json:"id"`
+	PushStatus string             `json:"push_status"`
+	Status     *string            `json:"status,omitempty"`
+	UserId     openapi_types.UUID `json:"user_id"`
 }
 
 // RideHistory defines model for RideHistory.
@@ -1714,6 +1823,13 @@ type VerificationUpload struct {
 	UploadUrl string             `json:"upload_url"`
 }
 
+// WatchdogSummary defines model for WatchdogSummary.
+type WatchdogSummary struct {
+	Cancelled       int64 `json:"cancelled"`
+	Reassigned      int64 `json:"reassigned"`
+	RiderReassigned int64 `json:"rider_reassigned"`
+}
+
 // ApplicationId defines model for ApplicationId.
 type ApplicationId = openapi_types.UUID
 
@@ -1815,6 +1931,11 @@ type ListRatingsParams struct {
 	Offset       *Offset             `form:"offset,omitempty" json:"offset,omitempty"`
 }
 
+// GetWatchdogSummaryParams defines parameters for GetWatchdogSummary.
+type GetWatchdogSummaryParams struct {
+	Hours *int32 `form:"hours,omitempty" json:"hours,omitempty"`
+}
+
 // DownloadDeliveryProofParamsProofKind defines parameters for DownloadDeliveryProof.
 type DownloadDeliveryProofParamsProofKind string
 
@@ -1904,6 +2025,9 @@ type SaveProhibitedItemJSONRequestBody = ProhibitedItem
 
 // ReviewVerificationApplicationJSONRequestBody defines body for ReviewVerificationApplication for application/json ContentType.
 type ReviewVerificationApplicationJSONRequestBody = ReviewRequest
+
+// ReviewVerificationDocumentsJSONRequestBody defines body for ReviewVerificationDocuments for application/json ContentType.
+type ReviewVerificationDocumentsJSONRequestBody = BulkReviewRequest
 
 // ReviewVerificationDocumentJSONRequestBody defines body for ReviewVerificationDocument for application/json ContentType.
 type ReviewVerificationDocumentJSONRequestBody = ReviewRequest
@@ -1997,6 +2121,9 @@ type ServerInterface interface {
 	// Logout End the device's session. Succeeds even if already ended.
 	// (POST /v1/auth/logout)
 	Logout(w http.ResponseWriter, r *http.Request)
+	// ListAuthMethods List the sign-in methods available
+	// (GET /v1/auth/methods)
+	ListAuthMethods(w http.ResponseWriter, r *http.Request)
 	// ConfirmTotpSetup Activate an authenticator with a code from it
 	// (POST /v1/auth/mfa/totp/confirm)
 	ConfirmTotpSetup(w http.ResponseWriter, r *http.Request)
@@ -2081,6 +2208,9 @@ type ServerInterface interface {
 	// ApplyEnforcement Apply a penalty directly
 	// (POST /v1/ops/moderation/enforcements)
 	ApplyEnforcement(w http.ResponseWriter, r *http.Request)
+	// GetEnforcementMetrics Summarize penalties
+	// (GET /v1/ops/moderation/enforcements/metrics)
+	GetEnforcementMetrics(w http.ResponseWriter, r *http.Request)
 	// LiftEnforcement End a penalty early
 	// (POST /v1/ops/moderation/enforcements/{enforcement_id}/lift)
 	LiftEnforcement(w http.ResponseWriter, r *http.Request, enforcementId EnforcementId)
@@ -2099,6 +2229,9 @@ type ServerInterface interface {
 	// ListRatings List ratings
 	// (GET /v1/ops/ratings)
 	ListRatings(w http.ResponseWriter, r *http.Request, params ListRatingsParams)
+	// GetRatingGuardrail Report whether an account has enough ratings to act on
+	// (GET /v1/ops/ratings/users/{user_id}/guardrails)
+	GetRatingGuardrail(w http.ResponseWriter, r *http.Request, userId openapi_types.UUID)
 	// NullifyRating Remove a rating from the score
 	// (POST /v1/ops/ratings/{rating_id}/nullify)
 	NullifyRating(w http.ResponseWriter, r *http.Request, ratingId RatingId)
@@ -2108,6 +2241,12 @@ type ServerInterface interface {
 	// GetUserIntegrity Report one account's recent strikes
 	// (GET /v1/ops/rides/integrity/users/{user_id})
 	GetUserIntegrity(w http.ResponseWriter, r *http.Request, userId openapi_types.UUID)
+	// GetWatchdogSummary Count rescued pickups
+	// (GET /v1/ops/rides/pickup-watchdog/summary)
+	GetWatchdogSummary(w http.ResponseWriter, r *http.Request, params GetWatchdogSummaryParams)
+	// ListRideDeliveries Show what was sent about a ride
+	// (GET /v1/ops/rides/{ride_id}/notifications)
+	ListRideDeliveries(w http.ResponseWriter, r *http.Request, rideId RideId)
 	// ListProhibitedItems List item screening rules
 	// (GET /v1/ops/send/prohibited-items)
 	ListProhibitedItems(w http.ResponseWriter, r *http.Request)
@@ -2135,6 +2274,9 @@ type ServerInterface interface {
 	// ReviewVerificationApplication Make the final decision on an application
 	// (POST /v1/ops/verification/applications/{application_id}/review)
 	ReviewVerificationApplication(w http.ResponseWriter, r *http.Request, applicationId ApplicationId)
+	// ReviewVerificationDocuments Apply one decision to many documents
+	// (POST /v1/ops/verification/documents/reviews/bulk)
+	ReviewVerificationDocuments(w http.ResponseWriter, r *http.Request)
 	// DownloadVerificationDocument Get a five-minute link to a document's file
 	// (POST /v1/ops/verification/documents/{document_id}/download)
 	DownloadVerificationDocument(w http.ResponseWriter, r *http.Request, documentId DocumentId)
@@ -2389,6 +2531,20 @@ func (siw *ServerInterfaceWrapper) Logout(w http.ResponseWriter, r *http.Request
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.Logout(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAuthMethods operation middleware
+func (siw *ServerInterfaceWrapper) ListAuthMethods(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAuthMethods(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3270,6 +3426,26 @@ func (siw *ServerInterfaceWrapper) ApplyEnforcement(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// GetEnforcementMetrics operation middleware
+func (siw *ServerInterfaceWrapper) GetEnforcementMetrics(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetEnforcementMetrics(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // LiftEnforcement operation middleware
 func (siw *ServerInterfaceWrapper) LiftEnforcement(w http.ResponseWriter, r *http.Request) {
 
@@ -3541,6 +3717,38 @@ func (siw *ServerInterfaceWrapper) ListRatings(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// GetRatingGuardrail operation middleware
+func (siw *ServerInterfaceWrapper) GetRatingGuardrail(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "user_id" -------------
+	var userId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", r.PathValue("user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetRatingGuardrail(w, r, userId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // NullifyRating operation middleware
 func (siw *ServerInterfaceWrapper) NullifyRating(w http.ResponseWriter, r *http.Request) {
 
@@ -3628,6 +3836,77 @@ func (siw *ServerInterfaceWrapper) GetUserIntegrity(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetUserIntegrity(w, r, userId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetWatchdogSummary operation middleware
+func (siw *ServerInterfaceWrapper) GetWatchdogSummary(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin"})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetWatchdogSummaryParams
+
+	// ------------- Optional query parameter "hours" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "hours", r.URL.Query(), &params.Hours, runtime.BindQueryParameterOptions{Type: "integer", Format: "int32"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "hours"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "hours", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetWatchdogSummary(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListRideDeliveries operation middleware
+func (siw *ServerInterfaceWrapper) ListRideDeliveries(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "ride_id" -------------
+	var rideId RideId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ride_id", r.PathValue("ride_id"), &rideId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ride_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListRideDeliveries(w, r, rideId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3934,6 +4213,26 @@ func (siw *ServerInterfaceWrapper) ReviewVerificationApplication(w http.Response
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ReviewVerificationApplication(w, r, applicationId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReviewVerificationDocuments operation middleware
+func (siw *ServerInterfaceWrapper) ReviewVerificationDocuments(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"ops", "admin", "mfa:step-up"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReviewVerificationDocuments(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -5888,6 +6187,12 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides/{ride_id}/shared/members/{member_id}/picked-up", wrapper.PickUpSharedMember)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides/{ride_id}/shared/members/{member_id}/dropped-off", wrapper.DropOffSharedMember)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides/{ride_id}/shared/members/{member_id}/no-show", wrapper.NoShowSharedMember)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/auth/methods", wrapper.ListAuthMethods)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/ops/rides/{ride_id}/notifications", wrapper.ListRideDeliveries)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/ops/rides/pickup-watchdog/summary", wrapper.GetWatchdogSummary)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/ops/moderation/enforcements/metrics", wrapper.GetEnforcementMetrics)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/ops/ratings/users/{user_id}/guardrails", wrapper.GetRatingGuardrail)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/ops/verification/documents/reviews/bulk", wrapper.ReviewVerificationDocuments)
 
 	return m
 }
@@ -6081,6 +6386,44 @@ type Logout204Response struct {
 func (response Logout204Response) VisitLogoutResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
+}
+
+type ListAuthMethodsRequestObject struct {
+}
+
+type ListAuthMethodsResponseObject interface {
+	VisitListAuthMethodsResponse(w http.ResponseWriter) error
+}
+
+type ListAuthMethods200JSONResponse AuthMethods
+
+func (response ListAuthMethods200JSONResponse) VisitListAuthMethodsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAuthMethodsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListAuthMethodsdefaultJSONResponse) VisitListAuthMethodsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type ConfirmTotpSetupRequestObject struct {
@@ -7181,6 +7524,44 @@ func (response ApplyEnforcementdefaultJSONResponse) VisitApplyEnforcementRespons
 	return err
 }
 
+type GetEnforcementMetricsRequestObject struct {
+}
+
+type GetEnforcementMetricsResponseObject interface {
+	VisitGetEnforcementMetricsResponse(w http.ResponseWriter) error
+}
+
+type GetEnforcementMetrics200JSONResponse EnforcementMetrics
+
+func (response GetEnforcementMetrics200JSONResponse) VisitGetEnforcementMetricsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetEnforcementMetricsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetEnforcementMetricsdefaultJSONResponse) VisitGetEnforcementMetricsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type LiftEnforcementRequestObject struct {
 	EnforcementId EnforcementId `json:"enforcement_id"`
 }
@@ -7399,6 +7780,45 @@ func (response ListRatingsdefaultJSONResponse) VisitListRatingsResponse(w http.R
 	return err
 }
 
+type GetRatingGuardrailRequestObject struct {
+	UserId openapi_types.UUID `json:"user_id"`
+}
+
+type GetRatingGuardrailResponseObject interface {
+	VisitGetRatingGuardrailResponse(w http.ResponseWriter) error
+}
+
+type GetRatingGuardrail200JSONResponse RatingGuardrail
+
+func (response GetRatingGuardrail200JSONResponse) VisitGetRatingGuardrailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetRatingGuardraildefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetRatingGuardraildefaultJSONResponse) VisitGetRatingGuardrailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type NullifyRatingRequestObject struct {
 	RatingId RatingId `json:"rating_id"`
 	Body     *NullifyRatingJSONRequestBody
@@ -7494,6 +7914,84 @@ type GetUserIntegritydefaultJSONResponse struct {
 }
 
 func (response GetUserIntegritydefaultJSONResponse) VisitGetUserIntegrityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetWatchdogSummaryRequestObject struct {
+	Params GetWatchdogSummaryParams
+}
+
+type GetWatchdogSummaryResponseObject interface {
+	VisitGetWatchdogSummaryResponse(w http.ResponseWriter) error
+}
+
+type GetWatchdogSummary200JSONResponse WatchdogSummary
+
+func (response GetWatchdogSummary200JSONResponse) VisitGetWatchdogSummaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetWatchdogSummarydefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response GetWatchdogSummarydefaultJSONResponse) VisitGetWatchdogSummaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRideDeliveriesRequestObject struct {
+	RideId RideId `json:"ride_id"`
+}
+
+type ListRideDeliveriesResponseObject interface {
+	VisitListRideDeliveriesResponse(w http.ResponseWriter) error
+}
+
+type ListRideDeliveries200JSONResponse RideDeliveries
+
+func (response ListRideDeliveries200JSONResponse) VisitListRideDeliveriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRideDeliveriesdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ListRideDeliveriesdefaultJSONResponse) VisitListRideDeliveriesResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -7834,6 +8332,45 @@ type ReviewVerificationApplicationdefaultJSONResponse struct {
 }
 
 func (response ReviewVerificationApplicationdefaultJSONResponse) VisitReviewVerificationApplicationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReviewVerificationDocumentsRequestObject struct {
+	Body *ReviewVerificationDocumentsJSONRequestBody
+}
+
+type ReviewVerificationDocumentsResponseObject interface {
+	VisitReviewVerificationDocumentsResponse(w http.ResponseWriter) error
+}
+
+type ReviewVerificationDocuments200JSONResponse BulkReviewResults
+
+func (response ReviewVerificationDocuments200JSONResponse) VisitReviewVerificationDocumentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReviewVerificationDocumentsdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ReviewVerificationDocumentsdefaultJSONResponse) VisitReviewVerificationDocumentsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -9961,6 +10498,9 @@ type StrictServerInterface interface {
 	// Logout End the device's session. Succeeds even if already ended.
 	// (POST /v1/auth/logout)
 	Logout(ctx context.Context, request LogoutRequestObject) (LogoutResponseObject, error)
+	// ListAuthMethods List the sign-in methods available
+	// (GET /v1/auth/methods)
+	ListAuthMethods(ctx context.Context, request ListAuthMethodsRequestObject) (ListAuthMethodsResponseObject, error)
 	// ConfirmTotpSetup Activate an authenticator with a code from it
 	// (POST /v1/auth/mfa/totp/confirm)
 	ConfirmTotpSetup(ctx context.Context, request ConfirmTotpSetupRequestObject) (ConfirmTotpSetupResponseObject, error)
@@ -10045,6 +10585,9 @@ type StrictServerInterface interface {
 	// ApplyEnforcement Apply a penalty directly
 	// (POST /v1/ops/moderation/enforcements)
 	ApplyEnforcement(ctx context.Context, request ApplyEnforcementRequestObject) (ApplyEnforcementResponseObject, error)
+	// GetEnforcementMetrics Summarize penalties
+	// (GET /v1/ops/moderation/enforcements/metrics)
+	GetEnforcementMetrics(ctx context.Context, request GetEnforcementMetricsRequestObject) (GetEnforcementMetricsResponseObject, error)
 	// LiftEnforcement End a penalty early
 	// (POST /v1/ops/moderation/enforcements/{enforcement_id}/lift)
 	LiftEnforcement(ctx context.Context, request LiftEnforcementRequestObject) (LiftEnforcementResponseObject, error)
@@ -10063,6 +10606,9 @@ type StrictServerInterface interface {
 	// ListRatings List ratings
 	// (GET /v1/ops/ratings)
 	ListRatings(ctx context.Context, request ListRatingsRequestObject) (ListRatingsResponseObject, error)
+	// GetRatingGuardrail Report whether an account has enough ratings to act on
+	// (GET /v1/ops/ratings/users/{user_id}/guardrails)
+	GetRatingGuardrail(ctx context.Context, request GetRatingGuardrailRequestObject) (GetRatingGuardrailResponseObject, error)
 	// NullifyRating Remove a rating from the score
 	// (POST /v1/ops/ratings/{rating_id}/nullify)
 	NullifyRating(ctx context.Context, request NullifyRatingRequestObject) (NullifyRatingResponseObject, error)
@@ -10072,6 +10618,12 @@ type StrictServerInterface interface {
 	// GetUserIntegrity Report one account's recent strikes
 	// (GET /v1/ops/rides/integrity/users/{user_id})
 	GetUserIntegrity(ctx context.Context, request GetUserIntegrityRequestObject) (GetUserIntegrityResponseObject, error)
+	// GetWatchdogSummary Count rescued pickups
+	// (GET /v1/ops/rides/pickup-watchdog/summary)
+	GetWatchdogSummary(ctx context.Context, request GetWatchdogSummaryRequestObject) (GetWatchdogSummaryResponseObject, error)
+	// ListRideDeliveries Show what was sent about a ride
+	// (GET /v1/ops/rides/{ride_id}/notifications)
+	ListRideDeliveries(ctx context.Context, request ListRideDeliveriesRequestObject) (ListRideDeliveriesResponseObject, error)
 	// ListProhibitedItems List item screening rules
 	// (GET /v1/ops/send/prohibited-items)
 	ListProhibitedItems(ctx context.Context, request ListProhibitedItemsRequestObject) (ListProhibitedItemsResponseObject, error)
@@ -10099,6 +10651,9 @@ type StrictServerInterface interface {
 	// ReviewVerificationApplication Make the final decision on an application
 	// (POST /v1/ops/verification/applications/{application_id}/review)
 	ReviewVerificationApplication(ctx context.Context, request ReviewVerificationApplicationRequestObject) (ReviewVerificationApplicationResponseObject, error)
+	// ReviewVerificationDocuments Apply one decision to many documents
+	// (POST /v1/ops/verification/documents/reviews/bulk)
+	ReviewVerificationDocuments(ctx context.Context, request ReviewVerificationDocumentsRequestObject) (ReviewVerificationDocumentsResponseObject, error)
 	// DownloadVerificationDocument Get a five-minute link to a document's file
 	// (POST /v1/ops/verification/documents/{document_id}/download)
 	DownloadVerificationDocument(ctx context.Context, request DownloadVerificationDocumentRequestObject) (DownloadVerificationDocumentResponseObject, error)
@@ -10473,6 +11028,30 @@ func (sh *strictHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(LogoutResponseObject); ok {
 		if err := validResponse.VisitLogoutResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListAuthMethods operation middleware
+func (sh *strictHandler) ListAuthMethods(w http.ResponseWriter, r *http.Request) {
+	var request ListAuthMethodsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAuthMethods(ctx, request.(ListAuthMethodsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAuthMethods")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAuthMethodsResponseObject); ok {
+		if err := validResponse.VisitListAuthMethodsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -11255,6 +11834,30 @@ func (sh *strictHandler) ApplyEnforcement(w http.ResponseWriter, r *http.Request
 	}
 }
 
+// GetEnforcementMetrics operation middleware
+func (sh *strictHandler) GetEnforcementMetrics(w http.ResponseWriter, r *http.Request) {
+	var request GetEnforcementMetricsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetEnforcementMetrics(ctx, request.(GetEnforcementMetricsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetEnforcementMetrics")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetEnforcementMetricsResponseObject); ok {
+		if err := validResponse.VisitGetEnforcementMetricsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // LiftEnforcement operation middleware
 func (sh *strictHandler) LiftEnforcement(w http.ResponseWriter, r *http.Request, enforcementId EnforcementId) {
 	var request LiftEnforcementRequestObject
@@ -11425,6 +12028,32 @@ func (sh *strictHandler) ListRatings(w http.ResponseWriter, r *http.Request, par
 	}
 }
 
+// GetRatingGuardrail operation middleware
+func (sh *strictHandler) GetRatingGuardrail(w http.ResponseWriter, r *http.Request, userId openapi_types.UUID) {
+	var request GetRatingGuardrailRequestObject
+
+	request.UserId = userId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetRatingGuardrail(ctx, request.(GetRatingGuardrailRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetRatingGuardrail")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetRatingGuardrailResponseObject); ok {
+		if err := validResponse.VisitGetRatingGuardrailResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // NullifyRating operation middleware
 func (sh *strictHandler) NullifyRating(w http.ResponseWriter, r *http.Request, ratingId RatingId) {
 	var request NullifyRatingRequestObject
@@ -11503,6 +12132,58 @@ func (sh *strictHandler) GetUserIntegrity(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetUserIntegrityResponseObject); ok {
 		if err := validResponse.VisitGetUserIntegrityResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetWatchdogSummary operation middleware
+func (sh *strictHandler) GetWatchdogSummary(w http.ResponseWriter, r *http.Request, params GetWatchdogSummaryParams) {
+	var request GetWatchdogSummaryRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetWatchdogSummary(ctx, request.(GetWatchdogSummaryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetWatchdogSummary")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetWatchdogSummaryResponseObject); ok {
+		if err := validResponse.VisitGetWatchdogSummaryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListRideDeliveries operation middleware
+func (sh *strictHandler) ListRideDeliveries(w http.ResponseWriter, r *http.Request, rideId RideId) {
+	var request ListRideDeliveriesRequestObject
+
+	request.RideId = rideId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListRideDeliveries(ctx, request.(ListRideDeliveriesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListRideDeliveries")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListRideDeliveriesResponseObject); ok {
+		if err := validResponse.VisitListRideDeliveriesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -11748,6 +12429,37 @@ func (sh *strictHandler) ReviewVerificationApplication(w http.ResponseWriter, r 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ReviewVerificationApplicationResponseObject); ok {
 		if err := validResponse.VisitReviewVerificationApplicationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReviewVerificationDocuments operation middleware
+func (sh *strictHandler) ReviewVerificationDocuments(w http.ResponseWriter, r *http.Request) {
+	var request ReviewVerificationDocumentsRequestObject
+
+	var body ReviewVerificationDocumentsJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReviewVerificationDocuments(ctx, request.(ReviewVerificationDocumentsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReviewVerificationDocuments")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReviewVerificationDocumentsResponseObject); ok {
+		if err := validResponse.VisitReviewVerificationDocumentsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

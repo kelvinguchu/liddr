@@ -115,3 +115,10 @@ UPDATE users SET account_status = sqlc.arg(status), updated_at = sqlc.arg(now) W
 -- name: TakeDriverOffline :exec
 UPDATE drivers SET is_online = false, updated_at = sqlc.arg(now) WHERE user_id = sqlc.arg(user_id);
 
+
+-- name: EnforcementCounts :many
+SELECT action, status, count(*)::bigint AS total FROM user_enforcements GROUP BY action, status ORDER BY action, status;
+
+-- name: CountOverdueSuspensions :one
+SELECT count(*) FROM user_enforcements
+WHERE status = 'active' AND action = 'temporary_suspension' AND ends_at <= sqlc.arg(now);

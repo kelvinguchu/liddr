@@ -393,7 +393,8 @@ func (q *Queries) GetQuoteSurge(ctx context.Context, id uuid.UUID) (int32, error
 }
 
 const getRide = `-- name: GetRide :one
-SELECT id, rider_id, driver_id, quote_id, vehicle_category_id, status, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, fare_kes, payment_mode, search_expires_at, next_dispatch_at, dispatch_wave, requested_at, accepted_at, arriving_at, arrived_at, started_at, completed_at, cancelled_at, cancelled_by, cancel_reason, arrival_distance_m, completion_distance_m, pickup_distance_m_at_accept, pickup_eta_s_at_accept, reassign_count, product_type FROM rides WHERE id = $1
+SELECT id, rider_id, driver_id, quote_id, vehicle_category_id, status, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, fare_kes, payment_mode, search_expires_at, next_dispatch_at, dispatch_wave, requested_at, accepted_at, arriving_at, arrived_at, started_at, completed_at, cancelled_at, cancelled_by, cancel_reason, arrival_distance_m, completion_distance_m, pickup_distance_m_at_accept, pickup_eta_s_at_accept, reassign_count, product_type
+FROM rides WHERE id = $1
 `
 
 func (q *Queries) GetRide(ctx context.Context, id uuid.UUID) (Ride, error) {
@@ -435,7 +436,8 @@ func (q *Queries) GetRide(ctx context.Context, id uuid.UUID) (Ride, error) {
 }
 
 const getRideForUpdate = `-- name: GetRideForUpdate :one
-SELECT id, rider_id, driver_id, quote_id, vehicle_category_id, status, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, fare_kes, payment_mode, search_expires_at, next_dispatch_at, dispatch_wave, requested_at, accepted_at, arriving_at, arrived_at, started_at, completed_at, cancelled_at, cancelled_by, cancel_reason, arrival_distance_m, completion_distance_m, pickup_distance_m_at_accept, pickup_eta_s_at_accept, reassign_count, product_type FROM rides WHERE id = $1 FOR UPDATE
+SELECT id, rider_id, driver_id, quote_id, vehicle_category_id, status, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, fare_kes, payment_mode, search_expires_at, next_dispatch_at, dispatch_wave, requested_at, accepted_at, arriving_at, arrived_at, started_at, completed_at, cancelled_at, cancelled_by, cancel_reason, arrival_distance_m, completion_distance_m, pickup_distance_m_at_accept, pickup_eta_s_at_accept, reassign_count, product_type
+FROM rides WHERE id = $1 FOR UPDATE
 `
 
 func (q *Queries) GetRideForUpdate(ctx context.Context, id uuid.UUID) (Ride, error) {
@@ -477,7 +479,8 @@ func (q *Queries) GetRideForUpdate(ctx context.Context, id uuid.UUID) (Ride, err
 }
 
 const getRideForUpdateSkipLocked = `-- name: GetRideForUpdateSkipLocked :one
-SELECT id, rider_id, driver_id, quote_id, vehicle_category_id, status, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, fare_kes, payment_mode, search_expires_at, next_dispatch_at, dispatch_wave, requested_at, accepted_at, arriving_at, arrived_at, started_at, completed_at, cancelled_at, cancelled_by, cancel_reason, arrival_distance_m, completion_distance_m, pickup_distance_m_at_accept, pickup_eta_s_at_accept, reassign_count, product_type FROM rides WHERE id = $1 FOR UPDATE SKIP LOCKED
+SELECT id, rider_id, driver_id, quote_id, vehicle_category_id, status, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, fare_kes, payment_mode, search_expires_at, next_dispatch_at, dispatch_wave, requested_at, accepted_at, arriving_at, arrived_at, started_at, completed_at, cancelled_at, cancelled_by, cancel_reason, arrival_distance_m, completion_distance_m, pickup_distance_m_at_accept, pickup_eta_s_at_accept, reassign_count, product_type
+FROM rides WHERE id = $1 FOR UPDATE SKIP LOCKED
 `
 
 func (q *Queries) GetRideForUpdateSkipLocked(ctx context.Context, id uuid.UUID) (Ride, error) {
@@ -519,7 +522,8 @@ func (q *Queries) GetRideForUpdateSkipLocked(ctx context.Context, id uuid.UUID) 
 }
 
 const getRideFull = `-- name: GetRideFull :one
-SELECT id, rider_id, driver_id, quote_id, vehicle_category_id, status, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, fare_kes, payment_mode, search_expires_at, next_dispatch_at, dispatch_wave, requested_at, accepted_at, arriving_at, arrived_at, started_at, completed_at, cancelled_at, cancelled_by, cancel_reason, arrival_distance_m, completion_distance_m, pickup_distance_m_at_accept, pickup_eta_s_at_accept, reassign_count, product_type FROM rides WHERE id = $1
+SELECT id, rider_id, driver_id, quote_id, vehicle_category_id, status, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, fare_kes, payment_mode, search_expires_at, next_dispatch_at, dispatch_wave, requested_at, accepted_at, arriving_at, arrived_at, started_at, completed_at, cancelled_at, cancelled_by, cancel_reason, arrival_distance_m, completion_distance_m, pickup_distance_m_at_accept, pickup_eta_s_at_accept, reassign_count, product_type
+FROM rides WHERE id = $1
 `
 
 func (q *Queries) GetRideFull(ctx context.Context, id uuid.UUID) (Ride, error) {
@@ -1219,6 +1223,28 @@ func (q *Queries) SetRideStatus(ctx context.Context, arg SetRideStatusParams) (S
 	)
 	var i SetRideStatusRow
 	err := row.Scan(&i.RiderID, &i.DriverID)
+	return i, err
+}
+
+const watchdogSummary = `-- name: WatchdogSummary :one
+SELECT
+    count(*) FILTER (WHERE e.reason = 'pickup_watchdog') AS reassigned,
+    count(*) FILTER (WHERE e.reason = 'rider_reassign') AS rider_reassigned,
+    count(*) FILTER (WHERE e.to_status = 'cancelled' AND e.actor_user_id IS NULL AND e.reason = 'driver_not_moving') AS cancelled
+FROM ride_events AS e
+WHERE e.occurred_at >= $1
+`
+
+type WatchdogSummaryRow struct {
+	Reassigned      int64
+	RiderReassigned int64
+	Cancelled       int64
+}
+
+func (q *Queries) WatchdogSummary(ctx context.Context, since time.Time) (WatchdogSummaryRow, error) {
+	row := q.db.QueryRow(ctx, watchdogSummary, since)
+	var i WatchdogSummaryRow
+	err := row.Scan(&i.Reassigned, &i.RiderReassigned, &i.Cancelled)
 	return i, err
 }
 

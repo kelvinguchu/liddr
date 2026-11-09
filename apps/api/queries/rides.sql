@@ -91,10 +91,12 @@ VALUES (
 );
 
 -- name: GetRide :one
-SELECT * FROM rides WHERE id = sqlc.arg(id);
+SELECT id, rider_id, driver_id, quote_id, vehicle_category_id, status, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, fare_kes, payment_mode, search_expires_at, next_dispatch_at, dispatch_wave, requested_at, accepted_at, arriving_at, arrived_at, started_at, completed_at, cancelled_at, cancelled_by, cancel_reason, arrival_distance_m, completion_distance_m, pickup_distance_m_at_accept, pickup_eta_s_at_accept, reassign_count, product_type
+FROM rides WHERE id = sqlc.arg(id);
 
 -- name: GetRideForUpdate :one
-SELECT * FROM rides WHERE id = sqlc.arg(id) FOR UPDATE;
+SELECT id, rider_id, driver_id, quote_id, vehicle_category_id, status, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, fare_kes, payment_mode, search_expires_at, next_dispatch_at, dispatch_wave, requested_at, accepted_at, arriving_at, arrived_at, started_at, completed_at, cancelled_at, cancelled_by, cancel_reason, arrival_distance_m, completion_distance_m, pickup_distance_m_at_accept, pickup_eta_s_at_accept, reassign_count, product_type
+FROM rides WHERE id = sqlc.arg(id) FOR UPDATE;
 
 -- name: SetRideStatus :one
 UPDATE rides
@@ -146,10 +148,12 @@ ORDER BY accepted_at
 LIMIT sqlc.arg(batch);
 
 -- name: GetRideForUpdateSkipLocked :one
-SELECT * FROM rides WHERE id = sqlc.arg(id) FOR UPDATE SKIP LOCKED;
+SELECT id, rider_id, driver_id, quote_id, vehicle_category_id, status, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, fare_kes, payment_mode, search_expires_at, next_dispatch_at, dispatch_wave, requested_at, accepted_at, arriving_at, arrived_at, started_at, completed_at, cancelled_at, cancelled_by, cancel_reason, arrival_distance_m, completion_distance_m, pickup_distance_m_at_accept, pickup_eta_s_at_accept, reassign_count, product_type
+FROM rides WHERE id = sqlc.arg(id) FOR UPDATE SKIP LOCKED;
 
 -- name: GetRideFull :one
-SELECT * FROM rides WHERE id = sqlc.arg(id);
+SELECT id, rider_id, driver_id, quote_id, vehicle_category_id, status, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, fare_kes, payment_mode, search_expires_at, next_dispatch_at, dispatch_wave, requested_at, accepted_at, arriving_at, arrived_at, started_at, completed_at, cancelled_at, cancelled_by, cancel_reason, arrival_distance_m, completion_distance_m, pickup_distance_m_at_accept, pickup_eta_s_at_accept, reassign_count, product_type
+FROM rides WHERE id = sqlc.arg(id);
 
 -- name: GetCategoryRates :one
 SELECT slug, base_fee_cents, price_per_km_cents, price_per_min_cents, min_fare_cents, discount_bps
@@ -237,3 +241,11 @@ UPDATE users SET booking_restricted_until = GREATEST(booking_restricted_until, s
 
 -- name: GetBookingRestriction :one
 SELECT booking_restricted_until FROM users WHERE id = sqlc.arg(id);
+
+-- name: WatchdogSummary :one
+SELECT
+    count(*) FILTER (WHERE e.reason = 'pickup_watchdog') AS reassigned,
+    count(*) FILTER (WHERE e.reason = 'rider_reassign') AS rider_reassigned,
+    count(*) FILTER (WHERE e.to_status = 'cancelled' AND e.actor_user_id IS NULL AND e.reason = 'driver_not_moving') AS cancelled
+FROM ride_events AS e
+WHERE e.occurred_at >= sqlc.arg(since);

@@ -166,6 +166,20 @@ func moveToDispatch(ctx context.Context, q *store.Queries, ride store.Ride, acto
 	return nil
 }
 
+// WatchdogCounts says how often rides were rescued in a period.
+type WatchdogCounts struct {
+	Reassigned, RiderReassigned, Cancelled int64
+}
+
+// WatchdogSummary reports rescues since a moment.
+func (s *Service) WatchdogSummary(ctx context.Context, since time.Time) (WatchdogCounts, error) {
+	row, err := s.queries.WatchdogSummary(ctx, since)
+	if err != nil {
+		return WatchdogCounts{}, fmt.Errorf("summarize watchdog: %w", err)
+	}
+	return WatchdogCounts{Reassigned: row.Reassigned, RiderReassigned: row.RiderReassigned, Cancelled: row.Cancelled}, nil
+}
+
 // RunWatchdog rescues rides whose driver is not coming, until ctx ends.
 func (s *Service) RunWatchdog(ctx context.Context, logger *slog.Logger) {
 	ticker := time.NewTicker(watchdogInterval)

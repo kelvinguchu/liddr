@@ -2104,6 +2104,113 @@ paths:
         default:
           $ref: "#/components/responses/Problem"
 
+  /v1/auth/methods:
+    get:
+      operationId: listAuthMethods
+      summary: List the sign-in methods available
+      security: []
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMethods"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/rides/{ride_id}/notifications:
+    get:
+      operationId: listRideDeliveries
+      summary: Show what was sent about a ride
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RideDeliveries"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/rides/pickup-watchdog/summary:
+    get:
+      operationId: getWatchdogSummary
+      summary: Count rescued pickups
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - {name: hours, in: query, required: false, schema: {type: integer, format: int32, minimum: 1, maximum: 720, default: 24}}
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WatchdogSummary"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/moderation/enforcements/metrics:
+    get:
+      operationId: getEnforcementMetrics
+      summary: Summarize penalties
+      security:
+        - bearerAuth: [ops, admin]
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnforcementMetrics"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/ratings/users/{user_id}/guardrails:
+    get:
+      operationId: getRatingGuardrail
+      summary: Report whether an account has enough ratings to act on
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - {name: user_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RatingGuardrail"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/verification/documents/reviews/bulk:
+    post:
+      operationId: reviewVerificationDocuments
+      summary: Apply one decision to many documents
+      security:
+        - bearerAuth: [ops, admin, "mfa:step-up"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkReviewRequest"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkReviewResults"
+        default:
+          $ref: "#/components/responses/Problem"
+
 components:
   parameters:
     ReportId:
@@ -3542,3 +3649,94 @@ components:
           type: array
           items: {$ref: "#/components/schemas/SharedStop"}
         earnings_kes: {type: integer, format: int32}
+
+    AuthMethods:
+      type: object
+      additionalProperties: false
+      required: [methods]
+      properties:
+        methods:
+          type: array
+          items: {type: string, enum: [phone_otp, email_otp, google]}
+    RideDelivery:
+      type: object
+      additionalProperties: false
+      required: [id, user_id, event_type, push_status, attempts, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        user_id: {type: string, format: uuid}
+        event_type: {type: string}
+        status: {type: string}
+        push_status: {type: string}
+        attempts: {type: integer, format: int32}
+        acked_at: {type: string, format: date-time}
+        created_at: {type: string, format: date-time}
+    RideDeliveries:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/RideDelivery"}
+    WatchdogSummary:
+      type: object
+      additionalProperties: false
+      required: [reassigned, rider_reassigned, cancelled]
+      properties:
+        reassigned: {type: integer, format: int64}
+        rider_reassigned: {type: integer, format: int64}
+        cancelled: {type: integer, format: int64}
+    EnforcementMetric:
+      type: object
+      additionalProperties: false
+      required: [action, status, total]
+      properties:
+        action: {type: string}
+        status: {type: string}
+        total: {type: integer, format: int64}
+    EnforcementMetrics:
+      type: object
+      additionalProperties: false
+      required: [data, overdue_suspensions]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/EnforcementMetric"}
+        overdue_suspensions: {type: integer, format: int64}
+    RatingGuardrail:
+      type: object
+      additionalProperties: false
+      required: [recent, minimum, window_days]
+      properties:
+        recent: {type: integer, format: int64}
+        minimum: {type: integer, format: int64}
+        window_days: {type: integer, format: int32}
+    BulkReviewRequest:
+      type: object
+      additionalProperties: false
+      required: [document_ids, decision]
+      properties:
+        document_ids:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: {type: string, format: uuid}
+        decision: {type: string, enum: [approve, reject, request_resubmission]}
+        reason: {type: string, maxLength: 500}
+    BulkReviewResult:
+      type: object
+      additionalProperties: false
+      required: [document_id, ok]
+      properties:
+        document_id: {type: string, format: uuid}
+        ok: {type: boolean}
+        code: {type: string}
+    BulkReviewResults:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/BulkReviewResult"}

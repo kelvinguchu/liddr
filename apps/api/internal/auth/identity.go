@@ -131,3 +131,9 @@ func (s *Service) finishSignIn(ctx context.Context, q *store.Queries, acct accou
 	}
 	return tokens, audit(ctx, q, entry)
 }
+
+// EmailEnabled reports whether email sign-in is configured.
+func (s *Service) EmailEnabled() bool { return s.email != nil }
+
+// GoogleEnabled reports whether Google sign-in is configured.
+func (s *Service) GoogleEnabled() bool { return s.google != nil }

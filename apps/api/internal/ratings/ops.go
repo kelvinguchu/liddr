@@ -46,6 +46,21 @@ func (s *Service) List(ctx context.Context, ratedUser *uuid.UUID, excludedOnly b
 	return out, nil
 }
 
+// Guardrail reports whether an account has enough recent ratings to act on.
+type Guardrail struct {
+	Recent, Minimum int64
+	WindowDays      int32
+}
+
+// GuardrailFor reports on one account.
+func (s *Service) GuardrailFor(ctx context.Context, user uuid.UUID) (Guardrail, error) {
+	recent, err := s.queries.GetRatingGuardrail(ctx, store.GetRatingGuardrailParams{RatedUser: user, Since: s.now().Add(-guardrailWindow)})
+	if err != nil {
+		return Guardrail{}, fmt.Errorf("load guardrail: %w", err)
+	}
+	return Guardrail{Recent: recent, Minimum: guardrailMinimum, WindowDays: int32(guardrailWindow / (24 * time.Hour))}, nil
+}
+
 func (s *Service) lockRating(ctx context.Context, q *store.Queries, id, actor uuid.UUID) (store.GetRatingForUpdateRow, error) {
 	row, err := q.GetRatingForUpdate(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {

@@ -9,6 +9,7 @@ const TONES = {
   amber: ['pending', 'pending_review', 'under_review', 'submitted', 'triaged', 'scanning', 'resubmission_required', 'pending_callback', 'initiated', 'needs_review'],
   red: ['rejected', 'suspended', 'infected', 'failed', 'timeout', 'permanent_ban'],
   blue: ['active'],
+  grey: ['cancelled', 'dismissed', 'expired', 'lifted'],
 };
 const TONE_OF = new Map(Object.entries(TONES).flatMap(([tone, list]) => list.map((s) => [s, tone])));
 
@@ -22,9 +23,9 @@ export function severity(level) {
   return badge('', { tone: level >= 4 ? 'red' : level >= 2 ? 'amber' : '', text: `Level ${level}` });
 }
 
-/** A button. variant: primary (default), outline, ghost, danger. */
-export function button(text, { variant = 'primary', size, iconName, onClick, type = 'button', title, danger = false, disabled } = {}) {
-  const cls = ['btn', variant === 'primary' ? '' : variant, size, danger ? 'danger-text' : '', text ? '' : 'icon-only'].filter(Boolean).join(' ');
+/** A button. variant: primary (default), outline, ghost, danger, brand. */
+export function button(text, { variant = 'primary', size, iconName, onClick, type = 'button', title, danger = false, disabled, className } = {}) {
+  const cls = ['btn', variant === 'primary' ? '' : variant, size, danger ? 'danger-text' : '', text ? '' : 'icon-only', className].filter(Boolean).join(' ');
   return h('button', {
     class: cls, type, title, disabled,
     attrs: text ? undefined : { 'aria-label': title },
@@ -44,23 +45,14 @@ export async function busy(btn, action) {
   }
 }
 
-export function pageHead(title, desc, ...actions) {
-  return h('header', { class: 'page-head' },
-    h('div', {}, h('h1', { text: title }), desc && h('p', { class: 'desc', text: desc })),
-    actions.length ? h('div', { class: 'actions' }, actions) : null);
-}
-
-/** A filter select that calls onPick with the chosen value. */
-export function filter(name, options, current, onPick) {
-  const el = h('select', { class: 'select', name, attrs: { 'aria-label': name } },
-    options.map(([value, text]) => h('option', { value, text, selected: value === current })));
-  el.addEventListener('change', () => onPick(el.value));
-  return el;
-}
-
-/** A data table. columns: [{title, cell(row), right}]. onOpen makes rows open a record. */
-export function table(columns, rows, onOpen) {
-  return h('div', { class: 'table-wrap' }, h('table', {},
+/**
+ * A list of records: a table from tablet width up, and tappable cards on
+ * phones when card is given. columns: [{title, cell(row), right}].
+ * card(row) returns {title, status, tags, meta, actions}. onOpen makes a
+ * record open its detail.
+ */
+export function table(columns, rows, onOpen, card) {
+  const wide = h('div', { class: card ? 'table-wrap wide-only' : 'table-wrap' }, h('table', {},
     h('thead', {}, h('tr', {}, columns.map((c) => h('th', { class: c.right ? 'right' : undefined, text: c.title, attrs: { scope: 'col' } })))),
     h('tbody', {}, rows.map((row) => {
       const tr = h('tr', {}, columns.map((c) => h('td', { class: c.right ? 'right' : undefined }, c.cell(row))));
@@ -76,12 +68,31 @@ export function table(columns, rows, onOpen) {
       }
       return tr;
     }))));
+  if (!card) return wide;
+  return h('div', {}, h('div', { class: 'cards' }, rows.map((row) => cardFor(card(row), onOpen && (() => onOpen(row))))), wide);
+}
+
+// A phone card shows the same fields as the table row, stacked.
+function cardFor({ title, status, tags = [], meta = [], actions = [] }, open) {
+  const shownTags = tags.filter(Boolean);
+  const shownMeta = meta.filter(Boolean);
+  const shownActions = actions.filter(Boolean);
+  const body = [
+    h('span', { class: 'card-top' }, h('span', { class: 'card-title' }, title), status),
+    shownTags.length ? h('span', { class: 'card-tags' }, shownTags) : null,
+    shownMeta.length ? h('span', { class: 'card-meta' }, shownMeta.flatMap((m, i) => (i ? [h('span', { class: 'dot', text: '·', attrs: { 'aria-hidden': 'true' } }), m] : [m]))) : null,
+  ];
+  if (open && !shownActions.length) return h('button', { class: 'card', type: 'button', on: { click: open } }, body);
+  return h('div', { class: 'card' }, body, shownActions.length ? h('div', { class: 'card-actions' }, shownActions) : null);
 }
 
 export function skeleton(columns = 5, count = 6) {
-  return h('div', { class: 'table-wrap', attrs: { role: 'status', 'aria-label': 'Loading' } }, h('table', {}, h('tbody', {},
-    Array.from({ length: count }, () => h('tr', { class: 'skeleton-row' },
-      Array.from({ length: columns }, () => h('td', {}, h('div', { class: 'bar' }))))))));
+  return h('div', { attrs: { role: 'status', 'aria-label': 'Loading' } },
+    h('div', { class: 'cards' }, Array.from({ length: Math.min(count, 4) }, () => h('div', { class: 'card' },
+      h('div', { class: 'bar' }), h('div', { class: 'bar short' }), h('div', { class: 'bar shorter' })))),
+    h('div', { class: 'table-wrap wide-only' }, h('table', {}, h('tbody', {},
+      Array.from({ length: count }, () => h('tr', { class: 'skeleton-row' },
+        Array.from({ length: columns }, () => h('td', {}, h('div', { class: 'bar' })))))))));
 }
 
 export function empty(text) {
@@ -116,9 +127,13 @@ export async function paged(load, show, emptyText) {
   return wrap;
 }
 
+/**
+ * A strip of headline figures: [label, value, tone]. Tone 'brand' marks the
+ * figure the reviewer should act on; true or 'warn' marks a problem.
+ */
 export function stats(items) {
-  return h('div', { class: 'stats' }, items.filter(Boolean).map(([k, v, warn]) =>
-    h('div', { class: `stat ${warn ? 'warn' : ''}`.trim() }, h('span', { class: 'k', text: k }), h('span', { class: 'v' }, v))));
+  return h('div', { class: 'stats' }, items.filter(Boolean).map(([k, v, tone]) =>
+    h('div', { class: `stat ${tone === true ? 'warn' : tone || ''}`.trim() }, h('span', { class: 'k', text: k }), h('span', { class: 'v' }, v))));
 }
 
 /** A titled block of label/value rows. */

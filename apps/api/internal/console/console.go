@@ -71,6 +71,9 @@ func Handler(cfg Config) (http.Handler, error) {
 		h.Set("Referrer-Policy", "no-referrer")
 		h.Set("Cross-Origin-Opener-Policy", "same-origin")
 		h.Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()")
+		// Embedded files carry no modification time, so make browsers revalidate
+		// rather than mix an old script with a newly deployed page.
+		h.Set("Cache-Control", "no-cache")
 		http.ServeFileFS(w, r, root, name) //nolint:gosec // name passed fs.ValidPath and root is the embedded FS, which holds only the console's own files.
 	}), nil
 }

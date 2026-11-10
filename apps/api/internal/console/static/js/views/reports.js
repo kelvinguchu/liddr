@@ -2,12 +2,13 @@
 
 import { get, post, query } from '../api.js';
 import { h, fill, when, label, shortId } from '../dom.js';
-import { badge, busy, button, details, drawer, field, filter, formDialog, input, pageHead, paged, report, section, select, severity, stats, table, textArea, toast } from '../ui.js';
+import { badge, busy, button, details, drawer, field, formDialog, input, paged, report, section, select, severity, stats, table, textArea, toast } from '../ui.js';
+import { filters, pageHead } from '../controls.js';
 
 const STATUSES = [['submitted', 'New'], ['triaged', 'Triaged'], ['under_review', 'Under review'], ['resolved', 'Resolved'], ['dismissed', 'Dismissed']];
 const DECISIONS = ['no_action', 'warning', 'temporary_suspension', 'permanent_ban', 'needs_more_info', 'escalate', 'dismiss'];
 
-export async function mount(page, { params, go, goto }) {
+export async function mount(page, { params, go, goto, refresh }) {
   const status = STATUSES.some(([s]) => s === params.get('status')) ? params.get('status') : 'submitted';
   const sheet = drawer(() => go(''));
   let current = '';
@@ -22,15 +23,20 @@ export async function mount(page, { params, go, goto }) {
       { title: 'About account', cell: (r) => shortId(r.reported_id) },
       { title: 'Received', cell: (r) => h('span', { class: 'muted', text: when(r.created_at) }) },
       { title: 'Status', cell: (r) => badge(r.status) },
-    ], rows, (r) => go(r.id)),
+    ], rows, (r) => go(r.id), (r) => ({
+      title: label(r.category),
+      status: badge(r.status),
+      tags: [severity(r.severity), h('span', { text: label(r.incident_type) })],
+      meta: [label(r.source), h('span', {}, 'About ', shortId(r.reported_id)), when(r.created_at)],
+    })),
     status === 'submitted' ? 'No new reports.' : 'No reports in this state.',
   );
   const list = h('div', {}, await load());
   const reloadList = async () => fill(list, await load());
 
   fill(page,
-    pageHead('Reports', 'Most severe first. Start a review before looking into a case, so two people do not work it at once.'),
-    h('div', { class: 'toolbar' }, filter('Status', STATUSES, status, (s) => go('', { status: s }))),
+    pageHead({ title: 'Reports', desc: 'Most severe first. Start a review before looking into a case, so two people do not work it at once.', refresh }),
+    filters([{ key: 'status', label: 'Status', options: STATUSES, value: status, fallback: 'submitted' }], (v) => go('', v)),
     list);
 
   async function open(id) {

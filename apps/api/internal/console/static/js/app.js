@@ -4,7 +4,7 @@ import { get, hasSession, refresh, setSignedOutHandler, setStepUpPrompt, signOut
 import { h, fill } from './dom.js';
 import { icon } from './icons.js';
 import { signIn, afterSignIn } from './signin.js';
-import { askStepUp, badge, button, failure, skeleton } from './ui.js';
+import { askStepUp, badge, button, failure, report, skeleton } from './ui.js';
 import * as documents from './views/documents.js';
 import * as reports from './views/reports.js';
 import * as disputes from './views/disputes.js';
@@ -35,7 +35,8 @@ let main = null;
 let crumb = null;
 let stepUpChip = null;
 let stepUpTimer = 0;
-let mounted = null;
+let shown = null; // { key, handle } of the view on screen
+let pending = null; // token of the view being mounted
 let me = null;
 
 /** Reads #/section/id?key=value. */
@@ -55,6 +56,12 @@ function go(section, id = '', params = {}) {
   else location.hash = next;
 }
 
+function reset() {
+  pending = null;
+  if (shown) shown.handle.destroy();
+  shown = null;
+}
+
 function initials(name) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return 'ST';
@@ -72,7 +79,6 @@ function shell() {
   const logo = (cls, src) => h('img', { class: cls, src, alt: 'liddr', width: 74, height: 32 });
   crumb = h('strong');
   stepUpChip = h('span', { hidden: true });
-  const reload = button('', { variant: 'outline', size: 'sm', iconName: 'refresh', title: 'Refresh this page', onClick: () => { mounted = null; render(); } });
   main = h('main', { class: 'main', id: 'main', tabIndex: -1 });
   shellEl = h('div', { class: 'shell' },
     h('div', { class: 'scrim', on: { click: () => shellEl.classList.remove('nav-open') } }),
@@ -81,15 +87,16 @@ function shell() {
       nav,
       h('div', { class: 'user' },
         h('div', { class: 'avatar', text: initials(name), attrs: { 'aria-hidden': 'true' } }),
-        h('div', { class: 'who' }, h('div', { class: 'name', text: name }), badge('', { text: staffRoles().map((r) => r === 'admin' ? 'Admin' : 'Operations').join(' · ') })),
+        h('div', { class: 'who' }, h('div', { class: 'name', text: name }), badge('', { tone: 'brand', text: staffRoles().map((r) => r === 'admin' ? 'Admin' : 'Operations').join(' · ') })),
         button('', { variant: 'ghost', size: 'sm', iconName: 'signout', title: 'Sign out', onClick: leave }))),
     h('div', { class: 'frame' },
       h('header', { class: 'topbar' },
-        button('', { variant: 'outline', size: 'sm', iconName: 'menu', title: 'Open menu', onClick: () => shellEl.classList.add('nav-open') }),
+        h('a', { class: 'topbar-logo', href: '#/documents', attrs: { 'aria-label': 'Liddr Ops, driver documents' } },
+          logo('logo-on-light', '/ops/logo-dark.svg'), logo('logo-on-dark', '/ops/logo.svg')),
         h('div', { class: 'crumbs' }, h('span', { text: 'Operations' }), h('span', { text: '/' }), crumb),
-        h('div', { class: 'end' }, stepUpChip, reload)),
+        h('div', { class: 'end' }, stepUpChip,
+          button('', { variant: 'outline', iconName: 'menu', title: 'Open menu', className: 'menu-btn', onClick: () => shellEl.classList.add('nav-open') }))),
       main));
-  shellEl.querySelector('.topbar .btn').classList.add('only-mobile');
   fill(root, shellEl);
   root.className = '';
   root.removeAttribute('aria-busy');
@@ -105,49 +112,73 @@ function showStepUp() {
     stepUpChip.hidden = true;
     return;
   }
-  fill(stepUpChip, badge('', { tone: 'green', text: `Confirmed · ${Math.max(1, Math.round(left / 60000))} min left` }));
-  stepUpChip.firstChild.prepend(icon('shield', { size: 14 }));
+  const minutes = Math.max(1, Math.round(left / 60000));
+  const chip = badge('', { tone: 'brand', text: '' });
+  chip.title = `High-risk actions are confirmed for ${minutes} more minute${minutes === 1 ? '' : 's'}`;
+  fill(chip, icon('shield', { size: 14 }), h('span', { class: 'long', text: `Confirmed · ${minutes} min left` }), h('span', { class: 'short', text: `${minutes} min` }));
+  fill(stepUpChip, chip);
   stepUpChip.hidden = false;
 }
 
-function render() {
-  if (!main) return;
+/**
+ * Shows the view for the current route. With reload, the view on screen stays
+ * (dimmed) while its replacement loads, so a refresh never blanks the page.
+ */
+function render({ reload = false } = {}) {
+  if (!main) return Promise.resolve();
   const { section, id, params } = route();
   const current = SECTIONS.find((s) => s.path === section);
   if (!current) {
     location.replace('#/documents');
-    return;
+    return Promise.resolve();
   }
   const key = `${section}?${params}`;
   showStepUp();
-  if (mounted && mounted.key === key) {
-    if (mounted.handle) mounted.handle.show(id);
-    return;
+  if (!reload && !pending && shown && shown.key === key) {
+    shown.handle.show(id);
+    return Promise.resolve();
   }
-  if (mounted && mounted.handle) mounted.handle.destroy();
-  for (const link of shellEl.querySelectorAll('.nav a')) {
-    if (link.dataset.section === current.path) link.setAttribute('aria-current', 'page');
-    else link.removeAttribute('aria-current');
-  }
-  fill(crumb, current.label);
-  document.title = `${current.label} · Liddr Ops`;
+  const token = {};
+  pending = token;
   const page = h('div', { class: 'page' }, skeleton());
-  fill(main, page);
-  const mount = { key, handle: null };
-  mounted = mount;
-  current.view.mount(page, { params, go: (sub, p) => go(section, sub, p ?? params), goto: go, refresh: () => { mounted = null; render(); } })
+  if (reload && shown) {
+    main.firstElementChild.classList.add('refreshing');
+  } else {
+    if (shown) shown.handle.destroy();
+    shown = null;
+    for (const link of shellEl.querySelectorAll('.nav a')) {
+      if (link.dataset.section === current.path) link.setAttribute('aria-current', 'page');
+      else link.removeAttribute('aria-current');
+    }
+    fill(crumb, current.label);
+    document.title = `${current.label} · Liddr Ops`;
+    fill(main, page);
+  }
+  const ctx = { params, go: (sub, p) => go(section, sub, p ?? params), goto: go, refresh: () => render({ reload: true }) };
+  return current.view.mount(page, ctx)
     .then((handle) => {
-      if (mounted !== mount) return handle.destroy();
-      mount.handle = handle;
+      if (pending !== token) return handle.destroy();
+      pending = null;
+      if (shown) shown.handle.destroy();
+      if (page.parentNode !== main) fill(main, page);
+      shown = { key, handle };
       return handle.show(route().id);
     })
-    .catch((err) => fill(page, failure(err, () => { mounted = null; render(); })));
+    .catch((err) => {
+      if (pending !== token) return;
+      pending = null;
+      if (shown) {
+        main.firstElementChild.classList.remove('refreshing');
+        report(err);
+      } else {
+        fill(page, failure(err, () => render()));
+      }
+    });
 }
 
 async function leave() {
   clearInterval(stepUpTimer);
-  if (mounted && mounted.handle) mounted.handle.destroy();
-  mounted = null;
+  reset();
   await signOut();
   location.hash = '';
   start('You have signed out.');
@@ -178,7 +209,7 @@ async function enter() {
   } catch {
     me = null;
   }
-  mounted = null;
+  reset();
   shell();
   render();
 }
@@ -186,11 +217,10 @@ async function enter() {
 setStepUpPrompt(() => askStepUp().finally(showStepUp));
 setSignedOutHandler(() => {
   if (!main) return;
-  if (mounted && mounted.handle) mounted.handle.destroy();
-  mounted = null;
+  reset();
   start('Your session ended. Please sign in again.');
 });
-window.addEventListener('hashchange', render);
+window.addEventListener('hashchange', () => render());
 start().catch((err) => {
   root.className = 'boot';
   fill(root, failure(err, () => location.reload()));

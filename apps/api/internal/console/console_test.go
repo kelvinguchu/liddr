@@ -53,7 +53,7 @@ func TestConsoleServesItsFilesSafely(t *testing.T) {
 	if strings.Contains(policy, "unsafe-inline") || strings.Contains(policy, "unsafe-eval") {
 		t.Errorf("policy allows inline code: %q", policy)
 	}
-	if rec.Header().Get("X-Frame-Options") != "DENY" || rec.Header().Get("Referrer-Policy") != "no-referrer" {
+	if rec.Header().Get("X-Frame-Options") != "DENY" || rec.Header().Get("Referrer-Policy") != "no-referrer" || rec.Header().Get("Cache-Control") != "no-cache" {
 		t.Errorf("headers = %v", rec.Header())
 	}
 }

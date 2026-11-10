@@ -3,7 +3,8 @@
 import { get, post, query } from '../api.js';
 import { h, fill, when, day, label } from '../dom.js';
 import { icon } from '../icons.js';
-import { badge, busy, button, details, drawer, field, filter, formDialog, pageHead, paged, report, stats, table, textArea, toast } from '../ui.js';
+import { badge, busy, button, details, drawer, field, formDialog, paged, report, stats, table, textArea, toast } from '../ui.js';
+import { filters, pageHead } from '../controls.js';
 
 // Under review comes first: an application lands there once every document is in.
 const STATUSES = [
@@ -25,7 +26,7 @@ const ORDER = Object.keys(DOCUMENT_NAMES);
 const docName = (type) => DOCUMENT_NAMES[type] || label(type);
 const OPEN = ['pending', 'under_review', 'resubmission_required'];
 
-export async function mount(page, { params, go }) {
+export async function mount(page, { params, go, refresh }) {
   const status = STATUSES.some(([s]) => s === params.get('status')) ? params.get('status') : 'under_review';
   const sheet = drawer(() => go(''));
   let current = '';
@@ -39,15 +40,20 @@ export async function mount(page, { params, go }) {
       { title: 'Application', cell: (r) => badge(r.application.status) },
       { title: 'Driver status', cell: (r) => label(r.driver_status) },
       { title: 'Submitted', cell: (r) => h('span', { class: 'muted', text: when(r.application.created_at) }) },
-    ], rows, (r) => go(r.application.id)),
+    ], rows, (r) => go(r.application.id), (r) => ({
+      title: r.full_name || 'Name not given',
+      status: badge(r.application.status),
+      tags: [r.plate_number && h('span', { class: 'mono', text: r.plate_number }), h('span', { class: 'num', text: r.phone_masked })],
+      meta: [`Driver ${label(r.driver_status).toLowerCase()}`, `Submitted ${when(r.application.created_at)}`],
+    })),
     EMPTY[status] || 'No applications in this state.',
   );
   const list = h('div', {}, await load());
   const reloadList = async () => fill(list, await load());
 
   fill(page,
-    pageHead('Driver documents', 'Check every document against the driver, then decide on the application.'),
-    h('div', { class: 'toolbar' }, filter('Status', STATUSES, status, (s) => go('', { status: s }))),
+    pageHead({ title: 'Driver documents', desc: 'Check every document against the driver, then decide on the application.', refresh }),
+    filters([{ key: 'status', label: 'Status', options: STATUSES, value: status, fallback: 'under_review' }], (v) => go('', v)),
     list);
 
   async function open(id) {
@@ -121,7 +127,7 @@ export async function mount(page, { params, go }) {
         decide('suspend', 'Suspend', { variant: 'ghost', danger: true }),
       ] : [],
     },
-    stats([['Application', badge(s.application.status)], ['Validated', `${validated} of ${docs.length}`], ['Awaiting you', String(waiting)], ['Driver status', label(s.driver_status)]]),
+    stats([['Application', badge(s.application.status)], ['Validated', `${validated} of ${docs.length}`], ['Awaiting you', String(waiting), waiting > 0 && 'brand'], ['Driver status', label(s.driver_status)]]),
     !isOpen && h('p', { class: 'muted', text: `Decided ${when(s.application.decided_at)}${s.application.decision_reason ? `: ${s.application.decision_reason}` : '.'}` }),
     h('section', { class: 'section' },
       h('div', { class: 'bulkbar' }, h('h3', { text: 'Documents' }), h('span', { class: 'spacer' }), isOpen && waiting > 0 && bulk),

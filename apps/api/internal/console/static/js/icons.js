@@ -23,6 +23,9 @@ const ICONS = {
   alert: [['circle', 12, 12, 9], ['path', 'M12 7.5v5.5M12 16.5v.01']],
   external: [['path', 'M14 4h6v6'], ['path', 'M20 4l-9 9'], ['path', 'M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5']],
   arrowLeft: [['path', 'M19 12H5M11 6l-6 6 6 6']],
+  more: [['circle', 5.5, 12, 1.2], ['circle', 12, 12, 1.2], ['circle', 18.5, 12, 1.2]],
+  sliders: [['path', 'M4 7h9M17 7h3M4 17h3M11 17h9'], ['circle', 15, 7, 2], ['circle', 9, 17, 2]],
+  chevronDown: [['path', 'M6 9l6 6 6-6']],
 };
 
 /** Returns an icon element; decorative unless a label is given. */

@@ -2,7 +2,8 @@
 
 import { get, post, query } from '../api.js';
 import { h, fill, when, label, shortId } from '../dom.js';
-import { badge, details, drawer, field, filter, formDialog, input, pageHead, paged, section, select, severity, stats, table, textArea, toast } from '../ui.js';
+import { badge, details, drawer, field, formDialog, input, paged, section, select, severity, stats, table, textArea, toast } from '../ui.js';
+import { filters, pageHead } from '../controls.js';
 
 const STATUSES = [['submitted', 'New'], ['triaged', 'Triaged'], ['under_review', 'Under review'], ['resolved', 'Resolved'], ['dismissed', 'Dismissed']];
 const OUTCOMES = ['no_action', 'refund_full', 'refund_partial', 'credit_note', 'escalate', 'dismissed'];
@@ -11,7 +12,7 @@ const OUTCOME_NAMES = {
   credit_note: 'Credit for a future ride', escalate: 'Escalate', dismissed: 'Dismiss',
 };
 
-export async function mount(page, { params, go, goto }) {
+export async function mount(page, { params, go, goto, refresh }) {
   const status = STATUSES.some(([s]) => s === params.get('status')) ? params.get('status') : 'submitted';
   const sheet = drawer(() => go(''));
   const loaded = new Map();
@@ -30,14 +31,19 @@ export async function mount(page, { params, go, goto }) {
       { title: 'Against', cell: (d) => shortId(d.reported_id) },
       { title: 'Received', cell: (d) => h('span', { class: 'muted', text: when(d.created_at) }) },
       { title: 'Status', cell: (d) => badge(d.status) },
-    ], rows, (d) => go(d.id)),
+    ], rows, (d) => go(d.id), (d) => ({
+      title: label(d.dispute_type),
+      status: badge(d.status),
+      tags: [severity(d.severity), h('span', { text: d.requested_resolution ? `Asks for ${label(d.requested_resolution).toLowerCase()}` : 'Nothing specific asked for' })],
+      meta: [h('span', {}, 'Ride ', shortId(d.ride_id)), h('span', {}, 'Against ', shortId(d.reported_id)), when(d.created_at)],
+    })),
     status === 'submitted' ? 'No new disputes.' : 'No disputes in this state.',
   );
   const list = h('div', {}, await load());
 
   fill(page,
-    pageHead('Disputes', 'Refunds are capped at what the person was charged for the ride.'),
-    h('div', { class: 'toolbar' }, filter('Status', STATUSES, status, (s) => go('', { status: s }))),
+    pageHead({ title: 'Disputes', desc: 'Refunds are capped at what the person was charged for the ride.', refresh }),
+    filters([{ key: 'status', label: 'Status', options: STATUSES, value: status, fallback: 'submitted' }], (v) => go('', v)),
     list);
 
   function open(id) {

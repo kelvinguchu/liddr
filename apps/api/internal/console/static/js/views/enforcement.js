@@ -2,7 +2,8 @@
 
 import { get, post, query } from '../api.js';
 import { h, fill, when, label, isUUID, shortId } from '../dom.js';
-import { badge, button, empty, field, filter, formDialog, input, pageHead, paged, select, stats, table, textArea, toast } from '../ui.js';
+import { badge, button, empty, field, formDialog, input, paged, select, stats, table, textArea, toast } from '../ui.js';
+import { filters, pageHead } from '../controls.js';
 import { icon } from '../icons.js';
 import { nairobi } from './reports.js';
 
@@ -21,6 +22,7 @@ export async function mount(page, { params, go, refresh }) {
       (rows) => {
         const shown = user ? rows.filter((r) => r.user_id === user) : rows;
         if (!shown.length) return empty('This account has no penalties in the rows loaded so far.');
+        const lifting = (r) => r.status === 'active' && button('Lift', { variant: 'outline', size: 'sm', onClick: () => lift(r).then((ok) => ok && reload()) });
         return table([
           { title: 'Account', cell: (r) => shortId(r.user_id) },
           { title: 'Penalty', cell: (r) => label(r.action) },
@@ -28,8 +30,14 @@ export async function mount(page, { params, go, refresh }) {
           { title: 'From', cell: (r) => h('span', { class: 'muted', text: when(r.starts_at) }) },
           { title: status === 'lifted' ? 'Lifted' : 'Until', cell: (r) => h('span', { class: 'muted', text: status === 'lifted' ? when(r.lifted_at) : r.ends_at ? when(r.ends_at) : 'No end' }) },
           { title: 'Status', cell: (r) => badge(r.status, { text: r.status === 'active' ? 'In force' : label(r.status) }) },
-          { title: '', right: true, cell: (r) => r.status === 'active' ? h('div', { class: 'row-actions' }, button('Lift', { variant: 'outline', size: 'sm', onClick: () => lift(r).then((ok) => ok && reload()) })) : '' },
-        ], shown);
+          { title: '', right: true, cell: (r) => r.status === 'active' ? h('div', { class: 'row-actions' }, lifting(r)) : '' },
+        ], shown, undefined, (r) => ({
+          title: label(r.action),
+          status: badge(r.status, { text: r.status === 'active' ? 'In force' : label(r.status) }),
+          tags: [h('span', { class: 'mono', text: r.reason_code }), h('span', {}, 'Account ', shortId(r.user_id))],
+          meta: [`From ${when(r.starts_at)}`, status === 'lifted' ? `Lifted ${when(r.lifted_at)}` : r.ends_at ? `Until ${when(r.ends_at)}` : 'No end'],
+          actions: [lifting(r)],
+        }));
       },
       status === 'active' ? 'No penalties are in force.' : `No ${label(status).toLowerCase()} penalties.`,
     ),
@@ -38,19 +46,24 @@ export async function mount(page, { params, go, refresh }) {
   const active = metrics.data.filter((m) => m.status === 'active');
   const total = (action) => active.filter((m) => m.action === action).reduce((n, m) => n + m.total, 0);
   const clear = button('', { variant: 'ghost', size: 'sm', iconName: 'close', title: 'Show every account', onClick: () => go('', { status }) });
+  const applyPenalty = () => apply(user).then((ok) => ok && reload());
 
   fill(page,
-    pageHead('Penalties', 'Every penalty carries a reason and the staff member who applied it.',
-      button('Apply a penalty', { iconName: 'plus', onClick: () => apply(user).then((ok) => ok && reload()) })),
+    pageHead({
+      title: 'Penalties', desc: 'Every penalty carries a reason and the staff member who applied it.', refresh,
+      actions: [{ text: 'Apply a penalty', iconName: 'plus', onClick: applyPenalty }],
+    }),
     stats([
-      ['Suspended now', String(total('temporary_suspension'))],
+      ['Suspended now', String(total('temporary_suspension')), 'brand'],
       ['Banned', String(total('permanent_ban'))],
       ['Restricted', String(total('feature_restriction'))],
       ['Suspensions past their end', String(metrics.overdue_suspensions), metrics.overdue_suspensions > 0],
     ]),
-    h('div', { class: 'toolbar' },
-      filter('Status', STATUSES, status, (s) => go('', { status: s, user })),
-      user && h('span', { class: 'chip' }, icon('search', { size: 14 }), h('span', { class: 'mono', text: `Account ${user.slice(0, 8)}` }), clear)),
+    user && h('div', { class: 'toolbar' }, h('span', { class: 'chip' }, icon('search', { size: 14 }), h('span', { class: 'mono', text: `Account ${user.slice(0, 8)}` }), clear)),
+    filters([
+      { key: 'status', label: 'Status', options: STATUSES, value: status, fallback: 'active' },
+      { key: 'user', label: 'Account', value: user, fallback: '', hidden: true },
+    ], (v) => go('', v)),
     list);
 
   return { show() {}, destroy() {} };

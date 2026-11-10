@@ -3,7 +3,8 @@
 import { get, post } from '../api.js';
 import { h, fill, when, label, kes, isUUID } from '../dom.js';
 import { icon } from '../icons.js';
-import { badge, busy, button, details, empty, failure, filter, pageHead, report, section, skeleton, stats, table, toast } from '../ui.js';
+import { badge, busy, button, details, empty, failure, report, section, skeleton, stats, table, toast } from '../ui.js';
+import { pageHead } from '../controls.js';
 
 const KINDS = [['driver', 'Driver account ID'], ['checkout', 'M-Pesa checkout request ID']];
 const PLACEHOLDER = { driver: 'e.g. 8d03619a-027f-441b-…', checkout: 'e.g. ws_CO_10112026…' };
@@ -19,12 +20,14 @@ export async function mount(page) {
   const out = h('div', { class: 'page' }, empty('Look up a driver or a payment to see it here.'));
   const value = h('input', { class: 'input mono', name: 'lookup', required: true, maxLength: 100, spellcheck: false, autocomplete: 'off', placeholder: PLACEHOLDER.driver, attrs: { 'aria-label': 'ID to look up' } });
   const go = button('Look up', { type: 'submit' });
-  const pick = filter('Look up by', KINDS, kind, (k) => {
-    kind = k;
-    value.placeholder = PLACEHOLDER[k];
+  const pick = h('select', { class: 'select', name: 'kind', attrs: { 'aria-label': 'Look up by' } },
+    KINDS.map(([v, text]) => h('option', { value: v, text, selected: v === kind })));
+  pick.addEventListener('change', () => {
+    kind = pick.value;
+    value.placeholder = PLACEHOLDER[kind];
     value.focus();
   });
-  const form = h('form', { class: 'toolbar' }, pick, h('div', { class: 'with-icon' }, icon('search', { size: 16 }), value), go);
+  const form = h('form', { class: 'toolbar lookup' }, pick, h('div', { class: 'with-icon' }, icon('search', { size: 16 }), value), go);
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     const id = value.value.trim();
@@ -46,7 +49,7 @@ export async function mount(page) {
   const showPayment = (p, checkoutId) => fill(out, payment(p, checkoutId, showPayment));
 
   fill(page,
-    pageHead('Payments', 'Driver subscriptions and M-Pesa payments. A recheck asks M-Pesa directly and can activate a driver who paid.'),
+    pageHead({ title: 'Payments', desc: 'Driver subscriptions and M-Pesa payments. A recheck asks M-Pesa directly and can activate a driver who paid.' }),
     form, out);
   value.focus();
   return { show() {}, destroy() {} };
@@ -54,7 +57,7 @@ export async function mount(page) {
 
 function driver(d) {
   return h('div', { class: 'page' },
-    stats([['This week', badge(d.status)], ['Weekly amount', kes(d.amount_kes)], ['Account reference', h('span', { class: 'mono', text: d.reference })]]),
+    stats([['This week', badge(d.status), 'brand'], ['Weekly amount', kes(d.amount_kes)], ['Account reference', h('span', { class: 'mono', text: d.reference })]]),
     section('Payment attempts', d.payments.length ? table([
       { title: 'Requested', cell: (p) => h('span', { class: 'muted', text: when(p.requested_at) }) },
       { title: 'Amount', right: true, cell: (p) => h('span', { class: 'num', text: kes(p.amount_kes) }) },
@@ -62,7 +65,12 @@ function driver(d) {
       { title: 'Receipt', cell: (p) => p.receipt ? h('span', { class: 'mono', text: p.receipt }) : '—' },
       { title: 'Paid', cell: (p) => h('span', { class: 'muted', text: when(p.paid_at) }) },
       { title: 'Status', cell: (p) => state(p.status) },
-    ], d.payments) : empty('This driver has not tried to pay yet.')));
+    ], d.payments, undefined, (p) => ({
+      title: h('span', { class: 'num', text: kes(p.amount_kes) }),
+      status: state(p.status),
+      tags: [h('span', { text: by(p.channel) }), p.receipt && h('span', { class: 'mono', text: p.receipt })],
+      meta: [`Requested ${when(p.requested_at)}`, p.paid_at && `Paid ${when(p.paid_at)}`],
+    })) : empty('This driver has not tried to pay yet.')));
 }
 
 function payment(p, checkoutId, redraw) {

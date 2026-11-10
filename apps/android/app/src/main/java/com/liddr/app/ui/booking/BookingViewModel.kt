@@ -3,6 +3,8 @@ package com.liddr.app.ui.booking
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.liddr.app.data.Coordinates
+import com.liddr.app.data.Delivery
+import com.liddr.app.data.DeliveryRequest
 import com.liddr.app.data.LiddrApi
 import com.liddr.app.data.Locator
 import com.liddr.app.data.OfflineException
@@ -11,12 +13,13 @@ import com.liddr.app.data.PlaceFinder
 import com.liddr.app.data.PlaceSearchUnavailable
 import com.liddr.app.data.ProblemException
 import com.liddr.app.data.Quote
+import com.liddr.app.data.Realtime
+import com.liddr.app.data.RealtimeEvent
 import com.liddr.app.data.Ride
 import com.liddr.app.data.RideStatus
+import com.liddr.app.data.SendApi
 import com.liddr.app.data.VehicleCategory
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,7 +27,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class Stage { RESUMING, HOME, SEARCH, OPTIONS, TRIP, RATE }
+enum class Stage { RESUMING, HOME, SEARCH, OPTIONS, SEND_DETAILS, TRIP, RATE }
 
 enum class SearchTarget { PICKUP, DROPOFF }
 
@@ -50,12 +53,18 @@ data class BookingUiState(
     val reconnecting: Boolean = false,
     val driverPhoto: ByteArray? = null,
     val ratingRideId: String? = null,
+    val delivery: Delivery? = null,
+    val needsAcknowledgement: Boolean = false,
+    val sharedQuote: Quote? = null,
+    val sharing: Boolean = false,
 )
 
 class BookingViewModel(
     private val api: LiddrApi,
+    private val send: SendApi,
     private val places: PlaceFinder,
     private val locator: Locator,
+    private val realtime: Realtime,
 ) : ViewModel() {
     private val _ui = MutableStateFlow(BookingUiState())
     val ui: StateFlow<BookingUiState> = _ui.asStateFlow()
@@ -65,6 +74,7 @@ class BookingViewModel(
     private var visible = false
 
     init {
+        viewModelScope.launch { realtime.events.collect(::onLive) }
         viewModelScope.launch {
             val active = runCatching { api.findActiveRide() }.getOrNull()
             if (active != null) {
@@ -95,6 +105,7 @@ class BookingViewModel(
     }
 
     fun openSearch(target: SearchTarget) {
+        places.startSession()
         _ui.update { it.copy(stage = Stage.SEARCH, target = target, query = "", results = null, searchError = null, searching = false) }
     }
 
@@ -103,6 +114,7 @@ class BookingViewModel(
         _ui.update {
             when (it.stage) {
                 Stage.SEARCH, Stage.OPTIONS -> it.copy(stage = Stage.HOME, error = null)
+                Stage.SEND_DETAILS -> it.copy(stage = Stage.OPTIONS, error = null, needsAcknowledgement = false)
                 else -> it
             }
         }
@@ -127,8 +139,21 @@ class BookingViewModel(
         }
     }
 
-    fun choosePlace(place: Place) {
+    fun choosePlace(chosen: Place) {
         searchJob?.cancel()
+        if (chosen.point == null) {
+            _ui.update { it.copy(searching = true) }
+            viewModelScope.launch {
+                try {
+                    choosePlace(places.resolve(chosen))
+                } catch (e: PlaceSearchUnavailable) {
+                    _ui.update { it.copy(searchError = e.message, searching = false) }
+                }
+            }
+            return
+        }
+        val place = chosen
+        _ui.update { it.copy(searching = false) }
         val target = _ui.value.target
         _ui.update {
             if (target == SearchTarget.PICKUP) it.copy(pickup = place, stage = Stage.HOME, locationError = null) else it.copy(dropoff = place, stage = Stage.HOME)
@@ -141,7 +166,7 @@ class BookingViewModel(
         val state = _ui.value
         val pickup = state.pickup?.point ?: return
         val dropoff = state.dropoff?.point ?: return
-        _ui.update { it.copy(stage = Stage.OPTIONS, optionsLoading = true, options = emptyList(), selected = null, error = null) }
+        _ui.update { it.copy(stage = Stage.OPTIONS, optionsLoading = true, options = emptyList(), selected = null, error = null, sharing = false, sharedQuote = null) }
         viewModelScope.launch {
             try {
                 val options = fetchOptions(pickup, dropoff)
@@ -156,12 +181,32 @@ class BookingViewModel(
         }
     }
 
-    fun select(slug: String) = _ui.update { it.copy(selected = slug) }
+    fun select(slug: String) = _ui.update { it.copy(selected = slug, sharing = false, sharedQuote = null) }
+
+    /** Prices the chosen car as a shared trip, so the rider sees exactly what they save. */
+    fun setSharing(share: Boolean) {
+        val state = _ui.value
+        if (!share) {
+            _ui.update { it.copy(sharing = false) }
+            return
+        }
+        val pickup = state.pickup?.point ?: return
+        val dropoff = state.dropoff?.point ?: return
+        val slug = state.selected ?: return
+        act {
+            val quote = api.createQuote(slug, pickup, dropoff, shared = true)
+            _ui.update { it.copy(sharing = true, sharedQuote = quote) }
+        }
+    }
 
     fun book() {
         val state = _ui.value
-        val quote = state.options.firstOrNull { it.category.slug == state.selected }?.quote ?: return
+        val quote = state.sharedQuote?.takeIf { state.sharing } ?: state.options.firstOrNull { it.category.slug == state.selected }?.quote ?: return
         if (state.busy) return
+        if (state.selected == SEND_CATEGORY) {
+            _ui.update { it.copy(stage = Stage.SEND_DETAILS, error = null) }
+            return
+        }
         act {
             try {
                 showRide(api.bookRide(quote.id))
@@ -175,6 +220,21 @@ class BookingViewModel(
         }
     }
 
+    /** Books a delivery on the Send quote the sender chose. */
+    fun sendPackage(details: DeliveryRequest) {
+        val state = _ui.value
+        val quote = state.options.firstOrNull { it.category.slug == SEND_CATEGORY }?.quote ?: return
+        act {
+            try {
+                showRide(send.book(details.copy(quoteId = quote.id, liabilityAcknowledged = state.needsAcknowledgement && details.liabilityAcknowledged)))
+            } catch (e: ProblemException) {
+                if (e.code == "LIABILITY_ACK_REQUIRED") _ui.update { it.copy(needsAcknowledgement = true) }
+                if (e.code == "QUOTE_EXPIRED" || e.code == "QUOTE_NOT_FOUND") loadOptions()
+                throw e
+            }
+        }
+    }
+
     fun cancel(reason: String) {
         val id = _ui.value.ride?.id ?: return
         act { _ui.update { it.copy(ride = api.cancelRide(id, reason)) } }
@@ -183,7 +243,7 @@ class BookingViewModel(
     /** Leaves a finished trip. The places stay, so booking again is quick. */
     fun finishTrip() {
         pollJob?.cancel()
-        _ui.update { it.copy(stage = Stage.HOME, ride = null, driverPhoto = null, options = emptyList(), dropoff = null, error = null) }
+        _ui.update { it.copy(stage = Stage.HOME, ride = null, driverPhoto = null, options = emptyList(), dropoff = null, error = null, delivery = null, needsAcknowledgement = false) }
     }
 
     fun submitRating(score: Int, tags: List<String>, comment: String) {
@@ -224,29 +284,34 @@ class BookingViewModel(
     }
 
     private suspend fun fetchOptions(pickup: Coordinates, dropoff: Coordinates): List<RideOption> {
-        val categories = api.listVehicleCategories().filter { it.capacity > 0 }
-        var firstFailure: Exception? = null
-        val priced = categories.map { category ->
-            viewModelScope.async {
-                try {
-                    RideOption(category, api.createQuote(category.slug, pickup, dropoff))
-                } catch (e: ProblemException) {
-                    firstFailure = firstFailure ?: e
-                    null
-                } catch (e: OfflineException) {
-                    firstFailure = firstFailure ?: e
-                    null
-                }
-            }
-        }.awaitAll().filterNotNull()
-        if (priced.isEmpty()) firstFailure?.let { throw it }
-        return priced
+        // Send is the one category without seats, and the only one riders can book a package on.
+        val categories = api.listVehicleCategories().filter { it.capacity > 0 || it.slug == SEND_CATEGORY }.associateBy { it.slug }
+        return api.createQuotes(pickup, dropoff).mapNotNull { priced -> categories[priced.category]?.let { RideOption(it, priced.quote) } }
     }
 
     private fun showRide(ride: Ride) {
         _ui.update { it.copy(stage = Stage.TRIP, ride = ride, error = null) }
         loadPhoto(ride)
+        viewModelScope.launch { runCatching { send.getDelivery(ride.id) }.getOrNull()?.let { d -> _ui.update { it.copy(delivery = d) } } }
         if (visible) startPolling()
+    }
+
+    /** Applies a live update at once, instead of waiting for the next poll. */
+    private suspend fun onLive(event: RealtimeEvent) {
+        val ride = _ui.value.ride ?: return
+        when {
+            event.type == "driver.location" && event.rideId == ride.id && event.lat != null && event.lng != null ->
+                _ui.update { it.copy(ride = it.ride?.copy(driverLocation = Coordinates(event.lat, event.lng))) }
+            (event.type == "ride.status" && event.rideId == ride.id) || event.type == "resync" || event.type == "send.updated" -> refreshRide(ride.id)
+        }
+    }
+
+    private suspend fun refreshRide(id: String) {
+        val fresh = runCatching { api.getRide(id) }.getOrNull() ?: return
+        if (_ui.value.ride?.id != id) return
+        _ui.update { it.copy(ride = fresh) }
+        loadPhoto(fresh)
+        if (_ui.value.delivery != null) runCatching { send.getDelivery(id) }.getOrNull()?.let { d -> _ui.update { it.copy(delivery = d) } }
     }
 
     private fun startPolling() {
@@ -254,12 +319,14 @@ class BookingViewModel(
         if (_ui.value.ride?.let { RideStatus.isActive(it.status) } != true) return
         pollJob = viewModelScope.launch {
             while (true) {
-                delay(POLL_MS)
+                // Live updates do the work while the socket is up, so polling slows to a safety net.
+                delay(if (realtime.connected.value) SLOW_POLL_MS else POLL_MS)
                 val id = _ui.value.ride?.id ?: return@launch
                 try {
                     val ride = api.getRide(id)
                     _ui.update { it.copy(ride = ride, reconnecting = false) }
                     loadPhoto(ride)
+                    if (_ui.value.delivery != null) send.getDelivery(id)?.let { d -> _ui.update { it.copy(delivery = d) } }
                     if (!RideStatus.isActive(ride.status)) return@launch
                 } catch (e: OfflineException) {
                     _ui.update { it.copy(reconnecting = true) }
@@ -296,8 +363,10 @@ class BookingViewModel(
 
     private companion object {
         const val CURRENT_LOCATION = "Current location"
+        const val SEND_CATEGORY = "send"
         const val MIN_QUERY = 3
         const val SEARCH_DEBOUNCE_MS = 400L
         const val POLL_MS = 3_000L
+        const val SLOW_POLL_MS = 15_000L
     }
 }

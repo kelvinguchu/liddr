@@ -3,6 +3,14 @@ package com.liddr.app.ui.account
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -74,6 +82,9 @@ fun SignedInRoot(
             },
             onSignOut = viewModel::signOut,
             onDelete = viewModel::deleteAccount,
+            onExport = viewModel::prepareExport,
+            onExportSaved = viewModel::exportSaved,
+            onExportFailed = viewModel::exportFailed,
         )
     }
 }
@@ -122,8 +133,34 @@ private fun NameScreen(state: AccountUiState, onSave: (String) -> Unit) {
 }
 
 @Composable
-private fun AccountScreen(state: AccountUiState, onBack: () -> Unit, switchLabel: String?, onSwitch: () -> Unit, onSignOut: () -> Unit, onDelete: () -> Unit) {
+private fun AccountScreen(
+    state: AccountUiState,
+    onBack: () -> Unit,
+    switchLabel: String?,
+    onSwitch: () -> Unit,
+    onSignOut: () -> Unit,
+    onDelete: () -> Unit,
+    onExport: () -> Unit,
+    onExportSaved: (Boolean) -> Unit,
+    onExportFailed: () -> Unit,
+) {
     val colors = MaterialTheme.colorScheme
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val pending = state.export
+    val save = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri == null || pending == null) {
+            onExportSaved(false)
+            return@rememberLauncherForActivityResult
+        }
+        scope.launch {
+            val written = withContext(Dispatchers.IO) {
+                runCatching { context.contentResolver.openOutputStream(uri)?.use { it.write(pending.toByteArray()) } != null }.getOrDefault(false)
+            }
+            if (written) onExportSaved(true) else onExportFailed()
+        }
+    }
+    LaunchedEffect(pending) { if (pending != null) save.launch("liddr-data.json") }
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
     val me = state.me ?: return
     OnboardingBackground {
@@ -143,8 +180,10 @@ private fun AccountScreen(state: AccountUiState, onBack: () -> Unit, switchLabel
                 Spacer(Modifier.height(6.dp))
                 Text(me.roles.joinToString { it.replaceFirstChar(Char::uppercase) }, style = MaterialTheme.typography.bodyLarge, color = colors.onSurfaceVariant)
                 AuthError(state.error)
+                state.notice?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp)) }
             }
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(onClick = onExport, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text("Download my data") }
                 if (switchLabel != null) OutlinedButton(onClick = onSwitch, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text(switchLabel) }
                 OutlinedButton(onClick = onSignOut, enabled = !state.busy, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("Sign out") }
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {

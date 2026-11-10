@@ -80,10 +80,13 @@ internal fun TripScreen(state: BookingUiState, viewModel: BookingViewModel) {
     var askReason by rememberSaveable { mutableStateOf(false) }
     Page {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            Spacer(Modifier.height(40.dp))
-            Heading(headline(ride.status))
+            Spacer(Modifier.height(if (mapsEnabled) 8.dp else 40.dp))
+            TripMap(ride.pickup, ride.dropoff, ride.driverLocation, null)
+            if (mapsEnabled) Spacer(Modifier.height(12.dp))
+            val delivery = state.delivery
+            Heading(if (delivery != null) deliveryHeadline(ride.status, delivery) else headline(ride.status))
             Spacer(Modifier.height(6.dp))
-            TripDetail(ride)
+            if (delivery != null) DeliveryDetail(ride, delivery) else TripDetail(ride)
             if (state.reconnecting) {
                 Spacer(Modifier.height(8.dp))
                 Text("Reconnecting…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

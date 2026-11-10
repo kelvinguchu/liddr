@@ -18,6 +18,8 @@ data class AccountUiState(
     val busy: Boolean = false,
     val me: Me? = null,
     val error: String? = null,
+    val notice: String? = null,
+    val export: String? = null,
 )
 
 class AccountViewModel(private val api: LiddrApi, private val session: SessionManager) : ViewModel() {
@@ -34,12 +36,21 @@ class AccountViewModel(private val api: LiddrApi, private val session: SessionMa
 
     fun deleteAccount() = attempt { api.deleteMe() }
 
+    /** Fetches first, so a refusal shows before the person picks where to save. */
+    fun prepareExport() = attempt { _ui.update { it.copy(export = api.exportMe(), notice = null) } }
+
+    fun exportSaved(saved: Boolean) = _ui.update {
+        it.copy(export = null, notice = if (saved) "Your data was saved." else null, error = if (saved) null else it.error)
+    }
+
+    fun exportFailed() = _ui.update { it.copy(export = null, error = "We couldn't save the file. Please try again.") }
+
     fun signOut() {
         viewModelScope.launch { session.signOut() }
     }
 
     private fun attempt(loading: Boolean = false, block: suspend () -> Unit) {
-        _ui.update { it.copy(loading = loading, busy = !loading, error = null) }
+        _ui.update { it.copy(loading = loading, busy = !loading, error = null, notice = null) }
         viewModelScope.launch {
             try {
                 block()

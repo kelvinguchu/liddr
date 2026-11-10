@@ -5,7 +5,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.foundation.background
@@ -21,6 +26,7 @@ import com.liddr.app.ui.account.AccountViewModel
 import com.liddr.app.ui.account.SignedInRoot
 import com.liddr.app.ui.booking.BookingRoot
 import com.liddr.app.ui.booking.BookingViewModel
+import com.liddr.app.ui.booking.IncomingViewModel
 import com.liddr.app.service.DriverLocationControl
 import com.liddr.app.ui.driver.DriverRoot
 import com.liddr.app.ui.driver.DriverViewModel
@@ -49,20 +55,42 @@ private fun AppRoot(app: LiddrApp) {
         is SessionState.SignedOut -> OnboardingNav(
             viewModel(key = "auth-${current.generation}", factory = viewModelFactory { initializer { AuthViewModel(app.api) } }),
         )
-        is SessionState.SignedIn -> SignedInRoot(
+        is SessionState.SignedIn -> {
+            LiveWhileVisible(app)
+            SignedInRoot(
             viewModel(key = "account-${current.generation}", factory = viewModelFactory { initializer { AccountViewModel(app.api, app.session) } }),
             riderHome = { onAccount ->
                 BookingRoot(
-                    viewModel(key = "booking-${current.generation}", factory = viewModelFactory { initializer { BookingViewModel(app.api, app.places, app.locator) } }),
+                    viewModel(key = "booking-${current.generation}", factory = viewModelFactory { initializer { BookingViewModel(app.api, app.send, app.places, app.locator, app.realtime) } }),
+                    viewModel(key = "incoming-${current.generation}", factory = viewModelFactory { initializer { IncomingViewModel(app.send, app.realtime) } }),
                     onAccount,
                 )
             },
             driverHome = { onAccount ->
                 DriverRoot(
-                    viewModel(key = "driver-${current.generation}", factory = viewModelFactory { initializer { DriverViewModel(app.drivers, app.api, DriverLocationControl(app)) } }),
+                    viewModel(key = "driver-${current.generation}", factory = viewModelFactory { initializer { DriverViewModel(app.drivers, app.api, app.send, DriverLocationControl(app), app.realtime) } }),
                     onAccount,
                 )
             },
         )
+        }
+    }
+}
+
+/** Keeps the live socket open while a signed-in person has the app on screen. */
+@Composable
+private fun LiveWhileVisible(app: LiddrApp) {
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val scope = rememberCoroutineScope()
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_START) app.realtime.start(scope)
+            if (event == Lifecycle.Event.ON_STOP) app.realtime.stop()
+        }
+        lifecycle.addObserver(observer)
+        onDispose {
+            lifecycle.removeObserver(observer)
+            app.realtime.stop()
+        }
     }
 }

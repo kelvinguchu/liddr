@@ -31,6 +31,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -39,13 +40,20 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
+import java.io.File
+import kotlinx.coroutines.launch
 import com.liddr.app.data.Coordinates
+import com.liddr.app.data.Delivery
 import com.liddr.app.data.Offer
 import com.liddr.app.data.Ride
 import com.liddr.app.data.RideStatus
+import com.liddr.app.data.SharedRide
 import com.liddr.app.ui.booking.BodyText
 import com.liddr.app.ui.booking.Heading
 import com.liddr.app.ui.booking.Page
+import com.liddr.app.ui.booking.TripMap
+import com.liddr.app.ui.booking.mapsEnabled
 import com.liddr.app.ui.booking.kilometres
 import com.liddr.app.ui.booking.money
 import com.liddr.app.ui.launch.AuthError
@@ -150,6 +158,69 @@ private fun openNavigation(context: Context, target: Coordinates) {
     }
 }
 
+private fun memberAction(status: String): Pair<String, String>? = when (status) {
+    // Reaching a pickup moves a passenger to pickup_pending, meaning the driver is waiting for them.
+    "requested", "assigned" -> "arrive-pickup" to "I'm at the pickup"
+    "pickup_pending" -> "picked-up" to "Picked up"
+    "picked_up" -> "dropped-off" to "Dropped off"
+    else -> null
+}
+
+/** States are worded differently from the buttons, so a driver never mistakes one for the other. */
+private fun memberState(status: String) = when (status) {
+    "requested", "assigned" -> "Not collected yet"
+    "pickup_pending" -> "Waiting at pickup"
+    "picked_up" -> "On board"
+    "dropped_off" -> "Arrived"
+    "no_show" -> "Didn't come"
+    "cancelled" -> "Left the trip"
+    else -> status
+}
+
+/** The passengers of a shared trip, in the order the driver reaches them. */
+@Composable
+private fun SharedStops(shared: SharedRide, busy: Boolean, viewModel: DriverViewModel, context: Context) {
+    val colors = MaterialTheme.colorScheme
+    Surface(shape = RoundedCornerShape(16.dp), color = colors.surface, border = BorderStroke(1.dp, colors.outlineVariant), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Shared trip · ${shared.members.count { it.status !in setOf("cancelled", "no_show") }} passengers", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = colors.onSurface)
+            shared.members.forEachIndexed { index, member ->
+                val action = memberAction(member.status)
+                val stop = shared.stops.firstOrNull { it.memberId == member.id && it.kind == (if (member.status == "picked_up") "dropoff" else "pickup") }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Passenger ${index + 1}", style = MaterialTheme.typography.bodyMedium, color = colors.onSurface)
+                        Text(memberState(member.status), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+                    }
+                    stop?.let { TextButton(onClick = { openNavigation(context, it.point) }) { Text("Directions") } }
+                    if (action != null) TextButton(onClick = { viewModel.memberStep(member.id, action.first) }, enabled = !busy) { Text(action.second) }
+                    if (member.status == "pickup_pending") TextButton(onClick = { viewModel.memberStep(member.id, "no-show") }, enabled = !busy) { Text("No-show") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeliveryPanel(delivery: Delivery, context: Context) {
+    val colors = MaterialTheme.colorScheme
+    Surface(shape = RoundedCornerShape(16.dp), color = colors.surface, border = BorderStroke(1.dp, colors.outlineVariant), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            Text("Package: ${delivery.itemDescription}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = colors.onSurface)
+            Text("${delivery.itemSize.replaceFirstChar(Char::uppercase)} · from ${delivery.senderName} to ${delivery.recipientName}", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+            delivery.specialInstructions?.let { Text("Note: $it", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant) }
+            if (delivery.dropoffProofAt != null && delivery.confirmedAt == null) {
+                Text("Waiting for the recipient to confirm. You can complete 10 minutes after your delivery photo.", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+            }
+            delivery.recipientPhone?.let { phone ->
+                TextButton(onClick = {
+                    runCatching { context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:+$phone"))) }
+                }) { Text("Call ${delivery.recipientName}") }
+            }
+        }
+    }
+}
+
 private data class NextStep(val title: String, val button: String, val action: String)
 
 private fun nextStep(status: String) = when (status) {
@@ -164,18 +235,41 @@ private fun nextStep(status: String) = when (status) {
 internal fun DriverTripScreen(state: DriverUiState, viewModel: DriverViewModel) {
     val ride = state.ride ?: return
     val context = LocalContext.current
+    val delivery = state.delivery
+    val needsPhoto = when {
+        delivery == null -> null
+        ride.status == RideStatus.ARRIVED && delivery.pickupProofAt == null -> "pickup"
+        ride.status == RideStatus.IN_PROGRESS && delivery.dropoffProofAt == null -> "dropoff"
+        else -> null
+    }
     val step = nextStep(ride.status)
+    val scope = rememberCoroutineScope()
+    var captureUri by rememberSaveable { mutableStateOf<String?>(null) }
+    val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
+        val uri = captureUri
+        val kind = needsPhoto
+        if (saved && uri != null && kind != null) {
+            scope.launch {
+                val file = readDocument(context, Uri.parse(uri))
+                if (file == null) viewModel.reportError("We couldn't read that photo. Please take it again.") else viewModel.uploadProof(kind, file.bytes)
+            }
+        }
+    }
     var askPayment by rememberSaveable { mutableStateOf(false) }
     var askCancel by rememberSaveable { mutableStateOf(false) }
     Page {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            Spacer(Modifier.height(40.dp))
+            Spacer(Modifier.height(if (mapsEnabled) 8.dp else 40.dp))
+            if (step != null) TripMap(ride.pickup, ride.dropoff, null, null)
+            if (mapsEnabled) Spacer(Modifier.height(12.dp))
             Heading(step?.title ?: "This trip was cancelled")
             Spacer(Modifier.height(6.dp))
             BodyText(if (step != null) "Fare ${money(ride.fareKes)}, paid to you directly." else "You can go back to waiting for trips.")
             if (state.reconnecting) Text("Reconnecting…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(18.dp))
-            ride.rider?.let { rider ->
+            delivery?.let { DeliveryPanel(it, context) }
+            state.shared?.let { SharedStops(it, state.busy, viewModel, context) }
+            ride.rider?.takeIf { delivery == null }?.let { rider ->
                 Text(rider.name ?: "Your rider", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
                 rider.rating?.let { Text("★ %.1f".format(it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
@@ -188,8 +282,17 @@ internal fun DriverTripScreen(state: DriverUiState, viewModel: DriverViewModel) 
             }
             val target = if (ride.status == RideStatus.IN_PROGRESS) ride.dropoff else ride.pickup
             OutlinedButton(onClick = { openNavigation(context, target) }, modifier = Modifier.fillMaxWidth().height(48.dp)) { Text("Open directions") }
-            AuthPrimaryButton(step.button, enabled = !state.busy, busy = state.busy) {
-                if (step.action == "complete") askPayment = true else viewModel.advance(step.action)
+            if (needsPhoto != null) {
+                AuthPrimaryButton(if (needsPhoto == "pickup") "Photograph the package" else "Photograph the delivered package", enabled = !state.busy, busy = state.busy) {
+                    val file = File(File(context.cacheDir, "captures").apply { mkdirs() }, "proof.jpg")
+                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+                    captureUri = uri.toString()
+                    camera.launch(uri)
+                }
+            } else {
+                AuthPrimaryButton(if (delivery != null && step.action == "complete") "Complete delivery" else step.button, enabled = !state.busy, busy = state.busy) {
+                    if (step.action == "complete") askPayment = true else viewModel.advance(step.action)
+                }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 TextButton(onClick = { askCancel = true }, enabled = !state.busy) { Text("Cancel trip") }

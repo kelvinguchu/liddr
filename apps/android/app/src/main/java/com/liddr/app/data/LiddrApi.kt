@@ -43,6 +43,9 @@ class LiddrApi(private val transport: Transport, private val session: SessionMan
         decode(transport.send("PATCH", "/v1/me", bearer = token, json = apiJson.encodeToString(NameChange(displayName))))
     }
 
+    /** The person's own data as JSON, ready to save. Needs a recent sign-in. */
+    suspend fun exportMe(): String = session.withAccess { token -> transport.send("GET", "/v1/me/export", bearer = token) }
+
     /** Deletes the account. The API has ended the session by the time this returns. */
     suspend fun deleteMe() {
         session.withAccess { token -> transport.send("DELETE", "/v1/me", bearer = token) }
@@ -52,8 +55,14 @@ class LiddrApi(private val transport: Transport, private val session: SessionMan
     suspend fun listVehicleCategories(): List<VehicleCategory> =
         decode<CategoryList>(transport.send("GET", "/v1/vehicle-categories")).data
 
-    suspend fun createQuote(category: String, pickup: Coordinates, dropoff: Coordinates): Quote = session.withAccess { token ->
-        decode(transport.send("POST", "/v1/rides/quotes", bearer = token, json = apiJson.encodeToString(QuoteRequest(category, pickup, dropoff))))
+    suspend fun createQuote(category: String, pickup: Coordinates, dropoff: Coordinates, shared: Boolean = false): Quote = session.withAccess { token ->
+        val request = QuoteRequest(category, pickup, dropoff, productType = if (shared) "shared" else null)
+        decode(transport.send("POST", "/v1/rides/quotes", bearer = token, json = apiJson.encodeToString(request)))
+    }
+
+    /** Prices the trip in every open category in one request, sharing routes between them. */
+    suspend fun createQuotes(pickup: Coordinates, dropoff: Coordinates): List<CategoryQuote> = session.withAccess { token ->
+        decode<CategoryQuoteList>(transport.send("POST", "/v1/rides/quotes/batch", bearer = token, json = apiJson.encodeToString(QuoteAllRequest(pickup, dropoff)))).data
     }
 
     /** Repeating this for the same quote returns the same ride, so a retry cannot double-book. */

@@ -7,6 +7,9 @@ plugins {
 
 // The address of the API this build talks to. Release builds must be given one.
 val apiBaseUrl = providers.gradleProperty("liddr.apiBaseUrl").orNull
+// A Google Maps Platform key restricted to this app. Kept out of the repository:
+// put it in ~/.gradle/gradle.properties. Without one, the app works with no map.
+val mapsApiKey = providers.gradleProperty("liddr.mapsApiKey").orNull.orEmpty()
 
 android {
     namespace = "com.liddr.app"
@@ -20,6 +23,8 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
+        buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
     }
 
     buildTypes {
@@ -62,7 +67,10 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.okhttp)
+    implementation(libs.maps.compose)
+    implementation(libs.google.places)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))

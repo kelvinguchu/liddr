@@ -7,7 +7,7 @@ import android.location.Location
 import android.location.LocationManager
 import androidx.core.content.ContextCompat
 import androidx.core.location.LocationManagerCompat
-import androidx.core.os.CancellationSignal
+import android.os.CancellationSignal
 import java.io.IOException
 import java.util.Locale
 import kotlin.coroutines.resume
@@ -15,16 +15,28 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 
-data class Place(val title: String, val detail: String, val point: Coordinates)
+/** A place. Search results from Google Places carry an [id] and get their point when chosen. */
+data class Place(val title: String, val detail: String, val point: Coordinates?, val id: String? = null)
+
+/** Finds places by name. */
+interface PlaceFinder {
+    suspend fun search(query: String): List<Place>
+
+    /** Fills in the point of a chosen place. */
+    suspend fun resolve(place: Place): Place = place
+
+    /** Starts a new search, which Google bills as one session however many letters are typed. */
+    fun startSession() = Unit
+}
 
 class PlaceSearchUnavailable : Exception("Place search isn't available right now. Please try again.")
 
-/** Finds places in Kenya by name, using the search built into the phone. */
-class PlaceFinder(context: Context) {
-    private val geocoder = Geocoder(context.applicationContext, Locale("en", "KE"))
+/** Finds places in Kenya using the search built into the phone. It needs no key, but knows fewer landmarks. */
+class GeocoderPlaceFinder(context: Context) : PlaceFinder {
+    private val geocoder = Geocoder(context.applicationContext, Locale.Builder().setLanguage("en").setRegion("KE").build())
 
     @Suppress("DEPRECATION") // The callback version needs Android 13, and the app supports older phones.
-    suspend fun search(query: String): List<Place> = withContext(Dispatchers.IO) {
+    override suspend fun search(query: String): List<Place> = withContext(Dispatchers.IO) {
         if (!Geocoder.isPresent()) throw PlaceSearchUnavailable()
         val found = try {
             geocoder.getFromLocationName(query, MAX_RESULTS, SOUTH, WEST, NORTH, EAST)

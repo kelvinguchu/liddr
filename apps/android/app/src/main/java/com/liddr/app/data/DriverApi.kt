@@ -153,6 +153,19 @@ class DriverApi(private val transport: Transport, private val session: SessionMa
         send("POST", "/v1/offers/$id/reject")
     }
 
+    /** Returns null for a solo ride, which has no shared group. */
+    suspend fun getSharedRide(rideId: String): SharedRide? = try {
+        get("/v1/rides/$rideId/shared")
+    } catch (e: ProblemException) {
+        if (e.status != 404) throw e
+        null
+    }
+
+    /** Records one passenger's progress: arrive-pickup, picked-up, dropped-off or no-show. */
+    suspend fun memberStep(rideId: String, memberId: String, step: String) {
+        send("POST", "/v1/rides/$rideId/shared/members/$memberId/$step")
+    }
+
     suspend fun getEarnings(): Earnings = get("/v1/drivers/me/earnings")
 
     suspend fun getRide(id: String): Ride = get("/v1/rides/$id")

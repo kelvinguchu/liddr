@@ -22,11 +22,13 @@ import com.liddr.app.LiddrApp
 import com.liddr.app.MainActivity
 import com.liddr.app.R
 import com.liddr.app.data.Coordinates
+import com.liddr.app.data.Offer
 import com.liddr.app.data.SessionState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -63,6 +65,7 @@ class DriverLocationService : Service(), LocationListener {
                 (application as LiddrApp).session.state.first { it is SessionState.SignedOut }
                 stopSelf()
             }
+            scope.launch { watchOffers() }
         }
         return START_STICKY
     }
@@ -75,7 +78,54 @@ class DriverLocationService : Service(), LocationListener {
         }
     }
 
+    /**
+     * While the app is out of sight, offers would otherwise go unseen until they
+     * expire, so they are announced. On screen, the app shows them itself.
+     */
+    private suspend fun watchOffers() {
+        val app = application as LiddrApp
+        var announced = emptySet<String>()
+        while (true) {
+            delay(OFFER_CHECK_MS)
+            if (app.isVisible) {
+                notifications.cancel(OFFER_NOTIFICATION_ID)
+                continue
+            }
+            val offers = runCatching { app.drivers.listOffers() }.getOrNull() ?: continue
+            val fresh = offers.firstOrNull { it.id !in announced }
+            when {
+                offers.isEmpty() -> notifications.cancel(OFFER_NOTIFICATION_ID)
+                fresh != null -> notifications.notify(OFFER_NOTIFICATION_ID, offerNotification(fresh))
+            }
+            announced = offers.mapTo(mutableSetOf()) { it.id }
+        }
+    }
+
+    private val notifications by lazy { getSystemService(NotificationManager::class.java) }
+
+    private fun offerNotification(offer: Offer): Notification {
+        notifications.createNotificationChannel(NotificationChannel(OFFER_CHANNEL, "Trip offers", NotificationManager.IMPORTANCE_HIGH))
+        return NotificationCompat.Builder(this, OFFER_CHANNEL)
+            .setSmallIcon(R.drawable.liddr_launcher_icon)
+            .setContentTitle("New trip · ${"KES %,d".format(offer.fareKes)}")
+            .setContentText("Pickup ${"%.1f".format(offer.distanceToPickupM / 1000.0)} km away. Open Liddr to accept.")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            .setContentIntent(openApp())
+            .setAutoCancel(true)
+            .setTimeoutAfter(OFFER_TIMEOUT_MS)
+            .build()
+    }
+
+    private fun openApp() = PendingIntent.getActivity(
+        this,
+        0,
+        Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+        PendingIntent.FLAG_IMMUTABLE,
+    )
+
     override fun onDestroy() {
+        notifications.cancel(OFFER_NOTIFICATION_ID)
         manager.removeUpdates(this)
         scope.cancel()
         super.onDestroy()
@@ -86,7 +136,7 @@ class DriverLocationService : Service(), LocationListener {
     private fun notification(): Notification {
         val channel = NotificationChannel(CHANNEL, "Online status", NotificationManager.IMPORTANCE_LOW)
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
-        val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
+        val open = openApp()
         return NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.liddr_launcher_icon)
             .setContentTitle("You're online")
@@ -100,5 +150,9 @@ class DriverLocationService : Service(), LocationListener {
         const val CHANNEL = "driver_online"
         const val NOTIFICATION_ID = 7
         const val INTERVAL_MS = 3_000L
+        const val OFFER_CHANNEL = "trip_offers"
+        const val OFFER_NOTIFICATION_ID = 8
+        const val OFFER_CHECK_MS = 4_000L
+        const val OFFER_TIMEOUT_MS = 20_000L
     }
 }

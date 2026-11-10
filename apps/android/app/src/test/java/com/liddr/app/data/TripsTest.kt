@@ -55,6 +55,16 @@ class TripsTest {
         assertTrue(body, body.contains("\"vehicle_category\":\"motorbike\"") && body.contains("\"pickup\":{\"lat\":-1.2"))
     }
 
+    @Test fun allPricesComeFromOneRequest() = runBlocking {
+        val quote = """{"id":"q","fare_kes":200,"base_fare_kes":200,"discount_kes":0,"surge_bps":10000,"distance_m":5000,"duration_s":900,"polyline":"x","expires_at":"2026-11-09T09:05:00Z"}"""
+        server.enqueue(MockResponse().setResponseCode(201).setBody("""{"data":[{"vehicle_category":"motorbike","quote":$quote},{"vehicle_category":"basic","quote":$quote}]}"""))
+        val priced = api.createQuotes(Coordinates(-1.2, 36.8), Coordinates(-1.3, 36.9))
+        assertEquals(listOf("motorbike", "basic"), priced.map { it.category })
+        val request = server.takeRequest()
+        assertEquals("/v1/rides/quotes/batch", request.path)
+        assertEquals(1, server.requestCount)
+    }
+
     @Test fun activeRideIsFoundAfterARestart() = runBlocking {
         server.enqueue(MockResponse().setBody("""{"data":[{"id":"r1","status":"accepted","category":"motorbike","fare_kes":350,"requested_at":"2026-11-09T09:00:00Z"}]}"""))
         server.enqueue(MockResponse().setBody(RIDE))
@@ -151,6 +161,45 @@ class TripsTest {
         val request = server.takeRequest()
         assertEquals("/v1/rides/r1/complete", request.path)
         assertEquals("{\"payment_mode\":\"mpesa_direct\"}", request.body.readUtf8())
+    }
+
+    private fun sendApi(): SendApi {
+        val transport = Transport(server.url("/").toString())
+        return SendApi(transport, SessionManager(transport, Held()) { 0L }.also { it.restore() })
+    }
+
+    @Test fun ordinaryRideHasNoDelivery() = runBlocking {
+        server.enqueue(MockResponse().setResponseCode(404).setBody("""{"code":"NOT_FOUND","message":"m","request_id":"r"}"""))
+        assertNull(sendApi().getDelivery("r1"))
+    }
+
+    @Test fun proofGoesToStorageThenToTheRightStage() = runBlocking {
+        val signed = server.url("/bucket/p").toString()
+        server.enqueue(MockResponse().setResponseCode(201).setBody("""{"upload_id":"u9","upload_url":"$signed","headers":{},"expires_at":"2026-11-09T10:00:00Z"}"""))
+        server.enqueue(MockResponse().setResponseCode(200))
+        server.enqueue(MockResponse().setResponseCode(204))
+        sendApi().uploadProof("r1", "dropoff", byteArrayOf(1, 2))
+        val prepare = server.takeRequest()
+        assertEquals("/v1/send/rides/r1/proof-uploads", prepare.path)
+        assertTrue(prepare.body.readUtf8().contains("\"proof_kind\":\"dropoff\""))
+        assertEquals("PUT", server.takeRequest().method)
+        val record = server.takeRequest()
+        assertEquals("/v1/send/rides/r1/dropoff-proof", record.path)
+        assertEquals("{\"upload_id\":\"u9\"}", record.body.readUtf8())
+    }
+
+    @Test fun deliveryRequestUsesContractNames() = runBlocking {
+        server.enqueue(MockResponse().setResponseCode(201).setBody(RIDE))
+        sendApi().book(DeliveryRequest("q", "Mary", "Juma", "0712345678", "Books", "small", "recipient", "after", liabilityAcknowledged = true))
+        val body = server.takeRequest().body.readUtf8()
+        for (field in listOf("\"quote_id\":\"q\"", "\"recipient_phone\":\"0712345678\"", "\"payment_timing\":\"after\"", "\"liability_acknowledged\":true")) {
+            assertTrue(body, body.contains(field))
+        }
+    }
+
+    @Test fun polylineDecodesGooglesExample() {
+        val points = decodePolyline("_p~iF~ps|U_ulLnnqC_mqNvxq`@")
+        assertEquals(listOf(Coordinates(38.5, -120.2), Coordinates(40.7, -120.95), Coordinates(43.252, -126.453)), points)
     }
 
     @Test fun distanceIsSensible() {

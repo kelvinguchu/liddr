@@ -33,6 +33,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Switch
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
+import com.liddr.app.data.canShare
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -53,7 +57,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -71,23 +75,27 @@ import compose.icons.tablericons.CurrentLocation
 import compose.icons.tablericons.MapPin
 
 @Composable
-fun BookingRoot(viewModel: BookingViewModel, onAccount: () -> Unit) {
+fun BookingRoot(viewModel: BookingViewModel, incoming: IncomingViewModel, onAccount: () -> Unit) {
     val state by viewModel.ui.collectAsState()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_START) viewModel.setVisible(true)
+            if (event == Lifecycle.Event.ON_START) {
+                viewModel.setVisible(true)
+                incoming.check()
+            }
             if (event == Lifecycle.Event.ON_STOP) viewModel.setVisible(false)
         }
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer) }
     }
-    BackHandler(enabled = state.stage == Stage.SEARCH || state.stage == Stage.OPTIONS, onBack = viewModel::back)
+    BackHandler(enabled = state.stage in setOf(Stage.SEARCH, Stage.OPTIONS, Stage.SEND_DETAILS), onBack = viewModel::back)
     when (state.stage) {
         Stage.RESUMING -> Page { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { AuthProgress() } }
-        Stage.HOME -> HomeScreen(state, viewModel, onAccount)
+        Stage.HOME -> HomeScreen(state, viewModel, incoming, onAccount)
         Stage.SEARCH -> SearchScreen(state, viewModel)
         Stage.OPTIONS -> OptionsScreen(state, viewModel)
+        Stage.SEND_DETAILS -> SendDetailsScreen(state, viewModel)
         Stage.TRIP -> TripScreen(state, viewModel)
         Stage.RATE -> Page {
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
@@ -136,7 +144,7 @@ private fun PlaceRow(icon: ImageVector, label: String, value: String, placeholde
 }
 
 @Composable
-private fun HomeScreen(state: BookingUiState, viewModel: BookingViewModel, onAccount: () -> Unit) {
+private fun HomeScreen(state: BookingUiState, viewModel: BookingViewModel, incoming: IncomingViewModel, onAccount: () -> Unit) {
     val context = LocalContext.current
     fun granted() = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
     var refused by rememberSaveable { mutableStateOf(false) }
@@ -151,6 +159,7 @@ private fun HomeScreen(state: BookingUiState, viewModel: BookingViewModel, onAcc
             TextButton(onClick = onAccount) { Text("Account") }
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            IncomingPackageCard(incoming)
             Spacer(Modifier.height(28.dp))
             Heading("Where to?")
             Spacer(Modifier.height(20.dp))
@@ -234,6 +243,8 @@ private fun OptionsScreen(state: BookingUiState, viewModel: BookingViewModel) {
         TextButton(onClick = viewModel::back) { Text("Back") }
         Spacer(Modifier.height(8.dp))
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            state.pickup?.point?.let { from -> TripMap(from, state.dropoff?.point, null, chosen?.quote?.polyline) }
+            if (mapsEnabled) Spacer(Modifier.height(12.dp))
             Heading("Choose your ride")
             Spacer(Modifier.height(4.dp))
             BodyText("To ${state.dropoff?.title.orEmpty()}")
@@ -246,6 +257,17 @@ private fun OptionsScreen(state: BookingUiState, viewModel: BookingViewModel) {
                 }
                 else -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     state.options.forEach { option -> OptionCard(option, option.category.slug == state.selected) { viewModel.select(option.category.slug) } }
+                    val shared = state.sharedQuote
+                    if (chosen != null && canShare(chosen.category)) {
+                        Row(Modifier.fillMaxWidth().toggleable(value = state.sharing, enabled = !state.busy, role = Role.Switch, onValueChange = viewModel::setSharing), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text("Share with one other rider", style = MaterialTheme.typography.titleSmall, color = colors.onBackground)
+                                val saving = shared?.soloFareKes?.let { it - shared.fareKes }
+                                BodyText(if (state.sharing && shared != null && saving != null) "You pay ${money(shared.fareKes)}, saving ${money(saving)}. Pickups may add a few minutes." else "Pay less by sharing the car on the way.")
+                            }
+                            Switch(checked = state.sharing, onCheckedChange = null)
+                        }
+                    }
                     if (chosen != null && chosen.quote.surgeBps > NO_SURGE) {
                         BodyText("High demand: prices are ${formatSurge(chosen.quote.surgeBps)}× the usual fare right now.")
                     }
@@ -255,7 +277,8 @@ private fun OptionsScreen(state: BookingUiState, viewModel: BookingViewModel) {
         }
         if (state.options.isNotEmpty()) {
             Text("Pay your driver directly with cash or M-Pesa.", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, modifier = Modifier.padding(bottom = 10.dp))
-            AuthPrimaryButton("Book ${chosen?.category?.label.orEmpty()}", enabled = chosen != null && !state.busy, busy = state.busy, onClick = viewModel::book)
+            val label = if (chosen?.category?.slug == "send") "Continue" else "Book ${chosen?.category?.label.orEmpty()}"
+            AuthPrimaryButton(label, enabled = chosen != null && !state.busy, busy = state.busy, onClick = viewModel::book)
         }
     }
 }

@@ -328,6 +328,24 @@ func (e EnforcementRequestScope) Valid() bool {
 	}
 }
 
+// Defines values for ExportRideRole.
+const (
+	ExportRideRoleDriver ExportRideRole = "driver"
+	ExportRideRoleRider  ExportRideRole = "rider"
+)
+
+// Valid indicates whether the value is a known member of the ExportRideRole enum.
+func (e ExportRideRole) Valid() bool {
+	switch e {
+	case ExportRideRoleDriver:
+		return true
+	case ExportRideRoleRider:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for HealthStatus.
 const (
 	Ok          HealthStatus = "ok"
@@ -811,6 +829,21 @@ func (e ListRideHistoryParamsAs) Valid() bool {
 	}
 }
 
+// AccountExport defines model for AccountExport.
+type AccountExport struct {
+	Documents        []ExportDocument `json:"documents"`
+	GeneratedAt      time.Time        `json:"generated_at"`
+	MessagesSent     []ExportMessage  `json:"messages_sent"`
+	Payments         []ExportPayment  `json:"payments"`
+	Profile          ExportProfile    `json:"profile"`
+	RatingsGiven     []ExportRating   `json:"ratings_given"`
+	ReportsSubmitted []ExportReport   `json:"reports_submitted"`
+	Rides            []ExportRide     `json:"rides"`
+
+	// Truncated True if a list reached its limit. Support can provide the rest.
+	Truncated bool `json:"truncated"`
+}
+
 // AuthMethods defines model for AuthMethods.
 type AuthMethods struct {
 	Methods []AuthMethodsMethods `json:"methods"`
@@ -1124,6 +1157,77 @@ type Error struct {
 	// RequestId Quote this when contacting support.
 	RequestId string `json:"request_id"`
 }
+
+// ExportDocument defines model for ExportDocument.
+type ExportDocument struct {
+	DocumentType string              `json:"document_type"`
+	ExpiresOn    *openapi_types.Date `json:"expires_on,omitempty"`
+	ReviewedAt   *time.Time          `json:"reviewed_at,omitempty"`
+	Status       string              `json:"status"`
+	SubmittedAt  time.Time           `json:"submitted_at"`
+}
+
+// ExportMessage defines model for ExportMessage.
+type ExportMessage struct {
+	Body      string             `json:"body"`
+	CreatedAt time.Time          `json:"created_at"`
+	RideId    openapi_types.UUID `json:"ride_id"`
+}
+
+// ExportPayment defines model for ExportPayment.
+type ExportPayment struct {
+	AmountKes   int32      `json:"amount_kes"`
+	Channel     string     `json:"channel"`
+	PaidAt      *time.Time `json:"paid_at,omitempty"`
+	RequestedAt time.Time  `json:"requested_at"`
+	Status      string     `json:"status"`
+}
+
+// ExportProfile defines model for ExportProfile.
+type ExportProfile struct {
+	AccountStatus  string             `json:"account_status"`
+	CreatedAt      time.Time          `json:"created_at"`
+	DisplayName    *string            `json:"display_name,omitempty"`
+	Email          *string            `json:"email,omitempty"`
+	Id             openapi_types.UUID `json:"id"`
+	Phone          *string            `json:"phone,omitempty"`
+	PhotoConsentAt *time.Time         `json:"photo_consent_at,omitempty"`
+	PlateNumber    *string            `json:"plate_number,omitempty"`
+}
+
+// ExportRating defines model for ExportRating.
+type ExportRating struct {
+	Comment     *string            `json:"comment,omitempty"`
+	ReasonTags  []string           `json:"reason_tags"`
+	RideId      openapi_types.UUID `json:"ride_id"`
+	Score       int32              `json:"score"`
+	SubmittedAt time.Time          `json:"submitted_at"`
+}
+
+// ExportReport defines model for ExportReport.
+type ExportReport struct {
+	Category    string              `json:"category"`
+	CreatedAt   time.Time           `json:"created_at"`
+	Description string              `json:"description"`
+	RideId      *openapi_types.UUID `json:"ride_id,omitempty"`
+	Status      string              `json:"status"`
+}
+
+// ExportRide defines model for ExportRide.
+type ExportRide struct {
+	CancelledAt *time.Time         `json:"cancelled_at,omitempty"`
+	CompletedAt *time.Time         `json:"completed_at,omitempty"`
+	Dropoff     Coordinates        `json:"dropoff"`
+	FareKes     int32              `json:"fare_kes"`
+	Id          openapi_types.UUID `json:"id"`
+	Pickup      Coordinates        `json:"pickup"`
+	RequestedAt time.Time          `json:"requested_at"`
+	Role        ExportRideRole     `json:"role"`
+	Status      string             `json:"status"`
+}
+
+// ExportRideRole defines model for ExportRide.Role.
+type ExportRideRole string
 
 // FiledCase defines model for FiledCase.
 type FiledCase struct {
@@ -2251,6 +2355,9 @@ type ServerInterface interface {
 	// UpdateMe Set the signed-in account's name
 	// (PATCH /v1/me)
 	UpdateMe(w http.ResponseWriter, r *http.Request)
+	// ExportMe Download a copy of the signed-in account's own data
+	// (GET /v1/me/export)
+	ExportMe(w http.ResponseWriter, r *http.Request)
 	// ListNotifications List the signed-in user's notifications, newest first
 	// (GET /v1/notifications)
 	ListNotifications(w http.ResponseWriter, r *http.Request, params ListNotificationsParams)
@@ -3077,6 +3184,26 @@ func (siw *ServerInterfaceWrapper) UpdateMe(w http.ResponseWriter, r *http.Reque
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ExportMe operation middleware
+func (siw *ServerInterfaceWrapper) ExportMe(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider", "driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ExportMe(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -6228,6 +6355,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/me", wrapper.DeleteMe)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/me", wrapper.GetMe)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/v1/me", wrapper.UpdateMe)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/me/export", wrapper.ExportMe)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/drivers/me/earnings", wrapper.GetDriverEarnings)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides/quotes", wrapper.CreateQuote)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides", wrapper.BookRide)
@@ -7313,6 +7441,44 @@ type UpdateMedefaultJSONResponse struct {
 }
 
 func (response UpdateMedefaultJSONResponse) VisitUpdateMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportMeRequestObject struct {
+}
+
+type ExportMeResponseObject interface {
+	VisitExportMeResponse(w http.ResponseWriter) error
+}
+
+type ExportMe200JSONResponse AccountExport
+
+func (response ExportMe200JSONResponse) VisitExportMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ExportMedefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response ExportMedefaultJSONResponse) VisitExportMeResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -10809,6 +10975,9 @@ type StrictServerInterface interface {
 	// UpdateMe Set the signed-in account's name
 	// (PATCH /v1/me)
 	UpdateMe(ctx context.Context, request UpdateMeRequestObject) (UpdateMeResponseObject, error)
+	// ExportMe Download a copy of the signed-in account's own data
+	// (GET /v1/me/export)
+	ExportMe(ctx context.Context, request ExportMeRequestObject) (ExportMeResponseObject, error)
 	// ListNotifications List the signed-in user's notifications, newest first
 	// (GET /v1/notifications)
 	ListNotifications(ctx context.Context, request ListNotificationsRequestObject) (ListNotificationsResponseObject, error)
@@ -11837,6 +12006,30 @@ func (sh *strictHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateMeResponseObject); ok {
 		if err := validResponse.VisitUpdateMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ExportMe operation middleware
+func (sh *strictHandler) ExportMe(w http.ResponseWriter, r *http.Request) {
+	var request ExportMeRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ExportMe(ctx, request.(ExportMeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ExportMe")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ExportMeResponseObject); ok {
+		if err := validResponse.VisitExportMeResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -233,6 +233,25 @@ paths:
         default:
           $ref: "#/components/responses/Problem"
 
+  /v1/me/export:
+    get:
+      operationId: exportMe
+      summary: Download a copy of the signed-in account's own data
+      description: >-
+        Needs a sign-in from the last 15 minutes, and is limited to three a day. Holds only what
+        this person gave or did. Reports and ratings about them are left out to protect whoever made them.
+      security:
+        - bearerAuth: [rider, driver]
+      responses:
+        "200":
+          description: The account's data.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountExport"
+        default:
+          $ref: "#/components/responses/Problem"
+
   /v1/drivers/me/earnings:
     get:
       operationId: getDriverEarnings
@@ -2797,6 +2816,190 @@ components:
             $ref: "#/components/schemas/Role"
         display_name:
           type: string
+
+    AccountExport:
+      type: object
+      additionalProperties: false
+      required: [generated_at, truncated, profile, rides, payments, documents, ratings_given, reports_submitted, messages_sent]
+      properties:
+        generated_at:
+          type: string
+          format: date-time
+        truncated:
+          type: boolean
+          description: True if a list reached its limit. Support can provide the rest.
+        profile:
+          $ref: "#/components/schemas/ExportProfile"
+        rides:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExportRide"
+        payments:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExportPayment"
+        documents:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExportDocument"
+        ratings_given:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExportRating"
+        reports_submitted:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExportReport"
+        messages_sent:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExportMessage"
+
+    ExportProfile:
+      type: object
+      additionalProperties: false
+      required: [id, account_status, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        phone:
+          type: string
+        email:
+          type: string
+        display_name:
+          type: string
+        account_status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        plate_number:
+          type: string
+        photo_consent_at:
+          type: string
+          format: date-time
+
+    ExportRide:
+      type: object
+      additionalProperties: false
+      required: [id, role, status, pickup, dropoff, fare_kes, requested_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [rider, driver]
+        status:
+          type: string
+        pickup:
+          $ref: "#/components/schemas/Coordinates"
+        dropoff:
+          $ref: "#/components/schemas/Coordinates"
+        fare_kes:
+          type: integer
+          format: int32
+        requested_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        cancelled_at:
+          type: string
+          format: date-time
+
+    ExportPayment:
+      type: object
+      additionalProperties: false
+      required: [channel, status, amount_kes, requested_at]
+      properties:
+        channel:
+          type: string
+        status:
+          type: string
+        amount_kes:
+          type: integer
+          format: int32
+        requested_at:
+          type: string
+          format: date-time
+        paid_at:
+          type: string
+          format: date-time
+
+    ExportDocument:
+      type: object
+      additionalProperties: false
+      required: [document_type, status, submitted_at]
+      properties:
+        document_type:
+          type: string
+        status:
+          type: string
+        submitted_at:
+          type: string
+          format: date-time
+        reviewed_at:
+          type: string
+          format: date-time
+        expires_on:
+          type: string
+          format: date
+
+    ExportRating:
+      type: object
+      additionalProperties: false
+      required: [ride_id, score, reason_tags, submitted_at]
+      properties:
+        ride_id:
+          type: string
+          format: uuid
+        score:
+          type: integer
+          format: int32
+        reason_tags:
+          type: array
+          items:
+            type: string
+        comment:
+          type: string
+        submitted_at:
+          type: string
+          format: date-time
+
+    ExportReport:
+      type: object
+      additionalProperties: false
+      required: [category, status, description, created_at]
+      properties:
+        category:
+          type: string
+        status:
+          type: string
+        ride_id:
+          type: string
+          format: uuid
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    ExportMessage:
+      type: object
+      additionalProperties: false
+      required: [ride_id, body, created_at]
+      properties:
+        ride_id:
+          type: string
+          format: uuid
+        body:
+          type: string
+        created_at:
+          type: string
+          format: date-time
 
     UpdateMeRequest:
       type: object

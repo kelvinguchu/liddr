@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Drawn from the same shapes as the Canva logo "Liddr logo (Clear)". -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="164dp" android:height="48dp"
+    android:viewportWidth="1018" android:viewportHeight="298">
+    <group android:translateX="-44.2" android:translateY="-18.7" android:scaleX="5.2" android:scaleY="5.2">
+        <path android:fillColor="#FFFFFF" android:pathData="M8.5,45 A10.5,10.5 0 1,1 29.5,45 A10.5,10.5 0 1,1 8.5,45 Z M13.5,45 A5.5,5.5 0 1,0 24.5,45 A5.5,5.5 0 1,0 13.5,45 Z" />
+        <path android:fillColor="#FFFFFF" android:pathData="M28.19,39.34 L41.4,26.13 L37.87,22.6 L24.66,35.81 Z" />
+        <path android:fillColor="#12B5A6" android:pathData="M37,18 A9,9 0 1,1 55,18 A9,9 0 1,1 37,18 Z" />
+    </group>
+    <group android:translateX="289.8" android:translateY="-112" android:scaleX="4" android:scaleY="4">
+        <path android:fillColor="#FFFFFF" android:pathData="M5.5,28 H14.5 V100 H5.5 Z M29.5,62 H38.5 V100 H29.5 Z M78.5,28 H87.5 V100 H78.5 V98.49 A21.5,21.5 0 1,1 78.5,63.51 Z M53.5,81 A12.5,12.5 0 1,0 78.5,81 A12.5,12.5 0 1,0 53.5,81 Z M128.5,28 H137.5 V100 H128.5 V98.49 A21.5,21.5 0 1,1 128.5,63.51 Z M103.5,81 A12.5,12.5 0 1,0 128.5,81 A12.5,12.5 0 1,0 103.5,81 Z M151.5,100 V74 A18.5,18.5 0 0,1 170,55.5 H182 V64.5 H170 A9.5,9.5 0 0,0 160.5,74 V100 Z" />
+        <path android:fillColor="#12B5A6" android:pathData="M25.5,42 A8.5,8.5 0 1,1 42.5,42 A8.5,8.5 0 1,1 25.5,42 Z M29.5,42 A4.5,4.5 0 1,0 38.5,42 A4.5,4.5 0 1,0 29.5,42 Z" />
+    </group>
+</vector>

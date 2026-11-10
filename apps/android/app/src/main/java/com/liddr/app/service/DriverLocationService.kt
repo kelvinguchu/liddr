@@ -106,7 +106,7 @@ class DriverLocationService : Service(), LocationListener {
     private fun offerNotification(offer: Offer): Notification {
         notifications.createNotificationChannel(NotificationChannel(OFFER_CHANNEL, "Trip offers", NotificationManager.IMPORTANCE_HIGH))
         return NotificationCompat.Builder(this, OFFER_CHANNEL)
-            .setSmallIcon(R.drawable.liddr_launcher_icon)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("New trip · ${"KES %,d".format(offer.fareKes)}")
             .setContentText("Pickup ${"%.1f".format(offer.distanceToPickupM / 1000.0)} km away. Open Liddr to accept.")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -138,7 +138,7 @@ class DriverLocationService : Service(), LocationListener {
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         val open = openApp()
         return NotificationCompat.Builder(this, CHANNEL)
-            .setSmallIcon(R.drawable.liddr_launcher_icon)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("You're online")
             .setContentText("Liddr is sharing your location so riders can find you.")
             .setContentIntent(open)

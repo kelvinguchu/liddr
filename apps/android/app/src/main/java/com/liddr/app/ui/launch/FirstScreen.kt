@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -90,8 +91,8 @@ private fun RoleCard(icon: ImageVector, title: String, subtitle: String, onClick
                         },
                 shape = RoundedCornerShape(20.dp),
                 color = MaterialTheme.colorScheme.surface,
-                tonalElevation = if (pressed) 0.dp else 1.dp,
-                shadowElevation = if (pressed) 0.dp else 2.dp,
+                // Flat with a hairline border, like every other card in the Clear style.
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 interactionSource = src
         ) {
                 Row(

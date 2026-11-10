@@ -1,80 +1,97 @@
 package com.liddr.app.ui.theme
 
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
+
+// Every surface token is set, so Material never falls back to its own purples.
+private val LightColorScheme = lightColorScheme(
+    primary = Navy,
+    onPrimary = White,
+    primaryContainer = TealTint,
+    onPrimaryContainer = TealText,
+    secondary = Teal,
+    onSecondary = OnTeal,
+    secondaryContainer = MistDeep,
+    onSecondaryContainer = Navy,
+    tertiary = Teal,
+    onTertiary = OnTeal,
+    tertiaryContainer = TealTint,
+    onTertiaryContainer = TealText,
+    background = White,
+    onBackground = Navy,
+    surface = White,
+    onSurface = Navy,
+    surfaceVariant = Mist,
+    onSurfaceVariant = Slate,
+    surfaceTint = White,
+    surfaceBright = White,
+    surfaceDim = MistDeep,
+    surfaceContainerLowest = White,
+    surfaceContainerLow = Mist,
+    surfaceContainer = Mist,
+    surfaceContainerHigh = MistDeep,
+    surfaceContainerHighest = MistDeep,
+    inverseSurface = Navy,
+    inverseOnSurface = White,
+    inversePrimary = Teal,
+    outline = Line,
+    outlineVariant = Line,
+    error = Alert,
+    onError = White,
+    errorContainer = Color(0xFFFBE7E7),
+    onErrorContainer = Alert,
+    scrim = Navy,
+)
 
 private val DarkColorScheme = darkColorScheme(
-    primary = LightPrimary,
-    onPrimary = DarkForeground,
-    primaryContainer = DarkAccent,
-    onPrimaryContainer = DarkForeground,
-    secondary = DarkSecondary,
-    onSecondary = DarkForeground,
-    secondaryContainer = DarkMuted,
-    onSecondaryContainer = DarkMutedForeground,
-    tertiary = DarkChart2,
-    onTertiary = DarkBackground,
-    background = DarkBackground,
-    onBackground = DarkForeground,
-    surface = DarkCard,
-    onSurface = DarkForeground,
-    surfaceVariant = DarkSecondary,
-    onSurfaceVariant = DarkMutedForeground,
-    error = DarkDestructive,
-    onError = DarkForeground,
-    outline = DarkBorder,
-    outlineVariant = DarkInput
+    primary = Teal,
+    onPrimary = OnTeal,
+    primaryContainer = NightHigh,
+    onPrimaryContainer = NightText,
+    secondary = Teal,
+    onSecondary = OnTeal,
+    secondaryContainer = NightHigh,
+    onSecondaryContainer = NightText,
+    tertiary = Teal,
+    onTertiary = OnTeal,
+    tertiaryContainer = NightHigh,
+    onTertiaryContainer = NightText,
+    background = Night,
+    onBackground = NightText,
+    surface = NightSurface,
+    onSurface = NightText,
+    surfaceVariant = NightRaised,
+    onSurfaceVariant = NightMuted,
+    surfaceTint = NightSurface,
+    surfaceBright = NightHigh,
+    surfaceDim = Night,
+    surfaceContainerLowest = Night,
+    surfaceContainerLow = NightSurface,
+    surfaceContainer = NightRaised,
+    surfaceContainerHigh = NightHigh,
+    surfaceContainerHighest = NightHigh,
+    inverseSurface = NightText,
+    inverseOnSurface = Navy,
+    inversePrimary = Navy,
+    outline = NightLine,
+    outlineVariant = NightLine,
+    error = NightAlert,
+    onError = Night,
+    errorContainer = Color(0xFF4A1F25),
+    onErrorContainer = NightAlert,
+    scrim = Night,
 )
 
-private val LightColorScheme = lightColorScheme(
-    primary = LightPrimary,
-    onPrimary = LightBackground,
-    primaryContainer = LightAccent,
-    onPrimaryContainer = LightForeground,
-    secondary = LightSecondary,
-    onSecondary = LightForeground,
-    secondaryContainer = LightMuted,
-    onSecondaryContainer = LightMutedForeground,
-    tertiary = LightChart2,
-    onTertiary = LightBackground,
-    background = LightBackground,
-    onBackground = LightForeground,
-    surface = LightCard,
-    onSurface = LightForeground,
-    surfaceVariant = LightSecondary,
-    onSurfaceVariant = LightMutedForeground,
-    error = LightDestructive,
-    onError = LightBackground,
-    outline = LightBorder,
-    outlineVariant = LightInput
-)
-
+/** Liddr's Clear theme. Brand colours always win over the phone's wallpaper colours. */
 @Composable
-fun LiddrTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = false,
-    content: @Composable () -> Unit
-) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
-
+fun LiddrTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
         typography = Typography,
-        content = content
+        content = content,
     )
 }

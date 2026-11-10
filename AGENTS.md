@@ -9,7 +9,7 @@ Product rules: `docs/aboutapp.md` and the policy docs in `docs/`. Status: the AP
 
 In order: intentional product experience, low latency, security and privacy by default. Where rules conflict, take the stricter security rule.
 
-- Ship no placeholder UI or dead ends. Android uses theme tokens, Manrope, and clear loading, error and empty states.
+- Ship no placeholder UI or dead ends. Android uses the Clear theme tokens, Plus Jakarta Sans, and clear loading, error and empty states.
 - API and realtime p95 stay under 300ms in-region. Do not merge a known hot-path regression without approval.
 - Every protected route has authentication and role checks, deny by default. Ops and admin need MFA, and high-risk actions need step-up.
 - Critical data: ID documents, verification media, payment identifiers. Sensitive data: phones, exact pickup and dropoff, live location, report text.

@@ -1,8 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="liddr_background">#262422</color>
-    <color name="liddr_foreground">#FFFDF1</color>
-    <color name="liddr_primary">#EC5E28</color>
-    <color name="liddr_card">#2F2B28</color>
-    <color name="liddr_border">#4C443D</color>
+    <color name="liddr_background">#06152A</color>
 </resources>

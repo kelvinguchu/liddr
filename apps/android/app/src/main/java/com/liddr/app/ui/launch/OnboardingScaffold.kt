@@ -48,53 +48,10 @@ import kotlinx.coroutines.delay
 
 /* ── Background ────────────────────────────────────────────── */
 
+/** The flat page every screen sits on. Clear keeps backgrounds quiet so content leads. */
 @Composable
 fun OnboardingBackground(modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
-        val colors = MaterialTheme.colorScheme
-        val t = rememberInfiniteTransition(label = "bg")
-        val pulse by
-                t.animateFloat(
-                        initialValue = 0.97f,
-                        targetValue = 1.03f,
-                        animationSpec =
-                                infiniteRepeatable(
-                                        tween(4600, easing = FastOutSlowInEasing),
-                                        RepeatMode.Reverse
-                                ),
-                        label = "pulse"
-                )
-
-        Box(
-                modifier.fillMaxSize()
-                        .background(
-                                Brush.verticalGradient(listOf(colors.background, colors.surface))
-                        )
-        ) {
-                Box(
-                        Modifier.align(Alignment.TopEnd)
-                                .offset(x = 72.dp, y = (-56).dp)
-                                .size(220.dp)
-                                .graphicsLayer {
-                                        scaleX = pulse
-                                        scaleY = pulse
-                                }
-                                .clip(CircleShape)
-                                .background(colors.primary.copy(alpha = 0.08f))
-                )
-                Box(
-                        Modifier.align(Alignment.BottomStart)
-                                .offset(x = (-80).dp, y = 80.dp)
-                                .size(260.dp)
-                                .graphicsLayer {
-                                        val s = pulse * 1.04f
-                                        scaleX = s
-                                        scaleY = s
-                                }
-                                .clip(CircleShape)
-                                .background(colors.tertiary.copy(alpha = 0.06f))
-                )
-                content()
-        }
+        Box(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), content = content)
 }
 
 /* ── Logo ──────────────────────────────────────────────────── */
@@ -102,7 +59,7 @@ fun OnboardingBackground(modifier: Modifier = Modifier, content: @Composable Box
 @Composable
 fun LiddrLogo(modifier: Modifier = Modifier) {
         Image(
-                painterResource(R.drawable.liddr_orange_logo),
+                painterResource(R.drawable.liddr_logo),
                 "Liddr",
                 contentScale = ContentScale.Fit,
                 modifier = modifier.fillMaxWidth(0.44f).height(52.dp)

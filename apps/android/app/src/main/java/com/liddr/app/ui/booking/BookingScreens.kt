@@ -55,6 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -129,11 +130,11 @@ internal fun BodyText(text: String) {
 }
 
 @Composable
-private fun PlaceRow(icon: ImageVector, label: String, value: String, placeholder: Boolean, onClick: () -> Unit) {
+private fun PlaceRow(icon: ImageVector, label: String, value: String, placeholder: Boolean, tint: Color, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     Surface(onClick = onClick, shape = RoundedCornerShape(16.dp), color = colors.surface, border = BorderStroke(1.dp, colors.outlineVariant), modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, Modifier.size(22.dp), tint = colors.primary)
+            Icon(icon, null, Modifier.size(22.dp), tint = tint)
             Spacer(Modifier.width(14.dp))
             Column {
                 Text(label, style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant)
@@ -168,6 +169,7 @@ private fun HomeScreen(state: BookingUiState, viewModel: BookingViewModel, incom
                 label = "Pickup",
                 value = state.pickup?.title ?: if (state.locating) "Finding your location…" else "Enter pickup",
                 placeholder = state.pickup == null,
+                tint = MaterialTheme.colorScheme.onBackground,
                 onClick = { viewModel.openSearch(SearchTarget.PICKUP) },
             )
             Spacer(Modifier.height(12.dp))
@@ -176,6 +178,8 @@ private fun HomeScreen(state: BookingUiState, viewModel: BookingViewModel, incom
                 label = "Destination",
                 value = state.dropoff?.title ?: "Enter destination",
                 placeholder = state.dropoff == null,
+                // Teal marks what moves or where you are going, as in the logo.
+                tint = MaterialTheme.colorScheme.secondary,
                 onClick = { viewModel.openSearch(SearchTarget.DROPOFF) },
             )
             AuthError(state.locationError)

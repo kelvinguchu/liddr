@@ -812,6 +812,56 @@ func (q *Queries) LatestDestinationChangeAt(ctx context.Context, rideID uuid.UUI
 	return requested_at, err
 }
 
+const listActiveCategories = `-- name: ListActiveCategories :many
+SELECT id, slug, base_fee_cents, price_per_km_cents, price_per_min_cents, min_fare_cents,
+    discount_bps, search_radius_m, capacity
+FROM vehicle_categories
+WHERE is_active
+ORDER BY display_order
+`
+
+type ListActiveCategoriesRow struct {
+	ID               int64
+	Slug             string
+	BaseFeeCents     int64
+	PricePerKmCents  int64
+	PricePerMinCents int64
+	MinFareCents     int64
+	DiscountBps      int32
+	SearchRadiusM    int32
+	Capacity         int32
+}
+
+func (q *Queries) ListActiveCategories(ctx context.Context) ([]ListActiveCategoriesRow, error) {
+	rows, err := q.db.Query(ctx, listActiveCategories)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListActiveCategoriesRow{}
+	for rows.Next() {
+		var i ListActiveCategoriesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Slug,
+			&i.BaseFeeCents,
+			&i.PricePerKmCents,
+			&i.PricePerMinCents,
+			&i.MinFareCents,
+			&i.DiscountBps,
+			&i.SearchRadiusM,
+			&i.Capacity,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listChargeableEvents = `-- name: ListChargeableEvents :many
 SELECT ride_id, subject_role, violation_type, reason_code, occurred_at FROM ride_integrity_events
 WHERE subject_id = $1 AND chargeable AND occurred_at >= $2

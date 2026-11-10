@@ -290,6 +290,31 @@ paths:
         default:
           $ref: "#/components/responses/Problem"
 
+  /v1/rides/quotes/batch:
+    post:
+      operationId: createQuotes
+      summary: Price a trip in every open vehicle category at once
+      description: >-
+        Categories that travel the same way share one route, so this costs at most one routing
+        request per travel mode instead of one per category. Each quote counts toward the quote limit.
+      security:
+        - bearerAuth: [rider]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuoteAllRequest"
+      responses:
+        "201":
+          description: One quote per open category, in display order.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryQuoteList"
+        default:
+          $ref: "#/components/responses/Problem"
+
   /v1/rides:
     post:
       operationId: bookRide
@@ -2541,6 +2566,36 @@ components:
         expires_at:
           type: string
           format: date-time
+
+    QuoteAllRequest:
+      type: object
+      additionalProperties: false
+      required: [pickup, dropoff]
+      properties:
+        pickup:
+          $ref: "#/components/schemas/Coordinates"
+        dropoff:
+          $ref: "#/components/schemas/Coordinates"
+
+    CategoryQuote:
+      type: object
+      additionalProperties: false
+      required: [vehicle_category, quote]
+      properties:
+        vehicle_category:
+          type: string
+        quote:
+          $ref: "#/components/schemas/Quote"
+
+    CategoryQuoteList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategoryQuote"
 
     BookRideRequest:
       type: object

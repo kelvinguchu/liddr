@@ -887,6 +887,17 @@ type CancelRideRequest struct {
 	Reason string `json:"reason"`
 }
 
+// CategoryQuote defines model for CategoryQuote.
+type CategoryQuote struct {
+	Quote           Quote  `json:"quote"`
+	VehicleCategory string `json:"vehicle_category"`
+}
+
+// CategoryQuoteList defines model for CategoryQuoteList.
+type CategoryQuoteList struct {
+	Data []CategoryQuote `json:"data"`
+}
+
 // Compensation defines model for Compensation.
 type Compensation struct {
 	AmountKes           int32              `json:"amount_kes"`
@@ -1539,6 +1550,12 @@ type Quote struct {
 
 	// SurgeBps Demand multiplier in basis points. 10000 means no surge.
 	SurgeBps int32 `json:"surge_bps"`
+}
+
+// QuoteAllRequest defines model for QuoteAllRequest.
+type QuoteAllRequest struct {
+	Dropoff Coordinates `json:"dropoff"`
+	Pickup  Coordinates `json:"pickup"`
 }
 
 // QuoteRequest defines model for QuoteRequest.
@@ -2221,6 +2238,9 @@ type BookRideJSONRequestBody = BookRideRequest
 // CreateQuoteJSONRequestBody defines body for CreateQuote for application/json ContentType.
 type CreateQuoteJSONRequestBody = QuoteRequest
 
+// CreateQuotesJSONRequestBody defines body for CreateQuotes for application/json ContentType.
+type CreateQuotesJSONRequestBody = QuoteAllRequest
+
 // CancelRideJSONRequestBody defines body for CancelRide for application/json ContentType.
 type CancelRideJSONRequestBody = CancelRideRequest
 
@@ -2499,6 +2519,9 @@ type ServerInterface interface {
 	// CreateQuote Price a trip. The quote is required to book and expires quickly.
 	// (POST /v1/rides/quotes)
 	CreateQuote(w http.ResponseWriter, r *http.Request)
+	// CreateQuotes Price a trip in every open vehicle category at once
+	// (POST /v1/rides/quotes/batch)
+	CreateQuotes(w http.ResponseWriter, r *http.Request)
 	// GetRide Return a ride to its rider or assigned driver
 	// (GET /v1/rides/{ride_id})
 	GetRide(w http.ResponseWriter, r *http.Request, rideId RideId)
@@ -4830,6 +4853,26 @@ func (siw *ServerInterfaceWrapper) CreateQuote(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// CreateQuotes operation middleware
+func (siw *ServerInterfaceWrapper) CreateQuotes(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"rider"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateQuotes(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetRide operation middleware
 func (siw *ServerInterfaceWrapper) GetRide(w http.ResponseWriter, r *http.Request) {
 
@@ -6358,6 +6401,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/me/export", wrapper.ExportMe)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/drivers/me/earnings", wrapper.GetDriverEarnings)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides/quotes", wrapper.CreateQuote)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides/quotes/batch", wrapper.CreateQuotes)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides", wrapper.BookRide)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/rides/{ride_id}", wrapper.GetRide)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/rides/{ride_id}/cancel", wrapper.CancelRide)
@@ -9246,6 +9290,45 @@ func (response CreateQuotedefaultJSONResponse) VisitCreateQuoteResponse(w http.R
 	return err
 }
 
+type CreateQuotesRequestObject struct {
+	Body *CreateQuotesJSONRequestBody
+}
+
+type CreateQuotesResponseObject interface {
+	VisitCreateQuotesResponse(w http.ResponseWriter) error
+}
+
+type CreateQuotes201JSONResponse CategoryQuoteList
+
+func (response CreateQuotes201JSONResponse) VisitCreateQuotesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateQuotesdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response CreateQuotesdefaultJSONResponse) VisitCreateQuotesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetRideRequestObject struct {
 	RideId RideId `json:"ride_id"`
 }
@@ -11119,6 +11202,9 @@ type StrictServerInterface interface {
 	// CreateQuote Price a trip. The quote is required to book and expires quickly.
 	// (POST /v1/rides/quotes)
 	CreateQuote(ctx context.Context, request CreateQuoteRequestObject) (CreateQuoteResponseObject, error)
+	// CreateQuotes Price a trip in every open vehicle category at once
+	// (POST /v1/rides/quotes/batch)
+	CreateQuotes(ctx context.Context, request CreateQuotesRequestObject) (CreateQuotesResponseObject, error)
 	// GetRide Return a ride to its rider or assigned driver
 	// (GET /v1/rides/{ride_id})
 	GetRide(ctx context.Context, request GetRideRequestObject) (GetRideResponseObject, error)
@@ -13328,6 +13414,37 @@ func (sh *strictHandler) CreateQuote(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CreateQuoteResponseObject); ok {
 		if err := validResponse.VisitCreateQuoteResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateQuotes operation middleware
+func (sh *strictHandler) CreateQuotes(w http.ResponseWriter, r *http.Request) {
+	var request CreateQuotesRequestObject
+
+	var body CreateQuotesJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateQuotes(ctx, request.(CreateQuotesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateQuotes")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateQuotesResponseObject); ok {
+		if err := validResponse.VisitCreateQuotesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -61,7 +61,28 @@ func (a *API) CreateQuote(ctx context.Context, req CreateQuoteRequestObject) (Cr
 	if err != nil {
 		return nil, err
 	}
-	return CreateQuote201JSONResponse{
+	return CreateQuote201JSONResponse(toAPIQuote(quote)), nil
+}
+
+// CreateQuotes prices a trip in every open category.
+func (a *API) CreateQuotes(ctx context.Context, req CreateQuotesRequestObject) (CreateQuotesResponseObject, error) {
+	rider, err := actorID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	quotes, err := a.deps.Rides.QuoteAll(ctx, rider, toPoint(req.Body.Pickup), toPoint(req.Body.Dropoff))
+	if err != nil {
+		return nil, err
+	}
+	data := make([]CategoryQuote, len(quotes))
+	for i, q := range quotes {
+		data[i] = CategoryQuote{VehicleCategory: q.Category, Quote: toAPIQuote(q.Quote)}
+	}
+	return CreateQuotes201JSONResponse{Data: data}, nil
+}
+
+func toAPIQuote(quote rides.Quote) Quote {
+	return Quote{
 		Id:          quote.ID,
 		FareKes:     quote.Fare.FinalKES,
 		BaseFareKes: quote.Fare.BaseFareKES,
@@ -72,7 +93,7 @@ func (a *API) CreateQuote(ctx context.Context, req CreateQuoteRequestObject) (Cr
 		DurationS:   quote.DurationS,
 		Polyline:    quote.Polyline,
 		ExpiresAt:   quote.ExpiresAt,
-	}, nil
+	}
 }
 
 // BookRide books a quoted trip.

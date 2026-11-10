@@ -49,13 +49,16 @@ type harness struct {
 	clock      *clock
 	routesDown *atomic.Bool
 	nextPhone  atomic.Int64
+	routeCalls *atomic.Int64
 }
 
 func newHarness(t *testing.T) *harness {
 	t.Helper()
 	pool := testdb.Pool(t)
 	down := &atomic.Bool{}
+	calls := &atomic.Int64{}
 	google := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls.Add(1)
 		if down.Load() {
 			http.Error(w, "unavailable", http.StatusServiceUnavailable)
 			return
@@ -72,6 +75,7 @@ func newHarness(t *testing.T) *harness {
 		pool:       pool,
 		clock:      c,
 		routesDown: down,
+		routeCalls: calls,
 	}
 }
 

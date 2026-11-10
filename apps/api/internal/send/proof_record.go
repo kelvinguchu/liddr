@@ -41,7 +41,8 @@ func (s *Service) RecordDropoffProof(ctx context.Context, rideID, driverID, uplo
 	}
 	now := s.now()
 	return store.InTx(ctx, s.pool, func(q *store.Queries) error {
-		if _, err := lockAssigned(ctx, q, rideID, driverID, statusUnderway); err != nil {
+		ride, err := lockAssigned(ctx, q, rideID, driverID, statusUnderway)
+		if err != nil {
 			return err
 		}
 		row, err := q.GetSendDelivery(ctx, rideID)
@@ -59,6 +60,10 @@ func (s *Service) RecordDropoffProof(ctx context.Context, rideID, driverID, uplo
 		}
 		if err := q.RecordDropoffProof(ctx, store.RecordDropoffProofParams{Key: new(upload.StorageKey), Now: new(now), RideID: rideID}); err != nil {
 			return fmt.Errorf("record proof: %w", err)
+		}
+		// The sender learns at once that the package arrived, not on their next refresh.
+		if err := events.Notify(ctx, q, events.Event{Type: events.TypeSendUpdated, RideID: new(rideID), Status: "delivered"}, ride.RiderID); err != nil {
+			return err
 		}
 		recipient, err := q.FindUserIDByPhone(ctx, new(row.RecipientPhone))
 		if errors.Is(err, pgx.ErrNoRows) {

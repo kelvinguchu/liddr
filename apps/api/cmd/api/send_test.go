@@ -171,6 +171,9 @@ func TestSendDeliveryEndToEnd(t *testing.T) {
 	if got := send(t, http.MethodPost, sendPath+"/dropoff-proof", driver, map[string]string{"upload_id": proof}); got.status != http.StatusNoContent {
 		t.Fatalf("dropoff proof = %d %v", got.status, got.body)
 	}
+	if inbox := send(t, http.MethodGet, base+"/v1/notifications", sender, nil); !strings.Contains(fmt.Sprint(inbox.body), "status:delivered") {
+		t.Errorf("sender was not told of the delivery: %v", inbox.body)
+	}
 	if got := complete(); got.status != http.StatusConflict || got.body["code"] != "RECIPIENT_PENDING" {
 		t.Errorf("complete before confirmation = %d %v", got.status, got.body)
 	}

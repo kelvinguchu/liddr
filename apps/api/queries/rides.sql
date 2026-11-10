@@ -4,6 +4,13 @@ SELECT id, slug, base_fee_cents, price_per_km_cents, price_per_min_cents, min_fa
 FROM vehicle_categories
 WHERE slug = sqlc.arg(slug) AND is_active;
 
+-- name: ListActiveCategories :many
+SELECT id, slug, base_fee_cents, price_per_km_cents, price_per_min_cents, min_fare_cents,
+    discount_bps, search_radius_m, capacity
+FROM vehicle_categories
+WHERE is_active
+ORDER BY display_order;
+
 -- name: CountRecentQuotes :one
 SELECT count(*) FROM ride_quotes
 WHERE rider_id = sqlc.arg(rider_id) AND created_at > sqlc.arg(since);

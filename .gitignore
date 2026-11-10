@@ -4,6 +4,7 @@
 # Environment files
 .env
 .env.*
+!apps/api/.env.example
 
 # API (Phoenix / Elixir)
 legacy/api/.env

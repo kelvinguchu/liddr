@@ -65,6 +65,9 @@ type Deps struct {
 	// OpsAllowedNets restricts staff routes when it is not empty.
 	OpsAllowedNets []netip.Prefix
 
+	// Console serves the staff web console under /ops/. Nil leaves it off.
+	Console http.Handler
+
 	// TrustedProxyHops is how many proxies in front of this server append to
 	// X-Forwarded-For. Zero means clients connect directly.
 	TrustedProxyHops int
@@ -91,6 +94,10 @@ func New(deps Deps) *API {
 		ErrorHandlerFunc: a.requestError,
 	})
 	mux.Handle("GET /v1/realtime", a.protect(http.HandlerFunc(a.openRealtime)))
+	if deps.Console != nil {
+		mux.Handle("GET /ops/", deps.Console)
+		mux.Handle("GET /ops", http.RedirectHandler("/ops/", http.StatusMovedPermanently))
+	}
 	a.handler = a.withMiddleware(mux)
 	return a
 }

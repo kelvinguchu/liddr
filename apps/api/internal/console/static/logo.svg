@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="110" height="48" viewBox="-6 18 212 96" role="img" aria-label="liddr">
+<g fill="none" stroke="#FFFFFF" stroke-width="9" stroke-linecap="butt">
+<path d="M10 28 V100"/>
+<path d="M34 62 V100"/>
+<circle cx="66" cy="81" r="17"/><path d="M83 28 V100"/>
+<circle cx="116" cy="81" r="17"/><path d="M133 28 V100"/>
+<path d="M156 100 V74 A14 14 0 0 1 170 60 H182"/>
+</g>
+<circle cx="34" cy="42" r="6.5" fill="none" stroke="#12B5A6" stroke-width="4"/>
+</svg>

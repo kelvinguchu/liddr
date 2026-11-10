@@ -65,8 +65,10 @@ type Deps struct {
 	// OpsAllowedNets restricts staff routes when it is not empty.
 	OpsAllowedNets []netip.Prefix
 
-	// Console serves the staff web console under /ops/. Nil leaves it off.
-	Console http.Handler
+	// ConsoleOrigin is the staff console's exact origin. Set, staff may sign in
+	// there with a session cookie (console.go); empty, the console routes and
+	// cookies do not exist.
+	ConsoleOrigin string
 
 	// TrustedProxyHops is how many proxies in front of this server append to
 	// X-Forwarded-For. Zero means clients connect directly.
@@ -76,13 +78,14 @@ type Deps struct {
 // API implements the generated contract and is the process HTTP handler.
 type API struct {
 	deps     Deps
+	console  *consoleCookies
 	draining atomic.Bool
 	handler  http.Handler
 }
 
 // New registers every route and returns the API.
 func New(deps Deps) *API {
-	a := &API{deps: deps}
+	a := &API{deps: deps, console: newConsoleCookies(deps.ConsoleOrigin)}
 	mux := http.NewServeMux()
 	strict := NewStrictHandlerWithOptions(a, nil, StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  a.requestError,
@@ -94,10 +97,7 @@ func New(deps Deps) *API {
 		ErrorHandlerFunc: a.requestError,
 	})
 	mux.Handle("GET /v1/realtime", a.protect(http.HandlerFunc(a.openRealtime)))
-	if deps.Console != nil {
-		mux.Handle("GET /ops/", deps.Console)
-		mux.Handle("GET /ops", http.RedirectHandler("/ops/", http.StatusMovedPermanently))
-	}
+	a.registerConsole(mux)
 	a.handler = a.withMiddleware(mux)
 	return a
 }

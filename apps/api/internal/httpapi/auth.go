@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net/http"
 
 	"github.com/kelvinguchu/liddr/apps/api/internal/auth"
 )
@@ -74,22 +75,41 @@ func (a *API) RequestOtp(ctx context.Context, req RequestOtpRequestObject) (Requ
 // VerifyOtp exchanges a sign-in code for a session.
 func (a *API) VerifyOtp(ctx context.Context, req VerifyOtpRequestObject) (VerifyOtpResponseObject, error) {
 	tokens, err := a.deps.Auth.VerifyOTP(ctx, req.Body.ChallengeId, req.Body.Code, requestMeta(ctx))
-	switch {
-	case err == nil:
+	if err == nil {
 		return VerifyOtp200JSONResponse(toSession(tokens)), nil
+	}
+	status, code, message, ok := otpProblem(err)
+	if !ok {
+		return nil, err
+	}
+	body := errorBody(ctx, code, message)
+	switch status {
+	case http.StatusBadRequest:
+		return VerifyOtp400JSONResponse(body), nil
+	case http.StatusTooManyRequests:
+		return VerifyOtp429JSONResponse(body), nil
+	default:
+		return VerifyOtp403JSONResponse(body), nil
+	}
+}
+
+// otpProblem maps a refused sign-in code to its answer. ok is false for an
+// unexpected error, which the caller reports as a failure.
+func otpProblem(err error) (status int, code, message string, ok bool) {
+	switch {
 	case errors.Is(err, auth.ErrInvalidCode):
-		return VerifyOtp400JSONResponse(errorBody(ctx, "INVALID_CODE", "That code is incorrect.")), nil
+		return http.StatusBadRequest, "INVALID_CODE", "That code is incorrect.", true
 	case errors.Is(err, auth.ErrCodeExpired):
-		return VerifyOtp400JSONResponse(errorBody(ctx, "CODE_EXPIRED", "That code has expired. Request a new one.")), nil
+		return http.StatusBadRequest, "CODE_EXPIRED", "That code has expired. Request a new one.", true
 	case errors.Is(err, auth.ErrTooManyAttempts):
-		return VerifyOtp429JSONResponse(errorBody(ctx, "TOO_MANY_ATTEMPTS", "Too many incorrect codes. Request a new one.")), nil
+		return http.StatusTooManyRequests, "TOO_MANY_ATTEMPTS", "Too many incorrect codes. Request a new one.", true
 	case errors.Is(err, auth.ErrNotStaff):
-		return VerifyOtp403JSONResponse(errorBody(ctx, "NOT_STAFF", "This number does not have staff access.")), nil
+		return http.StatusForbidden, "NOT_STAFF", "This number does not have staff access.", true
 	case isAccountBlocked(err):
 		code, message := accountBlocked(err)
-		return VerifyOtp403JSONResponse(errorBody(ctx, code, message)), nil
+		return http.StatusForbidden, code, message, true
 	default:
-		return nil, err
+		return 0, "", "", false
 	}
 }
 

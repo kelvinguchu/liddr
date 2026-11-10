@@ -795,6 +795,136 @@ paths:
         default:
           $ref: "#/components/responses/Problem"
 
+  # The staff console's session. These routes exist only when the server is
+  # given OPS_CONSOLE_ORIGIN. They carry credentials in cookies the page cannot
+  # read, so the console never holds a token: __Host-liddr_staff (the access
+  # token, path /), __Secure-liddr_staff_refresh (path /v1/auth/web/session)
+  # and __Host-liddr_step_up. Every cookie is HttpOnly, Secure and
+  # SameSite=Strict; over plain http (local development only) the same names
+  # lose their prefix and Secure. Every request made with these cookies other
+  # than GET or HEAD, and every route here, must come from the console: the
+  # X-Liddr-Console header, and Sec-Fetch-Site same-origin or an Origin equal
+  # to OPS_CONSOLE_ORIGIN. Anything else is refused with
+  # CONSOLE_ORIGIN_REQUIRED. Staff routes accept the session cookie in place of
+  # a bearer token, and the step-up cookie in place of X-Step-Up-Token.
+  /v1/auth/web/session:
+    post:
+      operationId: startConsoleSession
+      summary: Exchange a staff sign-in code for a console session
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/ConsoleHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OtpVerification"
+      responses:
+        "200":
+          description: Signed in. The session and refresh cookies are set.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsoleSession"
+        "400":
+          description: The code is wrong or no longer valid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Not a staff account, the account cannot sign in, or the request did not come from the console.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Too many wrong codes. Request a new one.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: endConsoleSession
+      summary: Sign the console out. Succeeds even if already signed out.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/ConsoleHeader"
+      responses:
+        "204":
+          description: The session has ended and its cookies are cleared.
+        "403":
+          description: The request did not come from the console.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /v1/auth/web/session/refresh:
+    post:
+      operationId: refreshConsoleSession
+      summary: Rotate the console session's cookies
+      description: Clears the step-up cookie, which belongs to the session being replaced.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/ConsoleHeader"
+      responses:
+        "200":
+          description: New cookies are set. The old refresh cookie is spent.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsoleSession"
+        "401":
+          description: The session has ended. Sign in again. Its cookies are cleared.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: The account cannot sign in, or the request did not come from the console.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /v1/auth/web/step-up:
+    post:
+      operationId: verifyConsoleStepUp
+      summary: Confirm high-risk actions for a few minutes with an authenticator code
+      security:
+        - bearerAuth: [ops, admin, "mfa:exempt"]
+      parameters:
+        - $ref: "#/components/parameters/ConsoleHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TotpCode"
+      responses:
+        "200":
+          description: The step-up cookie is set.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsoleStepUp"
+        default:
+          $ref: "#/components/responses/Problem"
+
   /v1/verification/applications:
     post:
       operationId: startVerification
@@ -2307,6 +2437,14 @@ paths:
 
 components:
   parameters:
+    ConsoleHeader:
+      name: X-Liddr-Console
+      in: header
+      required: true
+      description: Sent by the staff console on every request. Pages on other sites cannot send it without the API's permission, which it never gives.
+      schema:
+        type: string
+        enum: ["1"]
     ReportId:
       name: report_id
       in: path
@@ -2413,6 +2551,11 @@ components:
     bearerAuth:
       type: http
       scheme: bearer
+    consoleSession:
+      type: apiKey
+      in: cookie
+      name: __Host-liddr_staff
+      description: The staff console's session, set by /v1/auth/web/session. Staff routes accept it wherever bearerAuth is listed, with the same roles and scopes.
 
   schemas:
     Subscription:
@@ -3196,6 +3339,33 @@ components:
         expires_in:
           type: integer
           format: int32
+
+    ConsoleSession:
+      type: object
+      additionalProperties: false
+      required: [user_id, roles, expires_in]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        roles:
+          type: array
+          items:
+            $ref: "#/components/schemas/Role"
+        expires_in:
+          type: integer
+          format: int32
+          description: Seconds until the session cookie must be refreshed.
+
+    ConsoleStepUp:
+      type: object
+      additionalProperties: false
+      required: [expires_in]
+      properties:
+        expires_in:
+          type: integer
+          format: int32
+          description: Seconds the step-up cookie stays valid.
 
     StartVerificationRequest:
       type: object

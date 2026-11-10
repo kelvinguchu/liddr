@@ -19,7 +19,8 @@ import (
 )
 
 const (
-	BearerAuthScopes bearerAuthContextKey = "bearerAuth.Scopes"
+	BearerAuthScopes     bearerAuthContextKey     = "bearerAuth.Scopes"
+	ConsoleSessionScopes consoleSessionContextKey = "consoleSession.Scopes"
 )
 
 // Defines values for AuthMethodsMethods.
@@ -2059,6 +2060,9 @@ type Problem = Error
 
 // bearerAuthContextKey is the context key for bearerAuth security scheme
 type bearerAuthContextKey string
+
+// consoleSessionContextKey is the context key for consoleSession security scheme
+type consoleSessionContextKey string
 
 // BeginTotpSetupParams defines parameters for BeginTotpSetup.
 type BeginTotpSetupParams struct {

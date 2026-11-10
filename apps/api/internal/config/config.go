@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/netip"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -66,6 +67,9 @@ type Config struct {
 	AuthHMACKey      Secret
 	DataKey          Secret
 	OpsAllowedNets   []netip.Prefix
+	// OpsConsoleOrigin is the staff console's exact origin. Set, staff can
+	// sign in there with a session cookie; empty, cookie sign-in is off.
+	OpsConsoleOrigin string
 	Documents        Documents
 	Push             Push
 	Email            Email
@@ -166,6 +170,13 @@ func Load(getenv func(string) string) (Config, error) {
 		cfg.OpsAllowedNets = append(cfg.OpsAllowedNets, prefix.Masked())
 	}
 
+	if origin := strings.TrimSpace(getenv("OPS_CONSOLE_ORIGIN")); origin != "" {
+		if !isOrigin(origin) {
+			errs = append(errs, errors.New("OPS_CONSOLE_ORIGIN must be an exact origin, such as https://ops.example.com"))
+		}
+		cfg.OpsConsoleOrigin = origin
+	}
+
 	cfg.Documents = Documents{
 		Bucket:         getenv("GCS_BUCKET"),
 		BaseURL:        withDefault(getenv("GCS_BASE_URL"), "https://storage.googleapis.com"),
@@ -223,4 +234,13 @@ func Load(getenv func(string) string) (Config, error) {
 		return Config{}, err
 	}
 	return cfg, nil
+}
+
+// isOrigin reports whether value is scheme://host[:port] and nothing more.
+func isOrigin(value string) bool {
+	u, err := url.Parse(value)
+	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
+		return false
+	}
+	return u.User == nil && u.Path == "" && u.RawQuery == "" && u.Fragment == "" && u.Opaque == ""
 }

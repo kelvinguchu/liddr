@@ -91,6 +91,8 @@ func TestLoadRejectsInvalidValues(t *testing.T) {
 		{"missing data key", "DATA_ENCRYPTION_KEY", "", "DATA_ENCRYPTION_KEY is required"},
 		{"short data key", "DATA_ENCRYPTION_KEY", "c2hvcnQ=", "DATA_ENCRYPTION_KEY must be base64"},
 		{"bad ops range", "OPS_ALLOWED_CIDRS", "not-a-range", "OPS_ALLOWED_CIDRS must be"},
+		{"console origin with a path", "OPS_CONSOLE_ORIGIN", "https://ops.example.com/app", "OPS_CONSOLE_ORIGIN must be"},
+		{"console origin without a scheme", "OPS_CONSOLE_ORIGIN", "ops.example.com", "OPS_CONSOLE_ORIGIN must be"},
 		{"bucket without account", "GCS_BUCKET", "bucket", "GCS_SERVICE_ACCOUNT_JSON is required"},
 		{"bucket without scanner", "GCS_BUCKET", "bucket", "CLAMAV_ADDR is required"},
 		{"push without account", "FCM_PROJECT_ID", "liddr", "FCM_SERVICE_ACCOUNT_JSON is required"},

@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/kelvinguchu/liddr/apps/api/internal/config"
-	"github.com/kelvinguchu/liddr/apps/api/internal/console"
 	"github.com/kelvinguchu/liddr/apps/api/internal/dispatch"
 	"github.com/kelvinguchu/liddr/apps/api/internal/disputes"
 	"github.com/kelvinguchu/liddr/apps/api/internal/httpapi"
@@ -125,10 +124,6 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	dispatcher := dispatch.NewService(dispatch.Config{Pool: pool, Now: time.Now})
 	billing := newSubscriptions(cfg, pool, logger)
 	hub := realtime.NewHub(logger)
-	staffConsole, err := console.Handler(console.Config{DocumentOrigin: cfg.Documents.BaseURL})
-	if err != nil {
-		return err
-	}
 	api := httpapi.New(httpapi.Deps{
 		Logger:           logger,
 		Database:         pool,
@@ -151,7 +146,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		MpesaAllowedIPs:  cfg.Mpesa.AllowedIPs,
 		OpsAllowedNets:   cfg.OpsAllowedNets,
 		TrustedProxyHops: cfg.TrustedProxyHops,
-		Console:          staffConsole,
+		ConsoleOrigin:    cfg.OpsConsoleOrigin,
 	})
 	server := &http.Server{
 		Handler:           api,

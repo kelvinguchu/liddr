@@ -71,7 +71,8 @@ func TestEveryRouteDeniesByDefault(t *testing.T) {
 	stub := &smsStub{}
 	provider := httptest.NewServer(stub)
 	defer provider.Close()
-	base, _ := startServer(t, databaseURL, provider.URL)
+	// The console's routes exist only with its origin set, and are walked too.
+	base, _ := startServerWithEnv(t, databaseURL, provider.URL, "http://127.0.0.1:1", map[string]string{"OPS_CONSOLE_ORIGIN": consoleOrigin})
 	grantStaff(t, databaseURL, "0700000001", "ops")
 	grantStaff(t, databaseURL, "0700000001", "admin")
 	rider, _ := signIn(t, base, stub, "0711111111", "rider")["access_token"].(string)

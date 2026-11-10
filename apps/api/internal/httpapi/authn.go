@@ -33,8 +33,18 @@ func (a *API) authenticate(next http.Handler) http.Handler {
 		}
 
 		token := bearerToken(r)
+		viaCookie := false
+		if token == "" && a.console != nil {
+			token, viaCookie = a.console.read(r, a.console.session)
+		}
 		if token == "" {
 			writeUnauthorized(w, r)
+			return
+		}
+		// A cookie is sent by the browser whoever asked, so a write made with
+		// one must show it came from the console's own page.
+		if viaCookie && r.Method != http.MethodGet && r.Method != http.MethodHead && !a.console.fromConsole(r) {
+			writeConsoleOriginRequired(w, r)
 			return
 		}
 		p, err := a.deps.Auth.Authenticate(r.Context(), token)
@@ -62,7 +72,11 @@ func (a *API) authenticate(next http.Handler) http.Handler {
 			writeError(w, r, http.StatusForbidden, "FORBIDDEN", "You do not have permission to do this.")
 			return
 		}
-		if err := a.checkStaffAccess(r, p, roles, requirement); err != nil {
+		stepUp := r.Header.Get(headerStepUp)
+		if stepUp == "" && viaCookie {
+			stepUp, _ = a.console.read(r, a.console.stepUp)
+		}
+		if err := a.checkStaffAccess(r, p, roles, requirement, stepUp); err != nil {
 			a.responseError(w, r, err)
 			return
 		}
@@ -70,11 +84,17 @@ func (a *API) authenticate(next http.Handler) http.Handler {
 	})
 }
 
-// protect applies the same rules as generated routes to a hand-registered one.
+// protect applies the same rules as generated routes to a hand-registered one
+// open to any signed-in account.
 func (a *API) protect(next http.Handler) http.Handler {
+	return a.guard([]string{}, next)
+}
+
+// guard applies the generated routes' rules with the given contract scopes.
+func (a *API) guard(scopes []string, next http.Handler) http.Handler {
 	guarded := a.authenticate(next)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		guarded.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), BearerAuthScopes, []string{})))
+		guarded.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), BearerAuthScopes, scopes)))
 	})
 }
 
@@ -85,6 +105,9 @@ func (a *API) openRealtime(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	token := bearerToken(r)
+	if token == "" && a.console != nil {
+		token, _ = a.console.read(r, a.console.session)
+	}
 	a.deps.Realtime.Serve(a.deps.RealtimeBase, w, r, realtime.Options{
 		UserID:         p.UserID,
 		OriginPatterns: a.deps.RealtimeOrigins,

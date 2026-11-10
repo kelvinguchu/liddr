@@ -47,8 +47,9 @@ func viaStaffRoleOnly(held []auth.Role, allowed []string) bool {
 
 // checkStaffAccess applies network and two-factor rules. Enrolment is required
 // unless the contract explicitly exempts a route, so a new staff route is
-// protected even if its author forgets.
-func (a *API) checkStaffAccess(r *http.Request, p auth.Principal, roles, requirement []string) error {
+// protected even if its author forgets. stepUp is the step-up proof sent with
+// the request, from its header or the console's cookie.
+func (a *API) checkStaffAccess(r *http.Request, p auth.Principal, roles, requirement []string, stepUp string) error {
 	if viaStaffRoleOnly(p.Roles, roles) {
 		if !a.staffAddressAllowed(r) {
 			return errAddressNotAllowed
@@ -58,7 +59,7 @@ func (a *API) checkStaffAccess(r *http.Request, p auth.Principal, roles, require
 		}
 	}
 	if slices.Contains(requirement, scopeStepUp) {
-		return a.deps.Auth.CheckStepUp(p, r.Header.Get(headerStepUp))
+		return a.deps.Auth.CheckStepUp(p, stepUp)
 	}
 	return nil
 }

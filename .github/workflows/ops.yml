@@ -1,0 +1,35 @@
+name: Ops console
+
+on:
+  pull_request:
+    paths: &paths
+      - apps/ops/**
+      - packages/contract/**
+      - .github/workflows/ops.yml
+  push:
+    branches: [main]
+    paths: *paths
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: apps/ops
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/ops/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      # The client's types must match the contract the API serves.
+      - run: npm run generate && git diff --exit-code src/lib/contract.gen.ts
+      - run: npm test
+      - run: npm run build
+      - run: npm audit --omit=dev --audit-level=high

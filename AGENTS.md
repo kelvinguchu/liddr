@@ -2,7 +2,7 @@
 
 Ride-hailing and delivery platform for Kenya: Go API, Postgres, Redis, WebSockets, background jobs, M-Pesa, and an Android app.
 
-Layout: `go.work` at the root, the Go API in `apps/api`, the Android app in `apps/android`, and the old Elixir backend in `legacy/api`.
+Layout: `go.work` at the root, the Go API in `apps/api`, the Android app in `apps/android`, the staff console in `apps/ops` (TanStack Start; its README covers setup, checks and routing), and the old Elixir backend in `legacy/api`.
 Product rules: `docs/aboutapp.md` and the policy docs in `docs/`. Status: the API domains in `legacy/api` are ported to Go. The Android app covers sign-in, rides, Send deliveries, shared rides, ratings and driver mode, all connected to the API with live updates. The map and Google Places switch on with a `liddr.mapsApiKey` Gradle property, and Firebase push is not wired into the app yet. Treat `legacy/api` as a business-rule reference, not as design or proof of correctness.
 
 ## Priorities

@@ -1,5 +1,6 @@
 package com.liddr.app.ui.launch
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -10,24 +11,37 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 
 @Composable
-fun OnboardingNav() {
+fun OnboardingNav(viewModel: AuthViewModel) {
+        val state by viewModel.ui.collectAsState()
         var role by rememberSaveable { mutableStateOf<AccountRoleUi?>(null) }
-        var mode by rememberSaveable { mutableStateOf(AuthModeUi.SIGN_UP) }
         var methodKey by rememberSaveable { mutableStateOf<String?>(null) }
 
         val step =
                 when {
                         role == null -> 0
                         methodKey == null -> 1
-                        else -> 2
+                        state.challengeId == null -> 2
+                        else -> 3
                 }
         val method = allOnboardingMethods.firstOrNull { it.method == methodKey }
+        val back: () -> Unit = {
+                when (step) {
+                        3 -> viewModel.editDestination()
+                        2 -> {
+                                viewModel.clearError()
+                                methodKey = null
+                        }
+                        else -> role = null
+                }
+        }
+        BackHandler(enabled = step > 0, onBack = back)
 
         AnimatedContent(
                 targetState = step,
@@ -82,32 +96,35 @@ fun OnboardingNav() {
                 label = "onboarding"
         ) { s ->
                 when (s) {
-                        0 ->
-                                FirstScreen(
-                                        onRoleSelected = { r ->
-                                                role = r
-                                                methodKey = null
-                                                mode = AuthModeUi.SIGN_UP
-                                        }
-                                )
+                        0 -> FirstScreen(onRoleSelected = { role = it })
                         1 ->
                                 AuthGatewayScreen(
                                         role = role ?: AccountRoleUi.RIDER,
-                                        mode = mode,
-                                        onBack = {
-                                                role = null
-                                                methodKey = null
-                                        },
-                                        onModeChange = { mode = it },
+                                        onBack = back,
                                         onMethodSelected = { methodKey = it.method }
                                 )
-                        else ->
+                        2 ->
                                 AuthMethodEntryScreen(
                                         role = role ?: AccountRoleUi.RIDER,
-                                        mode = mode,
                                         method = method ?: allOnboardingMethods.first(),
-                                        onBack = { methodKey = null },
-                                        onContinue = {}
+                                        state = state,
+                                        onBack = back,
+                                        onValueEdited = viewModel::clearError,
+                                        onContinue = { entered ->
+                                                viewModel.sendCode(
+                                                        role ?: AccountRoleUi.RIDER,
+                                                        method ?: allOnboardingMethods.first(),
+                                                        entered
+                                                )
+                                        }
+                                )
+                        else ->
+                                CodeEntryScreen(
+                                        state = state,
+                                        onChangeDestination = back,
+                                        onEdited = viewModel::clearError,
+                                        onVerify = viewModel::verify,
+                                        onResend = viewModel::resend
                                 )
                 }
         }

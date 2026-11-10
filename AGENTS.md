@@ -3,7 +3,7 @@
 Ride-hailing and delivery platform for Kenya: Go API, Postgres, Redis, WebSockets, background jobs, M-Pesa, and an Android app.
 
 Layout: `go.work` at the root, the Go API in `apps/api`, the Android app in `apps/android`, and the old Elixir backend in `legacy/api`.
-Product rules: `docs/aboutapp.md` and the policy docs in `docs/`. Status: the API domains in `legacy/api` are ported to Go. The Android app is launch and sign-in screens only and is not connected to the API yet. Treat `legacy/api` as a business-rule reference, not as design or proof of correctness.
+Product rules: `docs/aboutapp.md` and the policy docs in `docs/`. Status: the API domains in `legacy/api` are ported to Go. The Android app covers sign-in, rider booking and ratings, and driver verification, subscription, offers and trips, all connected to the API. The live map, Send, shared rides and push notifications are still to build. Treat `legacy/api` as a business-rule reference, not as design or proof of correctness.
 
 ## Priorities
 
@@ -75,7 +75,7 @@ migrations/  queries/  testdata/
 - Dependencies point inward: `httpapi` and `realtime` call domain packages, and domain packages call `store`.
 - Domain packages push to sockets through an interface they define, and `run` wires in `realtime`.
 - Prefer a few substantial packages. Ban catch-all names like `util`, `common`, `helpers`, `shared` and `pkg/`; purpose-named leaves such as `internal/money` are fine.
-- Keep handwritten files at 250 lines or fewer unless the file documents why, with no one-type-per-file rule. Generated files are exempt, and sqlc output is never edited by hand.
+- Keep handwritten files at 400 lines or fewer unless the file documents why, with no one-type-per-file rule. Generated files are exempt, and sqlc output is never edited by hand.
 - Use no package-level mutable state and no `func init`; sentinels and read-only lookup tables are fine. `run` builds every dependency and passes it in.
 - Use plain `net/http` with `http.ServeMux`, never a web framework or `DefaultServeMux`. Register routes in one place.
 - `packages/contract/openapi.yaml` is the API source of truth. Change it first, regenerate, and never edit generated code.

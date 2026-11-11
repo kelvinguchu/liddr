@@ -46,9 +46,10 @@ npm run generate       # after changing packages/contract/openapi.yaml
 npm run typecheck && npm test
 ```
 
-`LIDDR_DOCUMENT_ORIGIN` is the storage origin signed document links point at
-(default `https://storage.googleapis.com`); the page's policy lets images load
-from there and nowhere else.
+`LIDDR_DOCUMENT_ORIGIN` is the storage origin signed document links point at:
+the R2 account endpoint, `https://<account id>.r2.cloudflarestorage.com`. The
+page's policy lets images load from there and nowhere else; unset, document
+images do not load.
 
 ## Build and run
 

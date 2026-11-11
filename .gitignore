@@ -36,3 +36,5 @@ ios/**/*.xcuserstate
 Thumbs.db
 
 secrets
+# Google service account keys
+*-firebase-adminsdk-*.json

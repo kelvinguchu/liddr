@@ -34,13 +34,13 @@ const (
 	dataKeyBytes    = 32
 )
 
-// SMS holds HostPinnacle credentials.
+// SMS holds Onfon credentials.
 type SMS struct {
-	URL      string
-	APIKey   Secret
-	UserID   string
-	Password Secret
-	SenderID string
+	BaseURL   string
+	APIKey    Secret
+	ClientID  Secret
+	AccessKey Secret
+	SenderID  string
 }
 
 // Mpesa holds Daraja settings.
@@ -82,13 +82,21 @@ type Config struct {
 	RealtimeOrigins  []string
 }
 
-// LoadDatabaseURL returns the only setting that migrations need.
+// LoadDatabaseURL returns the only setting that migrations need. It may refer
+// to other settings as ${NAME}, as in
+// postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@host/${POSTGRES_DB}, so
+// the database container and the API share one set of credentials whatever
+// loads the environment.
 func LoadDatabaseURL(getenv func(string) string) (Secret, error) {
-	url := Secret(getenv("DATABASE_URL"))
-	if url == "" {
+	raw := getenv("DATABASE_URL")
+	if raw == "" {
 		return "", errors.New("DATABASE_URL is required")
 	}
-	return url, nil
+	expanded, missing := expandReferences(raw, getenv)
+	if len(missing) > 0 {
+		return "", fmt.Errorf("DATABASE_URL refers to unset %s", strings.Join(missing, ", "))
+	}
+	return Secret(expanded), nil
 }
 
 // Load validates the environment and reports every problem at once. Errors
@@ -105,17 +113,17 @@ func Load(getenv func(string) string) (Config, error) {
 
 	cfg := Config{
 		Addr:            withDefault(getenv("ADDR"), ":8080"),
-		DatabaseURL:     Secret(required("DATABASE_URL")),
+		DatabaseURL:     loadDatabaseURL(getenv, &errs),
 		AuthHMACKey:     Secret(required("AUTH_HMAC_KEY")),
 		DataKey:         decodeDataKey(required("DATA_ENCRYPTION_KEY"), &errs),
 		GoogleMapsKey:   Secret(required("GOOGLE_MAPS_API_KEY_SERVER")),
 		GoogleRoutesURL: withDefault(getenv("GOOGLE_ROUTES_BASE_URL"), "https://routes.googleapis.com"),
 		SMS: SMS{
-			URL:      required("HOSTPINNACLE_API_URL"),
-			APIKey:   Secret(required("HOSTPINNACLE_API_KEY")),
-			UserID:   required("HOSTPINNACLE_USER_ID"),
-			Password: Secret(required("HOSTPINNACLE_PASSWORD")),
-			SenderID: required("HOSTPINNACLE_SENDER_ID"),
+			BaseURL:   withDefault(getenv("ONFON_API_URL"), "https://api.onfonmedia.co.ke"),
+			APIKey:    Secret(required("ONFON_API_KEY")),
+			ClientID:  Secret(required("ONFON_CLIENT_ID")),
+			AccessKey: Secret(required("ONFON_ACCESS_KEY")),
+			SenderID:  required("ONFON_SENDER_ID"),
 		},
 	}
 	for origin := range strings.SplitSeq(getenv("REALTIME_ALLOWED_ORIGINS"), ",") {
@@ -127,12 +135,20 @@ func Load(getenv func(string) string) (Config, error) {
 			cfg.RealtimeOrigins = append(cfg.RealtimeOrigins, origin)
 		}
 	}
+	shortcode, passkey := getenv("MPESA_SHORTCODE"), getenv("MPESA_PASSKEY")
+	if getenv("MPESA_ENV") == "production" {
+		shortcode, passkey = required("MPESA_SHORTCODE"), required("MPESA_PASSKEY")
+	} else {
+		// Sandbox has one public test till; the Daraja app's own values are
+		// only for production.
+		shortcode, passkey = withDefault(shortcode, sandboxShortcode), withDefault(passkey, string(sandboxPasskey))
+	}
 	cfg.Mpesa = Mpesa{
 		BaseURL:         withDefault(getenv("MPESA_BASE_URL"), mpesaBaseURL(getenv("MPESA_ENV"))),
 		ConsumerKey:     Secret(required("MPESA_CONSUMER_KEY")),
 		ConsumerSecret:  Secret(required("MPESA_CONSUMER_SECRET")),
-		Shortcode:       required("MPESA_SHORTCODE"),
-		Passkey:         Secret(required("MPESA_PASSKEY")),
+		Shortcode:       shortcode,
+		Passkey:         Secret(passkey),
 		TransactionType: withDefault(getenv("MPESA_STK_TRANSACTION_TYPE"), "CustomerPayBillOnline"),
 		CallbackBaseURL: required("MPESA_CALLBACK_BASE_URL"),
 		CallbackToken:   Secret(required("MPESA_CALLBACK_TOKEN")),
@@ -178,18 +194,14 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 
 	cfg.Documents = Documents{
-		Bucket:         getenv("GCS_BUCKET"),
-		BaseURL:        withDefault(getenv("GCS_BASE_URL"), "https://storage.googleapis.com"),
-		ServiceAccount: Secret(getenv("GCS_SERVICE_ACCOUNT_JSON")),
-		ClamAVAddr:     getenv("CLAMAV_ADDR"),
+		Bucket:          getenv("R2_BUCKET"),
+		Endpoint:        getenv("R2_ENDPOINT"),
+		AccessKeyID:     Secret(getenv("R2_ACCESS_KEY_ID")),
+		SecretAccessKey: Secret(getenv("R2_SECRET_ACCESS_KEY")),
+		ClamAVAddr:      getenv("CLAMAV_ADDR"),
 	}
 	if cfg.Documents.Bucket != "" {
-		if cfg.Documents.ServiceAccount == "" {
-			errs = append(errs, errors.New("GCS_SERVICE_ACCOUNT_JSON is required with GCS_BUCKET"))
-		}
-		if cfg.Documents.ClamAVAddr == "" {
-			errs = append(errs, errors.New("CLAMAV_ADDR is required with GCS_BUCKET"))
-		}
+		errs = append(errs, documentErrors(&cfg.Documents, getenv("R2_ACCOUNT_ID"))...)
 	}
 
 	cfg.Push = Push{

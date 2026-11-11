@@ -11,10 +11,12 @@ test("scripts run only from this origin or with the response's nonce", () => {
 });
 
 test("images may also come from the document storage origin only", () => {
-  assert.match(documentPolicy("n", "https://storage.googleapis.com"), /img-src 'self' data: blob: https:\/\/storage\.googleapis\.com;/);
-  assert.equal(originOf("https://storage.googleapis.com/bucket/path"), "https://storage.googleapis.com");
+  const r2 = "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com";
+  assert.match(documentPolicy("n", r2), /img-src 'self' data: blob: https:\/\/0123456789abcdef0123456789abcdef\.r2\.cloudflarestorage\.com;/);
+  assert.equal(originOf(r2 + "/bucket/key.jpg?X-Amz-Signature=x"), r2);
+  assert.match(documentPolicy("n", originOf(undefined)), /img-src 'self' data: blob:;/);
   assert.equal(originOf("javascript:alert(1)"), "");
-  assert.equal(originOf("storage.googleapis.com"), "");
+  assert.equal(originOf("0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com"), "");
 });
 
 test("each nonce is fresh", () => {

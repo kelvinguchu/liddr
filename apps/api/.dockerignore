@@ -1,0 +1,6 @@
+# Never send secrets or local state into an image build.
+.env
+.env.*
+*.json.key
+*-firebase-adminsdk-*.json
+compose.yaml

@@ -2,12 +2,7 @@ package main
 
 import (
 	"bytes"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
 	"encoding/binary"
-	"encoding/json"
-	"encoding/pem"
 	"io"
 	"net"
 	"net/http"
@@ -17,7 +12,8 @@ import (
 	"testing"
 )
 
-// fakeBucket stands in for Google Cloud Storage, the real client being under test.
+// fakeBucket stands in for Cloudflare R2, the real client being under test. It
+// refuses unsigned requests, as a private bucket does.
 type fakeBucket struct {
 	mu      sync.Mutex
 	objects map[string]fakeObject
@@ -29,6 +25,10 @@ type fakeObject struct {
 }
 
 func (b *fakeBucket) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Query().Get("X-Amz-Signature") == "" {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	switch r.Method {
@@ -101,26 +101,6 @@ func answerClamd(conn net.Conn) {
 	_, _ = conn.Write([]byte(reply))
 }
 
-func serviceAccountJSON(t *testing.T) string {
-	t.Helper()
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatalf("generate key: %v", err)
-	}
-	der, err := x509.MarshalPKCS8PrivateKey(key)
-	if err != nil {
-		t.Fatalf("marshal key: %v", err)
-	}
-	account, err := json.Marshal(map[string]string{
-		"client_email": "signer@test.iam.gserviceaccount.com",
-		"private_key":  string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der})),
-	})
-	if err != nil {
-		t.Fatalf("marshal account: %v", err)
-	}
-	return string(account)
-}
-
 type verificationWorld struct {
 	baseURL string
 	stub    *smsStub
@@ -155,10 +135,11 @@ func startVerificationWorld(t *testing.T, databaseURL string, stub *smsStub) ver
 	}))
 	t.Cleanup(google.Close)
 	baseURL, _ := startServerWithEnv(t, databaseURL, provider.URL, google.URL, map[string]string{
-		"GCS_BUCKET":               "test-bucket",
-		"GCS_BASE_URL":             bucket.URL,
-		"GCS_SERVICE_ACCOUNT_JSON": serviceAccountJSON(t),
-		"CLAMAV_ADDR":              fakeClamd(t),
+		"R2_BUCKET":            "test-bucket",
+		"R2_ENDPOINT":          bucket.URL,
+		"R2_ACCESS_KEY_ID":     "test-access-key",
+		"R2_SECRET_ACCESS_KEY": "test-secret",
+		"CLAMAV_ADDR":          fakeClamd(t),
 	})
 	return verificationWorld{baseURL: baseURL, stub: stub, db: databaseURL, bucket: store, keys: map[string]string{}}
 }

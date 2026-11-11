@@ -1,11 +1,6 @@
 package verification
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
-	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -45,22 +40,7 @@ func storageFor(t *testing.T, w *world, b *bucket) *storage.Client {
 	t.Helper()
 	server := httptest.NewServer(b)
 	t.Cleanup(server.Close)
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatalf("generate key: %v", err)
-	}
-	der, err := x509.MarshalPKCS8PrivateKey(key)
-	if err != nil {
-		t.Fatalf("marshal key: %v", err)
-	}
-	account, err := json.Marshal(map[string]string{
-		"client_email": "signer@example.iam.gserviceaccount.com",
-		"private_key":  string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der})),
-	})
-	if err != nil {
-		t.Fatalf("marshal account: %v", err)
-	}
-	client, err := storage.New(storage.Config{BaseURL: server.URL, Bucket: "b", ServiceAccountJSON: string(account), Now: func() time.Time { return w.now }})
+	client, err := storage.New(storage.Config{Endpoint: server.URL, Bucket: "b", AccessKeyID: "key", SecretAccessKey: "secret", Now: func() time.Time { return w.now }})
 	if err != nil {
 		t.Fatalf("storage.New: %v", err)
 	}

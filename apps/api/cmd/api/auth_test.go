@@ -19,23 +19,28 @@ import (
 
 var smsCode = regexp.MustCompile(`code is: (\d{6})`)
 
-// smsStub stands in for HostPinnacle, the only third-party network here.
+// smsStub stands in for Onfon, the only third-party network here.
 type smsStub struct {
 	mu   sync.Mutex
 	code string
 }
 
 func (s *smsStub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+	var sent struct {
+		MessageParameters []struct {
+			Text string `json:"Text"`
+		} `json:"MessageParameters"`
+	}
+	if r.URL.Path != "/v1/sms/SendBulkSMS" || json.NewDecoder(r.Body).Decode(&sent) != nil || len(sent.MessageParameters) != 1 {
+		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	if match := smsCode.FindStringSubmatch(r.PostForm.Get("msg")); match != nil {
+	if match := smsCode.FindStringSubmatch(sent.MessageParameters[0].Text); match != nil {
 		s.mu.Lock()
 		s.code = match[1]
 		s.mu.Unlock()
 	}
-	_, _ = w.Write([]byte(`{"status":"success"}`))
+	_, _ = w.Write([]byte(`{"ErrorCode":0,"ErrorDescription":"Success"}`))
 }
 
 func (s *smsStub) lastCode() string {

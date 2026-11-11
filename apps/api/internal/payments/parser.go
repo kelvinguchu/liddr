@@ -14,6 +14,7 @@ var ErrInvalidCallback = errors.New("invalid m-pesa callback")
 // Daraja result codes with their own meaning.
 const (
 	ResultSuccess    = 0
+	ResultExpired    = 1019
 	ResultCancelled  = 1032
 	ResultTimeout    = 1037
 	ResultProcessing = 4999
@@ -161,7 +162,9 @@ func StatusFromResult(code int32) string {
 		return "success"
 	case ResultCancelled:
 		return "cancelled"
-	case ResultTimeout:
+	// 1037 means the prompt never reached the phone or went unanswered, and
+	// 1019 that it expired before the customer answered. Both are timeouts.
+	case ResultTimeout, ResultExpired:
 		return "timeout"
 	default:
 		return "failed"

@@ -1,14 +1,6 @@
 package storage
 
 import (
-	"crypto"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/sha256"
-	"crypto/x509"
-	"encoding/hex"
-	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -18,74 +10,104 @@ import (
 	"time"
 )
 
-func testClient(t *testing.T, base string) (*Client, *rsa.PublicKey) {
+var testNow = time.Date(2026, 3, 2, 9, 0, 0, 0, time.UTC)
+
+func testClient(t *testing.T, endpoint string) *Client {
 	t.Helper()
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatalf("generate key: %v", err)
-	}
-	der, err := x509.MarshalPKCS8PrivateKey(key)
-	if err != nil {
-		t.Fatalf("marshal key: %v", err)
-	}
-	account, err := json.Marshal(map[string]string{
-		"client_email": "signer@project.iam.gserviceaccount.com",
-		"private_key":  string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der})),
-	})
-	if err != nil {
-		t.Fatalf("marshal account: %v", err)
-	}
 	client, err := New(Config{
-		BaseURL:            base,
-		Bucket:             "private-bucket",
-		ServiceAccountJSON: string(account),
-		Now:                func() time.Time { return time.Date(2026, 3, 2, 9, 0, 0, 0, time.UTC) },
+		Endpoint:        endpoint,
+		Bucket:          "private-bucket",
+		AccessKeyID:     "access-key-id",
+		SecretAccessKey: "secret-access-key",
+		Now:             func() time.Time { return testNow },
 	})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	return client, &key.PublicKey
+	return client
 }
 
-// The canonical form is written out by hand from Google's V4 signing
-// documentation, so that a mistake in the code cannot also be in the test.
-func TestSignUploadSignsTheDocumentedCanonicalRequest(t *testing.T) {
-	client, public := testClient(t, "https://storage.googleapis.com")
+// The expected signature is the one AWS publishes for this request in its
+// Signature Version 4 query-string example (GET examplebucket/test.txt), so a
+// mistake in the signer cannot also be in the test.
+func TestPresignMatchesTheAWSDocumentedExample(t *testing.T) {
+	got := presign{
+		method:    http.MethodGet,
+		host:      "examplebucket.s3.amazonaws.com",
+		path:      "/test.txt",
+		region:    "us-east-1",
+		accessKey: "AKIAIOSFODNN7EXAMPLE",
+		secret:    "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+		at:        time.Date(2013, 5, 24, 0, 0, 0, 0, time.UTC),
+		ttl:       24 * time.Hour,
+	}.url("https")
+	want := "https://examplebucket.s3.amazonaws.com/test.txt" +
+		"?X-Amz-Algorithm=AWS4-HMAC-SHA256" +
+		"&X-Amz-Credential=AKIAIOSFODNN7EXAMPLE%2F20130524%2Fus-east-1%2Fs3%2Faws4_request" +
+		"&X-Amz-Date=20130524T000000Z&X-Amz-Expires=86400&X-Amz-SignedHeaders=host" +
+		"&X-Amz-Signature=aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404"
+	if got != want {
+		t.Errorf("presigned URL\n got %s\nwant %s", got, want)
+	}
+}
+
+func TestSignUploadBindsTheExactSizeAndType(t *testing.T) {
+	client := testClient(t, "https://account.r2.cloudflarestorage.com")
 	upload, err := client.SignUpload("docs/a b/1.jpg", "image/jpeg", 1024, 10*time.Minute)
 	if err != nil {
 		t.Fatalf("SignUpload: %v", err)
 	}
-	if upload.Headers["content-type"] != "image/jpeg" || upload.Headers["x-goog-content-length-range"] != "0,1024" {
-		t.Errorf("headers = %v", upload.Headers)
+	if upload.Headers["content-type"] != "image/jpeg" || upload.Headers["content-length"] != "1024" || len(upload.Headers) != 2 {
+		t.Errorf("headers = %v, want exactly content-type and content-length", upload.Headers)
 	}
 	parsed, err := url.Parse(upload.URL)
 	if err != nil {
 		t.Fatalf("parse url: %v", err)
 	}
-	if want := "/private-bucket/docs/a%20b/1.jpg"; parsed.EscapedPath() != want {
-		t.Errorf("path = %s, want %s", parsed.EscapedPath(), want)
+	if parsed.Host != "account.r2.cloudflarestorage.com" || parsed.EscapedPath() != "/private-bucket/docs/a%20b/1.jpg" {
+		t.Errorf("url = %s, want the bucket in the path on the account endpoint", upload.URL)
 	}
-	query := "X-Goog-Algorithm=GOOG4-RSA-SHA256" +
-		"&X-Goog-Credential=signer%40project.iam.gserviceaccount.com%2F20260302%2Fauto%2Fstorage%2Fgoog4_request" +
-		"&X-Goog-Date=20260302T090000Z&X-Goog-Expires=600" +
-		"&X-Goog-SignedHeaders=content-type%3Bhost%3Bx-goog-content-length-range"
-	canonical := "PUT\n/private-bucket/docs/a%20b/1.jpg\n" + query + "\n" +
-		"content-type:image/jpeg\nhost:storage.googleapis.com\nx-goog-content-length-range:0,1024\n\n" +
-		"content-type;host;x-goog-content-length-range\nUNSIGNED-PAYLOAD"
-	hashed := sha256.Sum256([]byte(canonical))
-	toSign := "GOOG4-RSA-SHA256\n20260302T090000Z\n20260302/auto/storage/goog4_request\n" + hex.EncodeToString(hashed[:])
-	digest := sha256.Sum256([]byte(toSign))
-	signature, err := hex.DecodeString(parsed.Query().Get("X-Goog-Signature"))
-	if err != nil {
-		t.Fatalf("decode signature: %v", err)
+	query := parsed.Query()
+	for name, want := range map[string]string{
+		"X-Amz-Credential":    "access-key-id/20260302/auto/s3/aws4_request",
+		"X-Amz-Expires":       "600",
+		"X-Amz-SignedHeaders": "content-length;content-type;host",
+	} {
+		if got := query.Get(name); got != want {
+			t.Errorf("%s = %q, want %q", name, got, want)
+		}
 	}
-	if err := rsa.VerifyPKCS1v15(public, crypto.SHA256, digest[:], signature); err != nil {
-		t.Errorf("signature does not cover the documented request: %v", err)
+	if strings.Contains(upload.URL, "secret-access-key") {
+		t.Error("the URL carries the secret")
+	}
+}
+
+func TestSignRefusesAnExpiryR2WillNotAccept(t *testing.T) {
+	client := testClient(t, "https://account.r2.cloudflarestorage.com")
+	if _, err := client.SignDownload("k", 8*24*time.Hour); err == nil {
+		t.Error("SignDownload accepted an expiry beyond seven days")
+	}
+}
+
+func TestNewRejectsIncompleteConfig(t *testing.T) {
+	for name, cfg := range map[string]Config{
+		"no endpoint": {Bucket: "b", AccessKeyID: "a", SecretAccessKey: "s"},
+		"no bucket":   {Endpoint: "https://x.r2.cloudflarestorage.com", AccessKeyID: "a", SecretAccessKey: "s"},
+		"no key":      {Endpoint: "https://x.r2.cloudflarestorage.com", Bucket: "b", SecretAccessKey: "s"},
+		"no secret":   {Endpoint: "https://x.r2.cloudflarestorage.com", Bucket: "b", AccessKeyID: "a"},
+	} {
+		if _, err := New(cfg); err == nil {
+			t.Errorf("%s: New accepted it", name)
+		}
 	}
 }
 
 func TestStatAndRead(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("X-Amz-Signature") == "" {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/missing"):
 			w.WriteHeader(http.StatusNotFound)
@@ -97,7 +119,7 @@ func TestStatAndRead(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	client, _ := testClient(t, server.URL)
+	client := testClient(t, server.URL)
 
 	object, err := client.Stat(t.Context(), "present")
 	if err != nil || object.ContentType != "image/png" || object.Size != 10 {
@@ -106,6 +128,9 @@ func TestStatAndRead(t *testing.T) {
 	data, err := client.Read(t.Context(), "present", 10)
 	if err != nil || string(data) != "0123456789" {
 		t.Errorf("Read = %q, %v", data, err)
+	}
+	if err := client.Delete(t.Context(), "present"); err != nil {
+		t.Errorf("Delete = %v", err)
 	}
 	cases := []struct {
 		name  string

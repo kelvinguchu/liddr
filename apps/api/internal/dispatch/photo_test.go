@@ -1,11 +1,6 @@
 package dispatch_test
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
-	"encoding/json"
-	"encoding/pem"
 	"net/url"
 	"strings"
 	"testing"
@@ -20,22 +15,7 @@ import (
 // signingClient signs links locally. Nothing here reaches a network.
 func signingClient(t *testing.T, h *harness) *storage.Client {
 	t.Helper()
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatalf("generate key: %v", err)
-	}
-	der, err := x509.MarshalPKCS8PrivateKey(key)
-	if err != nil {
-		t.Fatalf("marshal key: %v", err)
-	}
-	account, err := json.Marshal(map[string]string{
-		"client_email": "signer@example.iam.gserviceaccount.com",
-		"private_key":  string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der})),
-	})
-	if err != nil {
-		t.Fatalf("marshal account: %v", err)
-	}
-	client, err := storage.New(storage.Config{BaseURL: "https://storage.example", Bucket: "private", ServiceAccountJSON: string(account), Now: h.clock.Now})
+	client, err := storage.New(storage.Config{Endpoint: "https://account.r2.cloudflarestorage.com", Bucket: "private", AccessKeyID: "key", SecretAccessKey: "secret", Now: h.clock.Now})
 	if err != nil {
 		t.Fatalf("storage.New: %v", err)
 	}
@@ -91,7 +71,7 @@ func TestDriverPhotoIsTheirApprovedSelfie(t *testing.T) {
 			if err != nil {
 				t.Fatalf("parse photo link: %v", err)
 			}
-			if !strings.HasSuffix(link.Path, "selfies/asha.jpg") || link.Query().Get("X-Goog-Expires") != "300" {
+			if !strings.HasSuffix(link.Path, "selfies/asha.jpg") || link.Query().Get("X-Amz-Expires") != "300" {
 				t.Errorf("photo link = %s, want a five-minute link to the selfie", link.Redacted())
 			}
 		})

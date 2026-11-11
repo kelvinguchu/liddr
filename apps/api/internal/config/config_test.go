@@ -31,11 +31,10 @@ func validEnv(overrides map[string]string) map[string]string {
 		"MPESA_PASSKEY":              "passkey",
 		"MPESA_CALLBACK_BASE_URL":    "https://api.example",
 		"MPESA_CALLBACK_TOKEN":       testHMACKey,
-		"HOSTPINNACLE_API_URL":       "https://sms.example/send",
-		"HOSTPINNACLE_API_KEY":       "api-key",
-		"HOSTPINNACLE_USER_ID":       "user",
-		"HOSTPINNACLE_PASSWORD":      "password",
-		"HOSTPINNACLE_SENDER_ID":     "LIDDR",
+		"ONFON_API_KEY":              "api-key",
+		"ONFON_CLIENT_ID":            "client-id",
+		"ONFON_ACCESS_KEY":           "access-key",
+		"ONFON_SENDER_ID":            "LIDDR",
 	}
 	maps.Copy(values, overrides)
 	return values
@@ -54,7 +53,7 @@ func TestLoadAppliesDefaults(t *testing.T) {
 		ShutdownTimeout: 20 * time.Second,
 		AuthHMACKey:     testHMACKey,
 		DataKey:         Secret("\x00\x01\x02\x03\x04\x05\x06\a\b\t\n\v\f\r\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f"),
-		Documents:       Documents{BaseURL: "https://storage.googleapis.com"},
+		Documents:       Documents{},
 		Email:           Email{URL: "https://api.resend.com/emails"},
 		GoogleCertsURL:  "https://www.googleapis.com/oauth2/v3/certs",
 		Push:            Push{BaseURL: "https://fcm.googleapis.com", TokenURL: "https://oauth2.googleapis.com/token"},
@@ -71,11 +70,11 @@ func TestLoadAppliesDefaults(t *testing.T) {
 			CallbackToken:   testHMACKey,
 		},
 		SMS: SMS{
-			URL:      "https://sms.example/send",
-			APIKey:   "api-key",
-			UserID:   "user",
-			Password: "password",
-			SenderID: "LIDDR",
+			BaseURL:   "https://api.onfonmedia.co.ke",
+			APIKey:    "api-key",
+			ClientID:  "client-id",
+			AccessKey: "access-key",
+			SenderID:  "LIDDR",
 		},
 	}
 	if diff := cmp.Diff(got, want); diff != "" {
@@ -93,14 +92,15 @@ func TestLoadRejectsInvalidValues(t *testing.T) {
 		{"bad ops range", "OPS_ALLOWED_CIDRS", "not-a-range", "OPS_ALLOWED_CIDRS must be"},
 		{"console origin with a path", "OPS_CONSOLE_ORIGIN", "https://ops.example.com/app", "OPS_CONSOLE_ORIGIN must be"},
 		{"console origin without a scheme", "OPS_CONSOLE_ORIGIN", "ops.example.com", "OPS_CONSOLE_ORIGIN must be"},
-		{"bucket without account", "GCS_BUCKET", "bucket", "GCS_SERVICE_ACCOUNT_JSON is required"},
-		{"bucket without scanner", "GCS_BUCKET", "bucket", "CLAMAV_ADDR is required"},
+		{"bucket without account id", "R2_BUCKET", "bucket", "R2_ACCOUNT_ID must be"},
+		{"bucket without token", "R2_BUCKET", "bucket", "R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY are required"},
+		{"bucket without scanner", "R2_BUCKET", "bucket", "CLAMAV_ADDR is required"},
 		{"push without account", "FCM_PROJECT_ID", "liddr", "FCM_SERVICE_ACCOUNT_JSON is required"},
 		{"email without sender", "RESEND_API_KEY", "key", "OTP_EMAIL_FROM is required"},
 		{"missing hmac key", "AUTH_HMAC_KEY", "", "AUTH_HMAC_KEY is required"},
 		{"short hmac key", "AUTH_HMAC_KEY", "too-short", "AUTH_HMAC_KEY must be at least"},
-		{"missing sms url", "HOSTPINNACLE_API_URL", "", "HOSTPINNACLE_API_URL is required"},
-		{"missing sms password", "HOSTPINNACLE_PASSWORD", "", "HOSTPINNACLE_PASSWORD is required"},
+		{"missing sms access key", "ONFON_ACCESS_KEY", "", "ONFON_ACCESS_KEY is required"},
+		{"missing sms sender", "ONFON_SENDER_ID", "", "ONFON_SENDER_ID is required"},
 		{"short callback token", "MPESA_CALLBACK_TOKEN", "too-short", "MPESA_CALLBACK_TOKEN must be at least"},
 		{"unsafe callback token", "MPESA_CALLBACK_TOKEN", "0123456789/abcdef0123456789abcdefgh", "safe to place"},
 		{"bad allowed ip", "MPESA_CALLBACK_ALLOWED_IPS", "not-an-ip", "MPESA_CALLBACK_ALLOWED_IPS"},
@@ -157,5 +157,82 @@ func TestSecretNeverFormatsItsValue(t *testing.T) {
 	}
 	if got := s.Reveal(); got != "hunter2" {
 		t.Errorf("Reveal() = %q, want hunter2", got)
+	}
+}
+
+// Sandbox has one public test till and passkey, so they need not be set; a
+// live till must always name its own.
+func TestMpesaTillDefaultsOnlyInSandbox(t *testing.T) {
+	tests := []struct {
+		name, env   string
+		wantErr     string
+		wantShort   string
+		wantPasskey Secret
+	}{
+		{name: "sandbox", env: "sandbox", wantShort: "174379", wantPasskey: sandboxPasskey},
+		{name: "unset means sandbox", env: "", wantShort: "174379", wantPasskey: sandboxPasskey},
+		{name: "production", env: "production", wantErr: "MPESA_SHORTCODE is required"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := Load(env(validEnv(map[string]string{"MPESA_ENV": tt.env, "MPESA_SHORTCODE": "", "MPESA_PASSKEY": ""})))
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) || !strings.Contains(err.Error(), "MPESA_PASSKEY is required") {
+					t.Fatalf("Load error = %v, want %q and MPESA_PASSKEY", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+			if cfg.Mpesa.Shortcode != tt.wantShort || cfg.Mpesa.Passkey != tt.wantPasskey {
+				t.Errorf("till = %q, passkey set = %v; want %q and the public sandbox passkey", cfg.Mpesa.Shortcode, cfg.Mpesa.Passkey != "", tt.wantShort)
+			}
+		})
+	}
+}
+
+// DATABASE_URL may be written in terms of the POSTGRES_* settings, so one set
+// of credentials serves both the database container and the API.
+func TestDatabaseURLExpandsReferences(t *testing.T) {
+	tests := []struct {
+		name, url, want string
+		extra           map[string]string
+	}{
+		{
+			name:  "composed",
+			url:   "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:55432/${POSTGRES_DB}?sslmode=disable",
+			extra: map[string]string{"POSTGRES_USER": "liddr", "POSTGRES_PASSWORD": "pw", "POSTGRES_DB": "rides"},
+			want:  "postgresql://liddr:pw@127.0.0.1:55432/rides?sslmode=disable",
+		},
+		{name: "plain", url: "postgres://a:b@h/d", want: "postgres://a:b@h/d"},
+		{name: "a lone dollar stays", url: "postgres://a:pa$s@h/d", want: "postgres://a:pa$s@h/d"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			values := map[string]string{"DATABASE_URL": tt.url}
+			maps.Copy(values, tt.extra)
+			got, err := LoadDatabaseURL(env(values))
+			if err != nil {
+				t.Fatalf("LoadDatabaseURL: %v", err)
+			}
+			if string(got) != tt.want {
+				t.Errorf("LoadDatabaseURL = %q, want %q", got.Reveal(), tt.want)
+			}
+			cfg, err := Load(env(validEnv(values)))
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+			if string(cfg.DatabaseURL) != tt.want {
+				t.Errorf("Load DatabaseURL = %q, want %q", cfg.DatabaseURL.Reveal(), tt.want)
+			}
+		})
+	}
+}
+
+func TestDatabaseURLWithAMissingReference(t *testing.T) {
+	_, err := LoadDatabaseURL(env(map[string]string{"DATABASE_URL": "postgres://${POSTGRES_USER}@h/d"}))
+	if err == nil || !strings.Contains(err.Error(), "POSTGRES_USER") {
+		t.Errorf("LoadDatabaseURL error = %v, want it to name POSTGRES_USER", err)
 	}
 }

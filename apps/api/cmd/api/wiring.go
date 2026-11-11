@@ -43,11 +43,11 @@ func newAuth(cfg config.Config, pool *pgxpool.Pool) (*auth.Service, error) {
 	return auth.NewService(auth.Config{
 		Pool: pool,
 		SMS: sms.NewClient(sms.Config{
-			URL:      cfg.SMS.URL,
-			APIKey:   cfg.SMS.APIKey.Reveal(),
-			UserID:   cfg.SMS.UserID,
-			Password: cfg.SMS.Password.Reveal(),
-			SenderID: cfg.SMS.SenderID,
+			BaseURL:   cfg.SMS.BaseURL,
+			APIKey:    cfg.SMS.APIKey.Reveal(),
+			ClientID:  cfg.SMS.ClientID.Reveal(),
+			AccessKey: cfg.SMS.AccessKey.Reveal(),
+			SenderID:  cfg.SMS.SenderID,
 		}),
 		HMACKey: []byte(cfg.AuthHMACKey.Reveal()),
 		Box:     box,
@@ -82,10 +82,11 @@ func documentClients(cfg config.Config) (*storage.Client, *malware.Client, error
 		return nil, nil, nil
 	}
 	client, err := storage.New(storage.Config{
-		BaseURL:            cfg.Documents.BaseURL,
-		Bucket:             cfg.Documents.Bucket,
-		ServiceAccountJSON: cfg.Documents.ServiceAccount.Reveal(),
-		Now:                time.Now,
+		Endpoint:        cfg.Documents.Endpoint,
+		Bucket:          cfg.Documents.Bucket,
+		AccessKeyID:     cfg.Documents.AccessKeyID.Reveal(),
+		SecretAccessKey: cfg.Documents.SecretAccessKey.Reveal(),
+		Now:             time.Now,
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("configure document storage: %w", err)

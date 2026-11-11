@@ -98,7 +98,7 @@ func TestParseC2BCallback(t *testing.T) {
 }
 
 func TestStatusFromResult(t *testing.T) {
-	for code, want := range map[int32]string{0: "success", 1032: "cancelled", 1037: "timeout", 1: "failed", 2001: "failed"} {
+	for code, want := range map[int32]string{0: "success", 1032: "cancelled", 1037: "timeout", 1019: "timeout", 1: "failed", 1001: "failed", 2001: "failed"} {
 		if got := StatusFromResult(code); got != want {
 			t.Errorf("StatusFromResult(%d) = %q, want %q", code, got, want)
 		}

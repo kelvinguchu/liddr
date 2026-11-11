@@ -2,6 +2,7 @@ package auth_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -41,7 +42,7 @@ func (c *clock) Advance(d time.Duration) {
 	c.now = c.now.Add(d)
 }
 
-// provider is an httptest stand-in for HostPinnacle, driven by the real client.
+// provider is an httptest stand-in for Onfon, driven by the real client.
 type provider struct {
 	mu   sync.Mutex
 	code string
@@ -54,17 +55,22 @@ func (p *provider) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unavailable", http.StatusBadGateway)
 		return
 	}
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+	var sent struct {
+		MessageParameters []struct {
+			Text string `json:"Text"`
+		} `json:"MessageParameters"`
+	}
+	if json.NewDecoder(r.Body).Decode(&sent) != nil || len(sent.MessageParameters) != 1 {
+		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	if match := codePattern.FindStringSubmatch(r.PostForm.Get("msg")); match != nil {
+	if match := codePattern.FindStringSubmatch(sent.MessageParameters[0].Text); match != nil {
 		p.mu.Lock()
 		p.code = match[1]
 		p.mu.Unlock()
 	}
 	p.sent.Add(1)
-	_, _ = w.Write([]byte(`{"status":"success"}`))
+	_, _ = w.Write([]byte(`{"ErrorCode":"000","ErrorDescription":"Success"}`))
 }
 
 func (p *provider) lastCode() string {
@@ -94,7 +100,7 @@ func newHarness(t *testing.T) *harness {
 	return &harness{
 		svc: auth.NewService(auth.Config{
 			Pool:    pool,
-			SMS:     sms.NewClient(sms.Config{URL: server.URL}),
+			SMS:     sms.NewClient(sms.Config{BaseURL: server.URL}),
 			HMACKey: []byte("test-key-of-sufficient-length-for-hmac"),
 			Box:     box,
 			Now:     c.Now,

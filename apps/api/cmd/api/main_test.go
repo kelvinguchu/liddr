@@ -73,11 +73,11 @@ func envWithRoutes(databaseURL, smsURL, routesURL string) func(string) string {
 		"MPESA_BASE_URL":             "http://127.0.0.1:1",
 		"MPESA_CALLBACK_BASE_URL":    "https://api.example",
 		"MPESA_CALLBACK_TOKEN":       testCallbackToken,
-		"HOSTPINNACLE_API_URL":       withDefaultURL(smsURL),
-		"HOSTPINNACLE_API_KEY":       "test-key",
-		"HOSTPINNACLE_USER_ID":       "test-user",
-		"HOSTPINNACLE_PASSWORD":      "test-password",
-		"HOSTPINNACLE_SENDER_ID":     "LIDDR",
+		"ONFON_API_URL":              withDefaultURL(smsURL),
+		"ONFON_API_KEY":              "test-key",
+		"ONFON_CLIENT_ID":            "test-client",
+		"ONFON_ACCESS_KEY":           "test-access-key",
+		"ONFON_SENDER_ID":            "LIDDR",
 	}
 	return func(key string) string { return values[key] }
 }
@@ -85,7 +85,7 @@ func envWithRoutes(databaseURL, smsURL, routesURL string) func(string) string {
 // withDefaultURL gives tests that send no SMS an address that refuses connections.
 func withDefaultURL(smsURL string) string {
 	if smsURL == "" {
-		return "http://127.0.0.1:1/sms"
+		return "http://127.0.0.1:1"
 	}
 	return smsURL
 }

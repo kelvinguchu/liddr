@@ -56,7 +56,7 @@ internal/config    environment parsing and redacting secret type
 internal/httpapi   OpenAPI-generated types, handlers, middleware on net/http
 internal/realtime  WebSocket hub and per-connection writers
 internal/auth      sessions, OTP, TOTP, step-up
-internal/sms       HostPinnacle client
+internal/sms       Onfon client
 internal/testdb    private migrated database per test
 internal/rides     quotes, booking, trip state machine, completion
 internal/dispatch  driver availability and location, offers, the dispatch worker

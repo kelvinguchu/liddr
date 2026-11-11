@@ -2,7 +2,7 @@
 
 Status: Approved for implementation  
 Date: 2026-03-03  
-Scope: API backend (Phoenix/Elixir), mobile contract inputs, ops controls
+Scope: API backend (Go, `apps/api`), mobile contract inputs, ops controls
 
 ## 1. Why this exists
 

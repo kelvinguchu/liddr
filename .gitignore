@@ -1,21 +1,7 @@
-# Legacy nested git metadata backup
-/.git_api_legacy_backup/
-
 # Environment files
 .env
 .env.*
 !apps/api/.env.example
-
-# API (Phoenix / Elixir)
-legacy/api/.env
-legacy/api/.env.*
-!legacy/api/.env.example
-legacy/api/_build/
-legacy/api/deps/
-legacy/api/cover/
-legacy/api/doc/
-legacy/api/tmp/
-legacy/api/erl_crash.dump
 
 # Android
 apps/android/.gradle/

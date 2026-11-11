@@ -1,0 +1,19 @@
+package: httpapi
+output: internal/httpapi/api.gen.go
+generate:
+  models: true
+  std-http-server: true
+  strict-server: true
+compatibility:
+  # Without this the generated routes carry no auth requirement at all, and the
+  # authenticate middleware would treat every route as public.
+  enable-auth-scopes-on-context: true
+output-options:
+  # A WebSocket upgrade needs the raw request, and the console session routes
+  # read and set cookies, so these are hand-registered.
+  exclude-operation-ids:
+    - openRealtime
+    - startConsoleSession
+    - endConsoleSession
+    - refreshConsoleSession
+    - verifyConsoleStepUp

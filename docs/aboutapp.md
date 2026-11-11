@@ -28,121 +28,44 @@ Green (electric car)	3	KES 600–900	KES 2,000	Electric vehicles — eco categor
 
 
 2. Technology Stack
-Decisions are final — no alternatives listed. Backend has been deliberately chosen as Elixir over Go after thorough evaluation across performance, cost, fault tolerance, real-time capability, and long-term regret risk. The reasoning is documented in the architecture decision record below.
+What runs today. AGENTS.md at the repository root holds the engineering rules, and each app's own files hold its setup.
 
-Layer	Technology	Reason
-Mobile — Android	Kotlin	Native performance, best Android developer ecosystem.
-Mobile — iOS	Swift	Native performance, required for App Store.
-Backend Framework	Elixir + Phoenix	Native WebSockets via Phoenix Channels, built-in fault tolerance via OTP, consistent latency at 2M+ concurrent connections. Fewer engineers needed than Go for equivalent output.
-Real-time Layer	Phoenix Channels + Phoenix Presence	Purpose-built for live location, online/offline tracking, and ride event broadcasting. No external dependency required — replaces Socket.io and Redis pub/sub for real-time concerns.
-Primary Database	PostgreSQL	Relational integrity for rides, users, payments, subscriptions. Ecto (Elixir's DB layer) is one of the best query interfaces in any language.
-Cache / Location Store	Redis (Redix client)	Driver locations, matching queues, session tokens, category supply/demand counts. Redix is production-grade and actively maintained.
-Maps & Routing	Google Maps SDK + Directions API	Industry standard. Official Google Elixir client library available plus community Maps wrapper.
-Geo Indexing	Google S2 Library	Divides map into cells for efficient spatial queries. Called via HTTP or NIF binding.
-Payments	Safaricom Daraja API 3.0 (M-Pesa)	No official Elixir SDK — built in-house using Finch HTTP client. Daraja is REST-based, takes 2–3 days to wrap cleanly. Full ownership, no stale third-party dependency.
-Push Notifications	Firebase Cloud Messaging (FCM)	HTTP API — language agnostic. Called via Finch from Elixir.
-SMS Fallback	Africa's Talking API	REST API — works cleanly from Elixir via HTTP client.
-Background Jobs	Oban	Production-grade Elixir job queue backed by PostgreSQL. Handles subscription renewals, document verification webhooks, rating recalculation, expiry checks.
-Cloud Infrastructure	Google Cloud Platform (GCP)	Strong Africa region presence, integrates well with Google Maps and Firebase.
-Admin Dashboard	React (Web)	Single codebase, fast to build internal tooling. Communicates with Elixir backend via REST and Phoenix Channels.
+Layer	Technology	Notes
+API	Go, plain net/http	apps/api. The OpenAPI contract in packages/contract/openapi.yaml is the source of truth for every route.
+Real-time	WebSockets (coder/websocket)	Live ride status, offers and driver location, published through Postgres notifications.
+Database	PostgreSQL	pgx and sqlc; forward-only goose migrations applied as a deploy step. Live location and dispatch also run on Postgres.
+Background jobs	In-process workers over Postgres	Offer expiry, dispatch, payment rechecks, reminders and retention, with their deadlines kept in Postgres.
+Cache	Redis	Available but not used yet; Postgres stays the source of truth.
+Mobile — Android	Kotlin, Jetpack Compose	apps/android. Maps SDK and Places (New) behind the liddr.mapsApiKey Gradle property.
+Mobile — iOS	Swift	Not started.
+Staff console	TanStack Start (React)	apps/ops. Runs beside the API on one origin; staff sign in with session cookies.
+Maps & routing	Google Routes API	Fares and ETAs (computeRoutes).
+Payments	Safaricom Daraja (M-Pesa)	STK push and its status query, plus Paybill (C2B) confirmations, built in-house.
+SMS	Onfon Media	Sign-in codes.
+Email	Resend	Email sign-in codes.
+Push	Firebase Cloud Messaging (HTTP v1)	The API sends; the Android app does not receive yet.
+Document storage	Cloudflare R2	Private bucket, short-lived signed links; uploads scanned by ClamAV before review.
+Hosting (test)	Docker Compose behind a Cloudflare Tunnel	api-test.liddr.app and ops-test.liddr.app.
 
-2.1 Architecture Decision Record — Why Elixir Over Go
-This decision was made after evaluating Go, Elixir, Rust, PHP, and Node.js against the specific demands of a real-time ride-hailing platform. The reasoning is recorded here permanently so future engineers understand the foundation.
+2.1 Repository Layout
+One repository (a monorepo) with independent apps:
+  apps/api        Go API (go.work at the root)
+  apps/android    Kotlin Android app
+  apps/ops        staff console
+  packages/contract  the OpenAPI contract
+  docs/           product rules and policies
 
-Factor	Go	Elixir	Decision
-WebSocket performance at scale	Excellent — slight degradation at 70k+ connections	2M concurrent connections on one server, stays flat	Elixir
-Raw CPU compute	8–10x faster than Elixir	Slower on CPU-heavy tasks	Go — but irrelevant: our workload is I/O and concurrency, not compute
-Fault tolerance	Manual — requires engineering discipline	Built-in via OTP supervision trees. Process crashes are isolated by default	Elixir
-Real-time infrastructure	Requires Socket.io, Redis pub/sub, custom presence logic	Phoenix Channels, Presence, PubSub — all native	Elixir
-M-Pesa integration	Official Safaricom SDK	Build in-house — REST API, 2–3 days	Go advantage — offset by build simplicity
-Team size needed	3–5 engineers for equivalent output	1–2 engineers with Claude Code	Elixir
-Engineer cost	KES 180k–350k/month × 4 engineers	KES 200k–400k/month × 2 engineers	Elixir — significantly lower total
-Long-term regret risk	Low — large ecosystem, large talent pool	Low for our stack — hiring risk at 20+ engineer scale only	Tie — regret risk acceptable
-Production proof	Uber, Bolt, Grab	Discord (2M msg/sec), WhatsApp (900M users, 50 engineers), Bet365 (6M req/sec)	Tie — both proven at massive scale
-
-2.2 Monorepo Structure — One Folder, Three Platforms
-The entire Liddr codebase lives in a single repository. The API (Elixir/Phoenix), Android app (Kotlin), and iOS app (Swift/SwiftUI) are three completely independent codebases that share nothing technically — but live together in one folder. This is called a monorepo. It is how large engineering teams like Google, Meta, and Uber manage multi-platform products.
-The benefit is not technical — it is operational. One git repository, one place to raise issues, one place to review changes, one place for your CI/CD pipeline to run. A change to the API and the Android client that depends on it live in the same pull request. Nothing drifts out of sync.
-
-2.3 Full Repository Structure
-liddr/                                ← monorepo root
-  ├── api/                            ← Elixir/Phoenix backend (single app)
-  │     ├── lib/
-  │     │     ├── liddr_web/          ← Phoenix HTTP endpoints, Channels, Plugs
-  │     │     └── liddr/              ← Domain modules (rides, auth, ratings, verification, etc.)
-  │     ├── priv/repo/migrations/     ← PostgreSQL schema migrations
-  │     ├── config/                   ← Runtime + env configuration
-  │     ├── mix.exs                   ← Elixir project root
-  │     └── README.md
-  │
-  ├── android/                        ← Kotlin Android app
-  │     ├── app/
-  │     │     └── src/main/
-  │     │           ├── java/com/liddr/
-  │     │           │     ├── ui/     ← Jetpack Compose screens
-  │     │           │     ├── data/   ← API clients, repositories
-  │     │           │     └── domain/ ← business logic, models
-  │     │           └── res/          ← layouts, drawables, strings
-  │     ├── build.gradle
-  │     └── README.md
-  │
-  ├── ios/                            ← Swift/SwiftUI iOS app
-  │     ├── Liddr/
-  │     │     ├── Views/              ← SwiftUI screens
-  │     │     ├── ViewModels/         ← state and business logic
-  │     │     ├── Services/           ← API clients, WebSocket
-  │     │     └── Models/             ← data models
-  │     ├── Liddr.xcodeproj
-  │     └── README.md
-  │
-  ├── .github/                        ← CI/CD workflows per platform
-  │     └── workflows/
-  │           ├── api.yml             ← runs Elixir tests on push
-  │           ├── android.yml         ← runs Android build and tests
-  │           └── ios.yml             ← runs iOS build and tests
-  │
-  ├── docs/                           ← API contracts, architecture diagrams
-  ├── .gitignore                      ← covers all three platforms
-  └── README.md                       ← top-level project overview
-
-2.4 Setup Commands — From Zero To Running
-These commands assume Elixir, Erlang, Node.js, and PostgreSQL are already installed on the machine.
-
-Step 1 — Clone the repository
-git clone https://github.com/your-org/liddr.git
-cd liddr
-
-Step 2 — Set up the API
-cd api
-mix archive.install hex phx_new     # install Phoenix generator (once only)
-mix deps.get                         # fetch all Elixir dependencies
-mix ecto.create                      # create the PostgreSQL database
-mix ecto.migrate                     # run all database migrations
-mix phx.server                       # start the API on http://localhost:4000
-
-Step 3 — Set up Android
-cd ../android
-# Open this folder in Android Studio
-# Android Studio will sync Gradle dependencies automatically
-# Hit Run to launch on emulator or physical device
-
-Step 4 — Set up iOS
-cd ../ios
-# Open Liddr.xcodeproj in Xcode (macOS only)
-# Xcode will resolve Swift Package Manager dependencies automatically
-# Hit Run to launch on simulator or physical device
+The API was first built in Elixir/Phoenix and later rewritten in Go. The Elixir code was removed; the git tag legacy-elixir-final keeps its last version.
 
 Environment Variables
-Each platform has its own environment config — never commit secrets to git.
-api/config/dev.secret.exs            ← Elixir — DB credentials, M-Pesa keys, FCM key
-android/app/local.properties         ← Android — Google Maps API key
-ios/Liddr/Config.xcconfig            ← iOS — Google Maps API key, bundle ID
-
-2.5 Why Three READMEs
-Each platform folder has its own README because each platform has a completely different setup process, toolchain, and team. An Android engineer should never need to read Elixir setup instructions to get started. The top-level README links to all three and explains the overall architecture. This is standard monorepo practice.
+Each app has its own configuration — never commit secrets to git.
+apps/api/.env                 ← API settings; apps/api/.env.example lists and explains every one
+apps/android: ~/.gradle/gradle.properties  ← liddr.mapsApiKey, kept out of the repository
+apps/ops                      ← LIDDR_DOCUMENT_ORIGIN (see apps/ops/README.md)
 
 
 3. High-Level Architecture
+Note: sections 3 onward record the original design, written when the backend was Elixir/Phoenix (Channels, Presence, OTP, an umbrella app). The Go API in apps/api and the contract implement these ideas differently; where they differ, the code and contract are authoritative.
 The system is built around two core services — Supply (drivers) and Demand (passengers) — connected by a central Dispatch (matching) engine. This mirrors Uber's DISCO architecture adapted for our scale and market. The real-time layer is handled entirely by Phoenix Channels and Presence — no external WebSocket infrastructure required.
 
 3.1 Component Map
@@ -734,8 +657,9 @@ Cancellations are free on Liddr — for both passengers and drivers. As an early
 18.1 Passenger Cancellation
 •	Passengers can cancel at any time before IN_PROGRESS state — no charge
 •	Cancellation reason is optionally collected from passenger for analytics — helps identify systemic issues like drivers not moving
-•	Passengers with more than 5 cancellations in 7 days receive an in-app warning
-•	Passengers exceeding 15 cancellations in 30 days are temporarily suspended — abuse prevention without money
+•	A cancellation counts against the passenger only if it is chargeable. It is not chargeable when no driver has been assigned, within 2 minutes of a driver accepting, for a safety concern or emergency, or when the evidence shows the driver was late, had stopped sending a location, was not making progress, or was too far away
+•	5 chargeable cancellations or no-shows in 7 days pause the passenger's bookings for 24 hours — abuse prevention without money
+•	8 chargeable cancellations or no-shows in 7 days pause the passenger's bookings for 7 days
 •	Cancellation data is tracked per passenger and surfaces in ops dashboard for pattern review
 
 18.2 Driver Cancellation
@@ -750,7 +674,7 @@ Cancellations are free on Liddr — for both passengers and drivers. As an early
 •	System sends passenger a push notification and SMS warning at the 2-minute mark
 •	If passenger does not respond or arrive within 5 minutes, ride transitions to NO_SHOW_PASSENGER automatically
 •	No financial penalty at launch — driver is freed immediately to accept a new ride
-•	Passenger account flagged — repeated no-shows trigger a warning then suspension
+•	Each no-show counts toward the booking pause limits in 18.1
 •	Future consideration: once platform has scale and trust, introduce a nominal no-show fee as driver compensation
 
 18.4 Driver No-Show / Ghost Driver
@@ -800,7 +724,7 @@ Kenya enacted the Data Protection Act in 2019. Operating a platform that collect
 •	Users have the right to access, correct, and delete their data — provide in-app data management tools
 •	Data breach notification — if a breach occurs, ODPC must be notified within 72 hours
 •	Location data is sensitive — only collected while app is in active use, not in the background when no ride is active
-•	Biometric data (selfies, face scans) must be stored encrypted and deleted after verification is no longer needed
+•	Biometric data (selfies, face scans) must be stored in private storage and deleted when no longer needed. A driver's approved selfie is also their photo on the rider's trip screen, with the driver's explicit consent recorded when they apply, and riders only ever receive a link that expires after 5 minutes
 
 20.2 NTSA Regulatory Compliance
 •	Boda boda commercial operations require PSV licensing under NTSA regulations
@@ -820,7 +744,8 @@ Historical GPS traces	12 months	Auto-deleted after 12 months — needed for disp
 Ride records	5 years	Legal requirement for financial records
 Payment records	7 years	KRA compliance requirement
 Verification documents (ID, licence)	Duration of account + 1 year	Deleted 1 year after account closure
-Biometric data (face scans)	30 days post-verification	Deleted once verification decision is final
+Driver selfie in use as driver's photo	While the account is open	Deleted 30 days after account closure
+Other selfies (replaced, rejected, or from a rejected application)	30 days	Deleted 30 days after the decision
 Dispute records	3 years	Needed for audit trail and escalation history
 
 
@@ -938,6 +863,7 @@ Passenger below 3.0 sustained	Account review — possible suspension	After ops r
 
 26.7 Rating Display on Driver Profile
 The passenger sees the following on the driver's profile card during the booking confirmation screen:
+•	Driver photo — their approved verification selfie, while the trip is under way
 •	Star rating (1 decimal place — e.g. 4.7) — shown only if above minimum threshold
 •	Total number of completed rides — builds confidence in experienced drivers
 •	New Driver badge — if below threshold

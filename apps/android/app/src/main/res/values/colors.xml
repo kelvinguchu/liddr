@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The window behind the first frame, so launch matches the app. -->
+    <color name="liddr_background">#FFFFFF</color>
+</resources>

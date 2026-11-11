@@ -1,0 +1,4327 @@
+openapi: 3.0.3
+info:
+  title: Liddr API
+  version: 0.1.0
+  description: Ride-hailing and delivery API for Kenya.
+
+# Every operation requires a session unless it opts out with `security: []`.
+security:
+  - bearerAuth: []
+
+paths:
+  /healthz:
+    get:
+      operationId: getLiveness
+      summary: Report that the process is running
+      security: []
+      responses:
+        "200":
+          description: The process is running.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+
+  /readyz:
+    get:
+      operationId: getReadiness
+      summary: Report whether the instance can serve traffic
+      security: []
+      responses:
+        "200":
+          description: The instance can serve traffic.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+        "503":
+          description: The instance is draining or cannot reach Postgres.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+
+  /v1/vehicle-categories:
+    get:
+      operationId: listVehicleCategories
+      summary: List the vehicle categories open for booking and driver sign-up
+      security: []
+      responses:
+        "200":
+          description: Active categories in display order.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VehicleCategoryList"
+        "500":
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /v1/auth/otp/request:
+    post:
+      operationId: requestOtp
+      summary: Send a sign-in code to a Kenyan mobile number
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OtpRequest"
+      responses:
+        "201":
+          description: The code was sent.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OtpChallenge"
+        "400":
+          description: The phone number or role is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Too many codes were requested.
+          headers:
+            Retry-After:
+              required: true
+              description: Seconds until another request can succeed.
+              schema:
+                type: integer
+                format: int32
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: The SMS provider could not take the message.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /v1/auth/otp/verify:
+    post:
+      operationId: verifyOtp
+      summary: Exchange a sign-in code for a session, creating the account if new
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OtpVerification"
+      responses:
+        "200":
+          description: The code was correct.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "400":
+          description: The code is wrong or no longer valid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: The account cannot sign in.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Too many wrong codes. Request a new one.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /v1/auth/refresh:
+    post:
+      operationId: refreshSession
+      summary: Rotate a refresh token for new tokens
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200":
+          description: New tokens. The presented refresh token is spent.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "401":
+          description: The refresh token is not valid. Sign in again.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: The account cannot sign in.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /v1/auth/logout:
+    post:
+      operationId: logout
+      summary: End the device's session. Succeeds even if already ended.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "204":
+          description: The session has ended.
+
+  /v1/me:
+    get:
+      operationId: getMe
+      summary: Return the signed-in account
+      responses:
+        "200":
+          description: The signed-in account.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+    patch:
+      operationId: updateMe
+      summary: Set the signed-in account's name
+      description: A driver's name is locked once verification is approved, because it was checked against their ID.
+      security:
+        - bearerAuth: [rider, driver]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMeRequest"
+      responses:
+        "200":
+          description: The updated account.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        default:
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: deleteMe
+      summary: Delete the signed-in account
+      description: >-
+        Needs a sign-in from the last 15 minutes. Personal details are removed at once.
+        Ride and payment records stay, without them, for as long as the law requires.
+      security:
+        - bearerAuth: [rider, driver]
+      responses:
+        "204":
+          description: The account was deleted.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/me/export:
+    get:
+      operationId: exportMe
+      summary: Download a copy of the signed-in account's own data
+      description: >-
+        Needs a sign-in from the last 15 minutes, and is limited to three a day. Holds only what
+        this person gave or did. Reports and ratings about them are left out to protect whoever made them.
+      security:
+        - bearerAuth: [rider, driver]
+      responses:
+        "200":
+          description: The account's data.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountExport"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/drivers/me/earnings:
+    get:
+      operationId: getDriverEarnings
+      summary: Summarize the driver's completed trips for today, this week and the last seven days
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "200":
+          description: The driver's earnings. Drivers keep the whole fare.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DriverEarnings"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/quotes:
+    post:
+      operationId: createQuote
+      summary: Price a trip. The quote is required to book and expires quickly.
+      security:
+        - bearerAuth: [rider]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuoteRequest"
+      responses:
+        "201":
+          description: The priced trip.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quote"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/quotes/batch:
+    post:
+      operationId: createQuotes
+      summary: Price a trip in every open vehicle category at once
+      description: >-
+        Categories that travel the same way share one route, so this costs at most one routing
+        request per travel mode instead of one per category. Each quote counts toward the quote limit.
+      security:
+        - bearerAuth: [rider]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuoteAllRequest"
+      responses:
+        "201":
+          description: One quote per open category, in display order.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryQuoteList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides:
+    post:
+      operationId: bookRide
+      summary: Book a quoted trip. Repeating the call returns the same ride.
+      security:
+        - bearerAuth: [rider]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookRideRequest"
+      responses:
+        "201":
+          description: The ride.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ride"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}:
+    parameters:
+      - $ref: "#/components/parameters/RideId"
+    get:
+      operationId: getRide
+      summary: Return a ride to its rider or assigned driver
+      security:
+        - bearerAuth: [rider, driver]
+      responses:
+        "200":
+          description: The ride.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ride"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/RideId"
+    post:
+      operationId: cancelRide
+      summary: Cancel a ride as its rider or assigned driver
+      security:
+        - bearerAuth: [rider, driver]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelRideRequest"
+      responses:
+        "200":
+          description: The ride.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ride"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/arriving:
+    parameters:
+      - $ref: "#/components/parameters/RideId"
+    post:
+      operationId: markArriving
+      summary: Report that the driver is heading to pickup
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "200":
+          description: The ride.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ride"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/arrived:
+    parameters:
+      - $ref: "#/components/parameters/RideId"
+    post:
+      operationId: markArrived
+      summary: Report arrival at pickup. The driver must be near it.
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "200":
+          description: The ride.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ride"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/start:
+    parameters:
+      - $ref: "#/components/parameters/RideId"
+    post:
+      operationId: startTrip
+      summary: Start the trip
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "200":
+          description: The ride.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ride"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/complete:
+    parameters:
+      - $ref: "#/components/parameters/RideId"
+    post:
+      operationId: completeTrip
+      summary: Complete the trip at the quoted fare. The driver must be near dropoff.
+      security:
+        - bearerAuth: [driver]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompleteTripRequest"
+      responses:
+        "200":
+          description: The ride.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ride"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/no-show:
+    parameters:
+      - $ref: "#/components/parameters/RideId"
+    post:
+      operationId: markNoShow
+      summary: Report that the rider did not come after the waiting period
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "200":
+          description: The ride.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ride"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/drivers/me:
+    get:
+      operationId: getDriverProfile
+      summary: Return the signed-in driver's profile
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "200":
+          description: The profile.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DriverProfile"
+        default:
+          $ref: "#/components/responses/Problem"
+    put:
+      operationId: setDriverCategory
+      summary: Choose a vehicle category. Locked once the driver is approved.
+      security:
+        - bearerAuth: [driver]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetDriverCategoryRequest"
+      responses:
+        "200":
+          description: The profile.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DriverProfile"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/drivers/me/online:
+    post:
+      operationId: goOnline
+      summary: Start receiving offers
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "204":
+          description: The driver is online.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/drivers/me/offline:
+    post:
+      operationId: goOffline
+      summary: Stop receiving offers
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "204":
+          description: The driver is offline.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/drivers/me/location:
+    post:
+      operationId: updateDriverLocation
+      summary: Report the driver's position. Excess pings are dropped silently.
+      security:
+        - bearerAuth: [driver]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Coordinates"
+      responses:
+        "204":
+          description: The position was accepted or dropped as excess.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/drivers/me/offers:
+    get:
+      operationId: listDriverOffers
+      summary: List the driver's open offers
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "200":
+          description: Open offers.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OfferList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/offers/{offer_id}/accept:
+    parameters:
+      - $ref: "#/components/parameters/OfferId"
+    post:
+      operationId: acceptOffer
+      summary: Accept an offer
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "200":
+          description: The ride.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ride"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/offers/{offer_id}/reject:
+    parameters:
+      - $ref: "#/components/parameters/OfferId"
+    post:
+      operationId: rejectOffer
+      summary: Reject an offer
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "204":
+          description: The offer was rejected.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/subscriptions/me:
+    get:
+      operationId: getSubscription
+      summary: Return this week's subscription and how to pay it
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "200":
+          description: The subscription.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subscription"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/subscriptions/me/payments:
+    get:
+      operationId: listSubscriptionPayments
+      summary: List recent subscription payments
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "200":
+          description: Newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionPaymentList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/subscriptions/pay:
+    post:
+      operationId: paySubscription
+      summary: Send an M-Pesa prompt for this week to the driver's phone
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "202":
+          description: The prompt was sent or is being confirmed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionPayment"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/webhooks/mpesa/{token}/stk:
+    parameters:
+      - $ref: "#/components/parameters/CallbackToken"
+    post:
+      operationId: mpesaStkCallback
+      summary: Receive an STK push result from Safaricom
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MpesaCallback"
+      responses:
+        "200":
+          description: Accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MpesaAck"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/webhooks/mpesa/{token}/c2b/validation:
+    parameters:
+      - $ref: "#/components/parameters/CallbackToken"
+    post:
+      operationId: mpesaC2bValidation
+      summary: Answer Safaricom's paybill validation
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MpesaCallback"
+      responses:
+        "200":
+          description: Accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MpesaAck"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/webhooks/mpesa/{token}/c2b/confirmation:
+    parameters:
+      - $ref: "#/components/parameters/CallbackToken"
+    post:
+      operationId: mpesaC2bConfirmation
+      summary: Receive a paybill payment from Safaricom
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MpesaCallback"
+      responses:
+        "200":
+          description: Accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MpesaAck"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/realtime:
+    get:
+      operationId: openRealtime
+      summary: Open a WebSocket of live updates for the signed-in account
+      description: |
+        The server sends JSON text frames and accepts none. Each has a `type`:
+        `ride.status` (`ride_id`, `status`), `offer.created` (`offer_id`, `ride_id`),
+        `offer.closed` (`offer_id`), `driver.location` (`ride_id`, `lat`, `lng`) and
+        `resync`, which means updates may have been missed and state should be fetched.
+        The socket closes when the access token expires, so reconnect after refreshing.
+      responses:
+        "101":
+          description: Switching to the WebSocket protocol.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/auth/mfa/totp/setup:
+    post:
+      operationId: beginTotpSetup
+      summary: Start enrolling an authenticator app
+      description: |
+        A first enrolment needs a sign-in from the last 15 minutes. Replacing an
+        authenticator needs a step-up token from the current one.
+      security:
+        - bearerAuth: [ops, admin, "mfa:exempt"]
+      parameters:
+        - $ref: "#/components/parameters/StepUpToken"
+      responses:
+        "201":
+          description: Show the secret to the user once.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TotpSetup"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/auth/mfa/totp/confirm:
+    post:
+      operationId: confirmTotpSetup
+      summary: Activate an authenticator with a code from it
+      security:
+        - bearerAuth: [ops, admin, "mfa:exempt"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TotpCode"
+      responses:
+        "204":
+          description: The authenticator is active.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/auth/step-up:
+    post:
+      operationId: verifyStepUp
+      summary: Exchange an authenticator code for a short-lived step-up token
+      security:
+        - bearerAuth: [ops, admin, "mfa:exempt"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TotpCode"
+      responses:
+        "200":
+          description: Send this token as X-Step-Up-Token on high-risk actions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StepUpGrant"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  # The staff console's session. These routes exist only when the server is
+  # given OPS_CONSOLE_ORIGIN. They carry credentials in cookies the page cannot
+  # read, so the console never holds a token: __Host-liddr_staff (the access
+  # token, path /), __Secure-liddr_staff_refresh (path /v1/auth/web/session)
+  # and __Host-liddr_step_up. Every cookie is HttpOnly, Secure and
+  # SameSite=Strict; over plain http (local development only) the same names
+  # lose their prefix and Secure. Every request made with these cookies other
+  # than GET or HEAD, and every route here, must come from the console: the
+  # X-Liddr-Console header, and Sec-Fetch-Site same-origin or an Origin equal
+  # to OPS_CONSOLE_ORIGIN. Anything else is refused with
+  # CONSOLE_ORIGIN_REQUIRED. Staff routes accept the session cookie in place of
+  # a bearer token, and the step-up cookie in place of X-Step-Up-Token.
+  /v1/auth/web/session:
+    post:
+      operationId: startConsoleSession
+      summary: Exchange a staff sign-in code for a console session
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/ConsoleHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OtpVerification"
+      responses:
+        "200":
+          description: Signed in. The session and refresh cookies are set.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsoleSession"
+        "400":
+          description: The code is wrong or no longer valid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Not a staff account, the account cannot sign in, or the request did not come from the console.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Too many wrong codes. Request a new one.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      operationId: endConsoleSession
+      summary: Sign the console out. Succeeds even if already signed out.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/ConsoleHeader"
+      responses:
+        "204":
+          description: The session has ended and its cookies are cleared.
+        "403":
+          description: The request did not come from the console.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /v1/auth/web/session/refresh:
+    post:
+      operationId: refreshConsoleSession
+      summary: Rotate the console session's cookies
+      description: Clears the step-up cookie, which belongs to the session being replaced.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/ConsoleHeader"
+      responses:
+        "200":
+          description: New cookies are set. The old refresh cookie is spent.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsoleSession"
+        "401":
+          description: The session has ended. Sign in again. Its cookies are cleared.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: The account cannot sign in, or the request did not come from the console.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /v1/auth/web/step-up:
+    post:
+      operationId: verifyConsoleStepUp
+      summary: Confirm high-risk actions for a few minutes with an authenticator code
+      security:
+        - bearerAuth: [ops, admin, "mfa:exempt"]
+      parameters:
+        - $ref: "#/components/parameters/ConsoleHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TotpCode"
+      responses:
+        "200":
+          description: The step-up cookie is set.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsoleStepUp"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/verification/applications:
+    post:
+      operationId: startVerification
+      summary: Open a verification application, or return the open one
+      security:
+        - bearerAuth: [driver]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartVerificationRequest"
+      responses:
+        "201":
+          description: The open application.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerificationApplication"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/verification/uploads:
+    post:
+      operationId: prepareVerificationUpload
+      summary: Get a signed URL to upload one document
+      security:
+        - bearerAuth: [driver]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PrepareUploadRequest"
+      responses:
+        "201":
+          description: PUT the file to upload_url with exactly these headers.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerificationUpload"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/verification/documents:
+    post:
+      operationId: submitVerificationDocument
+      summary: Submit an uploaded file for checking
+      security:
+        - bearerAuth: [driver]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitDocumentRequest"
+      responses:
+        "201":
+          description: The document, now waiting for its safety scan.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerificationDocument"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/verification/status:
+    get:
+      operationId: getVerificationStatus
+      summary: Report the driver's verification progress
+      security:
+        - bearerAuth: [driver]
+      responses:
+        "200":
+          description: Current progress.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerificationStatus"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/verification/applications:
+    get:
+      operationId: listVerificationApplications
+      summary: List applications in one status, oldest first
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - name: status
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [pending, under_review, approved, rejected, resubmission_required, suspended]
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: One page of the queue.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerificationQueue"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/verification/applications/{application_id}:
+    get:
+      operationId: getVerificationApplication
+      summary: Load an application with the driver's current documents
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - $ref: "#/components/parameters/ApplicationId"
+      responses:
+        "200":
+          description: The application.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerificationApplicationDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/verification/applications/{application_id}/review:
+    post:
+      operationId: reviewVerificationApplication
+      summary: Make the final decision on an application
+      security:
+        - bearerAuth: [ops, admin, "mfa:step-up"]
+      parameters:
+        - $ref: "#/components/parameters/ApplicationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewRequest"
+      responses:
+        "204":
+          description: The decision was recorded.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/verification/documents/{document_id}/review:
+    post:
+      operationId: reviewVerificationDocument
+      summary: Decide on one document
+      security:
+        - bearerAuth: [ops, admin, "mfa:step-up"]
+      parameters:
+        - $ref: "#/components/parameters/DocumentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewRequest"
+      responses:
+        "204":
+          description: The decision was recorded.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/verification/documents/{document_id}/download:
+    post:
+      operationId: downloadVerificationDocument
+      summary: Get a five-minute link to a document's file
+      description: A POST because every request is written to the audit trail.
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - $ref: "#/components/parameters/DocumentId"
+      responses:
+        "200":
+          description: A signed link.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignedDownload"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/notifications:
+    get:
+      operationId: listNotifications
+      summary: List the signed-in user's notifications, newest first
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - name: include_acked
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Notifications.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/notifications/summary:
+    get:
+      operationId: getNotificationSummary
+      summary: Count unread notifications
+      security:
+        - bearerAuth: [rider, driver]
+      responses:
+        "200":
+          description: The count.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationSummary"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/notifications/{notification_id}/ack:
+    post:
+      operationId: ackNotification
+      summary: Mark a notification read
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - name: notification_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Marked read.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/push-tokens:
+    put:
+      operationId: registerPushToken
+      summary: Register this device for push notifications
+      security:
+        - bearerAuth: [rider, driver]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushTokenRegistration"
+      responses:
+        "204":
+          description: Registered.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/push-tokens/revoke:
+    post:
+      operationId: revokePushToken
+      summary: Stop push notifications to this device
+      security:
+        - bearerAuth: [rider, driver]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushTokenRevocation"
+      responses:
+        "204":
+          description: Revoked, or already gone.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/reports/categories:
+    get:
+      operationId: listReportCategories
+      summary: List what can be reported
+      security:
+        - bearerAuth: [rider, driver]
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportCategoryList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/reports:
+    post:
+      operationId: submitReport
+      summary: Report the other person on a ride
+      security:
+        - bearerAuth: [rider, driver]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportSubmission"
+      responses:
+        "201":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FiledCase"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/moderation/reports:
+    get:
+      operationId: listReports
+      summary: List reports in one status, most severe first
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - {name: status, in: query, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/moderation/reports/{report_id}:
+    get:
+      operationId: getReport
+      summary: Load one report including its text
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - $ref: "#/components/parameters/ReportId"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/moderation/reports/{report_id}/triage:
+    post:
+      operationId: triageReport
+      summary: Claim a report for review
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - $ref: "#/components/parameters/ReportId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TriageRequest"
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/moderation/reports/{report_id}/review:
+    post:
+      operationId: reviewReport
+      summary: Rule on a report and apply any penalty
+      security:
+        - bearerAuth: [ops, admin, "mfa:step-up"]
+      parameters:
+        - $ref: "#/components/parameters/ReportId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportReviewRequest"
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/moderation/enforcements:
+    get:
+      operationId: listEnforcements
+      summary: List penalties in one status
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - {name: status, in: query, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnforcementList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+    post:
+      operationId: applyEnforcement
+      summary: Apply a penalty directly
+      security:
+        - bearerAuth: [ops, admin, "mfa:step-up"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnforcementRequest"
+      responses:
+        "201":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Enforcement"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/moderation/enforcements/{enforcement_id}/lift:
+    post:
+      operationId: liftEnforcement
+      summary: End a penalty early
+      security:
+        - bearerAuth: [ops, admin, "mfa:step-up"]
+      parameters:
+        - $ref: "#/components/parameters/EnforcementId"
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ratings/pending:
+    get:
+      operationId: listPendingRatings
+      summary: List ratings the user can still give
+      security:
+        - bearerAuth: [rider, driver]
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PendingRatingList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/rate:
+    post:
+      operationId: rateRide
+      summary: Rate the other person on a completed ride
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RatingSubmission"
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/rate/skip:
+    post:
+      operationId: skipRating
+      summary: Decline to rate
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/ratings:
+    get:
+      operationId: listRatings
+      summary: List ratings
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - {name: rated_user_id, in: query, required: false, schema: {type: string, format: uuid}}
+        - {name: excluded_only, in: query, required: false, schema: {type: boolean, default: false}}
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RatingList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/ratings/{rating_id}/nullify:
+    post:
+      operationId: nullifyRating
+      summary: Remove a rating from the score
+      security:
+        - bearerAuth: [ops, admin, "mfa:step-up"]
+      parameters:
+        - $ref: "#/components/parameters/RatingId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NullifyRequest"
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/ratings/{rating_id}/reinstate:
+    post:
+      operationId: reinstateRating
+      summary: Return a rating to the score
+      security:
+        - bearerAuth: [ops, admin, "mfa:step-up"]
+      parameters:
+        - $ref: "#/components/parameters/RatingId"
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/disputes:
+    post:
+      operationId: submitDispute
+      summary: Raise a dispute about a ride
+      security:
+        - bearerAuth: [rider, driver]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DisputeSubmission"
+      responses:
+        "201":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FiledCase"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/disputes/me:
+    get:
+      operationId: listMyDisputes
+      summary: List disputes this account may see
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyDisputeList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/disputes/me/compensations:
+    get:
+      operationId: listMyCompensations
+      summary: List compensation owed to this account
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompensationList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/disputes:
+    get:
+      operationId: listDisputes
+      summary: List disputes in one status
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - {name: status, in: query, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DisputeCaseList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/disputes/{report_id}/resolve:
+    post:
+      operationId: resolveDispute
+      summary: Rule on a dispute
+      security:
+        - bearerAuth: [ops, admin, "mfa:step-up"]
+      parameters:
+        - $ref: "#/components/parameters/ReportId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DisputeResolution"
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/disputes/compensations:
+    get:
+      operationId: listCompensations
+      summary: List compensation in one status
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - {name: status, in: query, required: true, schema: {type: string}}
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompensationList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/disputes/compensations/{compensation_id}/mark-paid:
+    post:
+      operationId: markCompensationPaid
+      summary: Record that compensation was paid
+      security:
+        - bearerAuth: [ops, admin, "mfa:step-up"]
+      parameters:
+        - $ref: "#/components/parameters/CompensationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarkPaidRequest"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Compensation"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/disputes/compensations/{compensation_id}/cancel:
+    post:
+      operationId: cancelCompensation
+      summary: Withdraw approved compensation
+      security:
+        - bearerAuth: [ops, admin, "mfa:step-up"]
+      parameters:
+        - $ref: "#/components/parameters/CompensationId"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Compensation"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/messages/quick-actions:
+    get:
+      operationId: listQuickActions
+      summary: List canned chat messages
+      security:
+        - bearerAuth: [rider, driver]
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuickActionList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/messages:
+    get:
+      operationId: listRideMessages
+      summary: Read a ride's chat
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+        - {name: after_seq, in: query, required: false, schema: {type: integer, format: int64, minimum: 0}}
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageThread"
+        default:
+          $ref: "#/components/responses/Problem"
+
+    post:
+      operationId: sendRideMessage
+      summary: Send a chat message
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageDraft"
+      responses:
+        "201":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RideMessage"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/messages/{message_id}/read:
+    post:
+      operationId: markRideMessageRead
+      summary: Mark a message read
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+        - {name: message_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/messages/{message_id}/hide:
+    post:
+      operationId: hideRideMessage
+      summary: Hide a message from your own view
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+        - {name: message_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/messages/{message_id}/report:
+    post:
+      operationId: reportRideMessage
+      summary: Report a message
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+        - {name: message_id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageReport"
+      responses:
+        "201":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FiledMessageReport"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/send/requests:
+    post:
+      operationId: bookDelivery
+      summary: Book a delivery from a Send quote
+      security:
+        - bearerAuth: [rider]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeliveryRequest"
+      responses:
+        "201":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ride"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/send/rides/{ride_id}:
+    get:
+      operationId: getDelivery
+      summary: Load a delivery for its sender, driver or recipient
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Delivery"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/send/rides/{ride_id}/proof-uploads:
+    post:
+      operationId: prepareProofUpload
+      summary: Get a signed URL for a proof photo
+      security:
+        - bearerAuth: [driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProofUploadRequest"
+      responses:
+        "201":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProofUpload"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/send/rides/{ride_id}/pickup-proof:
+    post:
+      operationId: recordPickupProof
+      summary: Attach the collection photo
+      security:
+        - bearerAuth: [driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProofSubmission"
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/send/rides/{ride_id}/dropoff-proof:
+    post:
+      operationId: recordDropoffProof
+      summary: Attach the delivery photo
+      security:
+        - bearerAuth: [driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProofSubmission"
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/send/rides/{ride_id}/recipient-confirm:
+    post:
+      operationId: confirmDeliveryReceipt
+      summary: Confirm receipt as the recipient
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/send/rides/{ride_id}/proofs/{proof_kind}/download:
+    post:
+      operationId: downloadDeliveryProof
+      summary: Get a five-minute link to a proof photo
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+        - {name: proof_kind, in: path, required: true, schema: {type: string, enum: [pickup, dropoff]}}
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignedDownload"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/send/prohibited-items:
+    get:
+      operationId: listProhibitedItems
+      summary: List item screening rules
+      security:
+        - bearerAuth: [ops, admin]
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProhibitedItemList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+    put:
+      operationId: saveProhibitedItem
+      summary: Add or change a screening rule
+      security:
+        - bearerAuth: [admin, "mfa:step-up"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProhibitedItem"
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/pickup-health:
+    get:
+      operationId: getPickupHealth
+      summary: Report whether the driver appears to be coming
+      security:
+        - bearerAuth: [rider]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PickupHealth"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/reassign:
+    post:
+      operationId: reassignRide
+      summary: Find another driver when this one is not coming
+      security:
+        - bearerAuth: [rider]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ride"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/destination-changes:
+    get:
+      operationId: listDestinationChanges
+      summary: List destination changes
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DestinationChangeList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+    post:
+      operationId: requestDestinationChange
+      summary: Propose a new destination
+      security:
+        - bearerAuth: [rider]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DestinationChangeRequest"
+      responses:
+        "201":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DestinationChange"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/destination-changes/{change_id}/accept:
+    post:
+      operationId: acceptDestinationChange
+      summary: Accept a new destination and its fare
+      security:
+        - bearerAuth: [driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+        - {name: change_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/destination-changes/{change_id}/reject:
+    post:
+      operationId: rejectDestinationChange
+      summary: Decline a new destination
+      security:
+        - bearerAuth: [driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+        - {name: change_id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DestinationRejection"
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/history:
+    get:
+      operationId: listRideHistory
+      summary: List past and current trips
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - {name: as, in: query, required: true, schema: {type: string, enum: [rider, driver]}}
+        - {name: category, in: query, required: false, schema: {type: string}}
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RideHistory"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/events:
+    get:
+      operationId: listRideEvents
+      summary: List the steps of a ride
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RideTimeline"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/integrity/me:
+    get:
+      operationId: getMyIntegrity
+      summary: Report this account's cancellation record
+      security:
+        - bearerAuth: [rider, driver]
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntegrityStanding"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/rides/integrity/users/{user_id}:
+    get:
+      operationId: getUserIntegrity
+      summary: Report one account's recent strikes
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - {name: user_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntegrityDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/auth/email/request:
+    post:
+      operationId: requestEmailOtp
+      summary: Send a sign-in code to an email address
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmailOtpRequest"
+      responses:
+        "201":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OtpChallenge"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/auth/email/verify:
+    post:
+      operationId: verifyEmailOtp
+      summary: Exchange an email code for a session
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OtpVerification"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/auth/google:
+    post:
+      operationId: signInWithGoogle
+      summary: Exchange a Google ID token for a session
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GoogleSignIn"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/subscriptions/drivers/{user_id}:
+    get:
+      operationId: getDriverSubscriptionForOps
+      summary: Show a driver's week and payments
+      security: 
+        - bearerAuth: [ops, admin]
+      parameters:
+        - {name: user_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DriverSubscriptionDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/subscriptions/payments/{checkout_request_id}:
+    get:
+      operationId: getPaymentForOps
+      summary: Find a payment by M-Pesa reference
+      security: 
+        - bearerAuth: [ops, admin]
+      parameters:
+        - {name: checkout_request_id, in: path, required: true, schema: {type: string, maxLength: 100}}
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/subscriptions/payments/{checkout_request_id}/recheck:
+    post:
+      operationId: recheckPayment
+      summary: Ask M-Pesa again about a payment
+      security: 
+        - bearerAuth: [ops, admin, "mfa:step-up"]
+      parameters:
+        - {name: checkout_request_id, in: path, required: true, schema: {type: string, maxLength: 100}}
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/shared:
+    get:
+      operationId: getSharedRide
+      summary: Show a shared ride to one of its parties
+      security:
+        - bearerAuth: [rider, driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SharedRide"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/shared/members/{member_id}/cancel:
+    post:
+      operationId: cancelSharedMember
+      summary: Leave a shared ride
+      security:
+        - bearerAuth: [rider]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+        - {name: member_id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SharedCancel"
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/shared/members/{member_id}/arrive-pickup:
+    post:
+      operationId: arriveSharedMember
+      summary: Record reaching a passenger's pickup
+      security:
+        - bearerAuth: [driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+        - {name: member_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/shared/members/{member_id}/picked-up:
+    post:
+      operationId: pickUpSharedMember
+      summary: Record a passenger getting in
+      security:
+        - bearerAuth: [driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+        - {name: member_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/shared/members/{member_id}/dropped-off:
+    post:
+      operationId: dropOffSharedMember
+      summary: Record a passenger arriving
+      security:
+        - bearerAuth: [driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+        - {name: member_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/rides/{ride_id}/shared/members/{member_id}/no-show:
+    post:
+      operationId: noShowSharedMember
+      summary: Remove a passenger who never came
+      security:
+        - bearerAuth: [driver]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+        - {name: member_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "204":
+          description: Done.
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/auth/methods:
+    get:
+      operationId: listAuthMethods
+      summary: List the sign-in methods available
+      security: []
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMethods"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/rides/{ride_id}/notifications:
+    get:
+      operationId: listRideDeliveries
+      summary: Show what was sent about a ride
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - $ref: "#/components/parameters/RideId"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RideDeliveries"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/rides/pickup-watchdog/summary:
+    get:
+      operationId: getWatchdogSummary
+      summary: Count rescued pickups
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - {name: hours, in: query, required: false, schema: {type: integer, format: int32, minimum: 1, maximum: 720, default: 24}}
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WatchdogSummary"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/moderation/enforcements/metrics:
+    get:
+      operationId: getEnforcementMetrics
+      summary: Summarize penalties
+      security:
+        - bearerAuth: [ops, admin]
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnforcementMetrics"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/ratings/users/{user_id}/guardrails:
+    get:
+      operationId: getRatingGuardrail
+      summary: Report whether an account has enough ratings to act on
+      security:
+        - bearerAuth: [ops, admin]
+      parameters:
+        - {name: user_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RatingGuardrail"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/ops/verification/documents/reviews/bulk:
+    post:
+      operationId: reviewVerificationDocuments
+      summary: Apply one decision to many documents
+      security:
+        - bearerAuth: [ops, admin, "mfa:step-up"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkReviewRequest"
+      responses:
+        "200":
+          description: Done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkReviewResults"
+        default:
+          $ref: "#/components/responses/Problem"
+
+components:
+  parameters:
+    ConsoleHeader:
+      name: X-Liddr-Console
+      in: header
+      required: true
+      description: Sent by the staff console on every request. Pages on other sites cannot send it without the API's permission, which it never gives.
+      schema:
+        type: string
+        enum: ["1"]
+    ReportId:
+      name: report_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    EnforcementId:
+      name: enforcement_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RatingId:
+      name: rating_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CompensationId:
+      name: compensation_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+        maximum: 200
+        default: 50
+    Offset:
+      name: offset
+      in: query
+      required: false
+      schema:
+        type: integer
+        format: int32
+        minimum: 0
+        maximum: 100000
+        default: 0
+    ApplicationId:
+      name: application_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    DocumentId:
+      name: document_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    StepUpToken:
+      name: X-Step-Up-Token
+      in: header
+      required: false
+      schema:
+        type: string
+    CallbackToken:
+      name: token
+      in: path
+      required: true
+      description: Shared secret. Safaricom cannot send custom headers.
+      schema:
+        type: string
+    RideId:
+      name: ride_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    OfferId:
+      name: offer_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    Problem:
+      description: The request could not be completed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  securitySchemes:
+    # Operation scopes name the roles allowed in. No scopes means any account.
+    # Reaching a route through ops or admin alone also needs an enrolled
+    # authenticator. "mfa:exempt" lifts that for enrolment itself, and
+    # "mfa:step-up" additionally requires a fresh X-Step-Up-Token.
+    bearerAuth:
+      type: http
+      scheme: bearer
+    consoleSession:
+      type: apiKey
+      in: cookie
+      name: __Host-liddr_staff
+      description: The staff console's session, set by /v1/auth/web/session. Staff routes accept it wherever bearerAuth is listed, with the same roles and scopes.
+
+  schemas:
+    Subscription:
+      type: object
+      additionalProperties: false
+      required: [status, amount_kes, week_start, week_end, reference, paybill_shortcode]
+      properties:
+        status:
+          type: string
+          enum: [pending, active, expired]
+        amount_kes:
+          type: integer
+          format: int32
+        week_start:
+          type: string
+          format: date
+        week_end:
+          type: string
+          format: date
+        reference:
+          type: string
+          description: The account number to use when paying by paybill.
+        paybill_shortcode:
+          type: string
+
+    SubscriptionPayment:
+      type: object
+      additionalProperties: false
+      required: [id, channel, status, amount_kes, requested_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        channel:
+          type: string
+          enum: [stk, c2b]
+        status:
+          type: string
+          enum: [initiated, pending_callback, success, failed, cancelled, timeout, needs_review]
+        amount_kes:
+          type: integer
+          format: int32
+        receipt:
+          type: string
+        requested_at:
+          type: string
+          format: date-time
+        paid_at:
+          type: string
+          format: date-time
+
+    SubscriptionPaymentList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubscriptionPayment"
+
+    MpesaCallback:
+      type: object
+      additionalProperties: true
+      description: A Daraja callback body. Its shape is owned by Safaricom.
+
+    MpesaAck:
+      type: object
+      additionalProperties: false
+      required: [ResultCode, ResultDesc]
+      properties:
+        ResultCode:
+          type: integer
+          format: int32
+        ResultDesc:
+          type: string
+
+    Coordinates:
+      type: object
+      additionalProperties: false
+      required: [lat, lng]
+      properties:
+        lat:
+          type: number
+          format: double
+        lng:
+          type: number
+          format: double
+
+    QuoteRequest:
+      type: object
+      additionalProperties: false
+      required: [vehicle_category, pickup, dropoff]
+      properties:
+        vehicle_category:
+          type: string
+          example: motorbike
+        pickup:
+          $ref: "#/components/schemas/Coordinates"
+        dropoff:
+          $ref: "#/components/schemas/Coordinates"
+        product_type:
+          type: string
+          enum: [solo, shared]
+
+    Quote:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - fare_kes
+        - base_fare_kes
+        - discount_kes
+        - surge_bps
+        - distance_m
+        - duration_s
+        - polyline
+        - expires_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        fare_kes:
+          type: integer
+          format: int32
+          description: The price the rider pays.
+        base_fare_kes:
+          type: integer
+          format: int32
+          description: The price before the discount.
+        discount_kes:
+          type: integer
+          format: int32
+        solo_fare_kes:
+          type: integer
+          format: int32
+          description: What the trip would cost alone, on a shared quote.
+        surge_bps:
+          type: integer
+          format: int32
+          description: Demand multiplier in basis points. 10000 means no surge.
+        distance_m:
+          type: integer
+          format: int32
+        duration_s:
+          type: integer
+          format: int32
+        polyline:
+          type: string
+          description: Encoded route for display.
+        expires_at:
+          type: string
+          format: date-time
+
+    QuoteAllRequest:
+      type: object
+      additionalProperties: false
+      required: [pickup, dropoff]
+      properties:
+        pickup:
+          $ref: "#/components/schemas/Coordinates"
+        dropoff:
+          $ref: "#/components/schemas/Coordinates"
+
+    CategoryQuote:
+      type: object
+      additionalProperties: false
+      required: [vehicle_category, quote]
+      properties:
+        vehicle_category:
+          type: string
+        quote:
+          $ref: "#/components/schemas/Quote"
+
+    CategoryQuoteList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategoryQuote"
+
+    BookRideRequest:
+      type: object
+      additionalProperties: false
+      required: [quote_id]
+      properties:
+        quote_id:
+          type: string
+          format: uuid
+
+    RideStatus:
+      type: string
+      enum:
+        - searching
+        - accepted
+        - driver_arriving
+        - arrived
+        - in_progress
+        - completed
+        - cancelled
+        - no_drivers
+
+    PaymentMode:
+      type: string
+      enum: [cash_direct, mpesa_direct]
+
+    Ride:
+      type: object
+      additionalProperties: false
+      required: [id, status, pickup, dropoff, fare_kes, requested_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/RideStatus"
+        pickup:
+          $ref: "#/components/schemas/Coordinates"
+        dropoff:
+          $ref: "#/components/schemas/Coordinates"
+        fare_kes:
+          type: integer
+          format: int32
+        requested_at:
+          type: string
+          format: date-time
+        driver_id:
+          type: string
+          format: uuid
+        driver_location:
+          allOf:
+            - $ref: "#/components/schemas/Coordinates"
+          description: Present only while the driver is on the way or on the trip.
+        payment_mode:
+          $ref: "#/components/schemas/PaymentMode"
+        driver:
+          allOf:
+            - $ref: "#/components/schemas/DriverCard"
+          description: Shown to the rider while the driver is on the way or on the trip.
+        rider:
+          allOf:
+            - $ref: "#/components/schemas/RiderCard"
+          description: Shown to the driver of a solo ride while it is under way.
+
+    DriverCard:
+      type: object
+      additionalProperties: false
+      required: [vehicle_category, completed_rides]
+      properties:
+        name:
+          type: string
+        plate_number:
+          type: string
+        photo_url:
+          type: string
+          description: The driver's approved selfie. The link works for five minutes, so fetch it fresh from the ride.
+        vehicle_category:
+          type: string
+        completed_rides:
+          type: integer
+          format: int32
+        rating:
+          type: number
+          format: double
+          description: Absent until the driver has ten rated rides, when the client shows them as new.
+
+    RiderCard:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        rating:
+          type: number
+          format: double
+          description: Absent until the rider has ten rated rides.
+
+    CancelRideRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          description: A reason code allowed for the caller's side of the ride.
+          example: rider_changed_mind
+
+    CompleteTripRequest:
+      type: object
+      additionalProperties: false
+      required: [payment_mode]
+      properties:
+        payment_mode:
+          $ref: "#/components/schemas/PaymentMode"
+
+    DriverProfile:
+      type: object
+      additionalProperties: false
+      required: [vehicle_category, verification_status, subscription_status, is_online]
+      properties:
+        vehicle_category:
+          type: string
+        verification_status:
+          type: string
+          enum: [pending, approved, rejected]
+        subscription_status:
+          type: string
+          enum: [inactive, active, grace, suspended]
+        is_online:
+          type: boolean
+
+    SetDriverCategoryRequest:
+      type: object
+      additionalProperties: false
+      required: [vehicle_category]
+      properties:
+        vehicle_category:
+          type: string
+
+    Offer:
+      type: object
+      additionalProperties: false
+      required: [id, ride_id, pickup, distance_to_pickup_m, fare_kes, expires_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        ride_id:
+          type: string
+          format: uuid
+        pickup:
+          $ref: "#/components/schemas/Coordinates"
+        distance_to_pickup_m:
+          type: integer
+          format: int32
+        fare_kes:
+          type: integer
+          format: int32
+        expires_at:
+          type: string
+          format: date-time
+        rider_rating:
+          type: number
+          format: double
+          description: Absent for shared rides and until the rider has ten rated rides.
+
+    OfferList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Offer"
+
+    # staff signs in an existing ops or admin account and never grants a role.
+    SignupRole:
+      type: string
+      enum: [rider, driver, staff]
+
+    Role:
+      type: string
+      enum: [rider, driver, ops, admin]
+
+    OtpRequest:
+      type: object
+      additionalProperties: false
+      required: [phone, role]
+      properties:
+        phone:
+          type: string
+          example: "0712345678"
+        role:
+          $ref: "#/components/schemas/SignupRole"
+
+    OtpChallenge:
+      type: object
+      additionalProperties: false
+      required: [challenge_id, expires_at]
+      properties:
+        challenge_id:
+          type: string
+          format: uuid
+        expires_at:
+          type: string
+          format: date-time
+
+    OtpVerification:
+      type: object
+      additionalProperties: false
+      required: [challenge_id, code]
+      properties:
+        challenge_id:
+          type: string
+          format: uuid
+        code:
+          type: string
+          example: "123456"
+
+    RefreshRequest:
+      type: object
+      additionalProperties: false
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+
+    Session:
+      type: object
+      additionalProperties: false
+      required:
+        - access_token
+        - access_token_expires_in
+        - refresh_token
+        - refresh_token_expires_in
+        - user_id
+        - roles
+      properties:
+        access_token:
+          type: string
+        access_token_expires_in:
+          type: integer
+          format: int32
+          description: Lifetime in seconds.
+        refresh_token:
+          type: string
+        refresh_token_expires_in:
+          type: integer
+          format: int32
+          description: Lifetime in seconds.
+        user_id:
+          type: string
+          format: uuid
+        roles:
+          type: array
+          items:
+            $ref: "#/components/schemas/Role"
+
+    Me:
+      type: object
+      additionalProperties: false
+      required: [id, phone, roles]
+      properties:
+        id:
+          type: string
+          format: uuid
+        phone:
+          type: string
+        roles:
+          type: array
+          items:
+            $ref: "#/components/schemas/Role"
+        display_name:
+          type: string
+
+    AccountExport:
+      type: object
+      additionalProperties: false
+      required: [generated_at, truncated, profile, rides, payments, documents, ratings_given, reports_submitted, messages_sent]
+      properties:
+        generated_at:
+          type: string
+          format: date-time
+        truncated:
+          type: boolean
+          description: True if a list reached its limit. Support can provide the rest.
+        profile:
+          $ref: "#/components/schemas/ExportProfile"
+        rides:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExportRide"
+        payments:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExportPayment"
+        documents:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExportDocument"
+        ratings_given:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExportRating"
+        reports_submitted:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExportReport"
+        messages_sent:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExportMessage"
+
+    ExportProfile:
+      type: object
+      additionalProperties: false
+      required: [id, account_status, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        phone:
+          type: string
+        email:
+          type: string
+        display_name:
+          type: string
+        account_status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        plate_number:
+          type: string
+        photo_consent_at:
+          type: string
+          format: date-time
+
+    ExportRide:
+      type: object
+      additionalProperties: false
+      required: [id, role, status, pickup, dropoff, fare_kes, requested_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [rider, driver]
+        status:
+          type: string
+        pickup:
+          $ref: "#/components/schemas/Coordinates"
+        dropoff:
+          $ref: "#/components/schemas/Coordinates"
+        fare_kes:
+          type: integer
+          format: int32
+        requested_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        cancelled_at:
+          type: string
+          format: date-time
+
+    ExportPayment:
+      type: object
+      additionalProperties: false
+      required: [channel, status, amount_kes, requested_at]
+      properties:
+        channel:
+          type: string
+        status:
+          type: string
+        amount_kes:
+          type: integer
+          format: int32
+        requested_at:
+          type: string
+          format: date-time
+        paid_at:
+          type: string
+          format: date-time
+
+    ExportDocument:
+      type: object
+      additionalProperties: false
+      required: [document_type, status, submitted_at]
+      properties:
+        document_type:
+          type: string
+        status:
+          type: string
+        submitted_at:
+          type: string
+          format: date-time
+        reviewed_at:
+          type: string
+          format: date-time
+        expires_on:
+          type: string
+          format: date
+
+    ExportRating:
+      type: object
+      additionalProperties: false
+      required: [ride_id, score, reason_tags, submitted_at]
+      properties:
+        ride_id:
+          type: string
+          format: uuid
+        score:
+          type: integer
+          format: int32
+        reason_tags:
+          type: array
+          items:
+            type: string
+        comment:
+          type: string
+        submitted_at:
+          type: string
+          format: date-time
+
+    ExportReport:
+      type: object
+      additionalProperties: false
+      required: [category, status, description, created_at]
+      properties:
+        category:
+          type: string
+        status:
+          type: string
+        ride_id:
+          type: string
+          format: uuid
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    ExportMessage:
+      type: object
+      additionalProperties: false
+      required: [ride_id, body, created_at]
+      properties:
+        ride_id:
+          type: string
+          format: uuid
+        body:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    UpdateMeRequest:
+      type: object
+      additionalProperties: false
+      required: [display_name]
+      properties:
+        display_name:
+          type: string
+          example: Wanjiru Kamau
+
+    EarningsPeriod:
+      type: object
+      additionalProperties: false
+      required: [trips, total_kes]
+      properties:
+        trips:
+          type: integer
+          format: int32
+        total_kes:
+          type: integer
+          format: int32
+
+    EarningsDay:
+      type: object
+      additionalProperties: false
+      required: [date, trips, total_kes]
+      properties:
+        date:
+          type: string
+          format: date
+        trips:
+          type: integer
+          format: int32
+        total_kes:
+          type: integer
+          format: int32
+
+    DriverEarnings:
+      type: object
+      additionalProperties: false
+      required: [today, this_week, last_seven_days]
+      properties:
+        today:
+          $ref: "#/components/schemas/EarningsPeriod"
+        this_week:
+          $ref: "#/components/schemas/EarningsPeriod"
+        last_seven_days:
+          type: array
+          description: One entry per Nairobi day with at least one completed trip, newest first.
+          items:
+            $ref: "#/components/schemas/EarningsDay"
+
+    Health:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, unavailable]
+
+    VehicleCategory:
+      type: object
+      additionalProperties: false
+      required: [slug, label, capacity, weekly_subscription_kes]
+      properties:
+        slug:
+          type: string
+          example: motorbike
+        label:
+          type: string
+          example: Motorbike
+        capacity:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Passenger seats. Zero for package delivery.
+        weekly_subscription_kes:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Weekly driver subscription in whole Kenyan shillings.
+
+    VehicleCategoryList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/VehicleCategory"
+
+    Error:
+      type: object
+      additionalProperties: false
+      required: [code, message, request_id]
+      properties:
+        code:
+          type: string
+          description: Stable machine-readable error code.
+          example: INTERNAL_ERROR
+        message:
+          type: string
+          description: Safe message for display.
+        request_id:
+          type: string
+          description: Quote this when contacting support.
+
+    TotpSetup:
+      type: object
+      additionalProperties: false
+      required: [secret, otpauth_uri, expires_at]
+      properties:
+        secret:
+          type: string
+        otpauth_uri:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+
+    TotpCode:
+      type: object
+      additionalProperties: false
+      required: [code]
+      properties:
+        code:
+          type: string
+          pattern: '^[0-9]{6}$'
+
+    StepUpGrant:
+      type: object
+      additionalProperties: false
+      required: [step_up_token, expires_in]
+      properties:
+        step_up_token:
+          type: string
+        expires_in:
+          type: integer
+          format: int32
+
+    ConsoleSession:
+      type: object
+      additionalProperties: false
+      required: [user_id, roles, expires_in]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        roles:
+          type: array
+          items:
+            $ref: "#/components/schemas/Role"
+        expires_in:
+          type: integer
+          format: int32
+          description: Seconds until the session cookie must be refreshed.
+
+    ConsoleStepUp:
+      type: object
+      additionalProperties: false
+      required: [expires_in]
+      properties:
+        expires_in:
+          type: integer
+          format: int32
+          description: Seconds the step-up cookie stays valid.
+
+    StartVerificationRequest:
+      type: object
+      additionalProperties: false
+      required: [plate_number, full_name, photo_consent]
+      properties:
+        plate_number:
+          type: string
+          example: KMFB 123A
+        full_name:
+          type: string
+          description: The name on the driver's national ID. Riders see it, and reviewers check it against the ID.
+          example: Wanjiru Kamau
+        photo_consent:
+          type: boolean
+          description: Must be true. The driver agrees that riders on their trips may see their selfie as their photo.
+
+    PrepareUploadRequest:
+      type: object
+      additionalProperties: false
+      required: [document_type, content_type, size_bytes]
+      properties:
+        document_type:
+          type: string
+        content_type:
+          type: string
+          enum: [image/jpeg, image/png, application/pdf]
+        size_bytes:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 10485760
+
+    VerificationUpload:
+      type: object
+      additionalProperties: false
+      required: [upload_id, upload_url, headers, expires_at]
+      properties:
+        upload_id:
+          type: string
+          format: uuid
+        upload_url:
+          type: string
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        expires_at:
+          type: string
+          format: date-time
+
+    SubmitDocumentRequest:
+      type: object
+      additionalProperties: false
+      required: [upload_id]
+      properties:
+        upload_id:
+          type: string
+          format: uuid
+        expires_on:
+          type: string
+          format: date
+
+    VerificationApplication:
+      type: object
+      additionalProperties: false
+      required: [id, status, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        decided_at:
+          type: string
+          format: date-time
+        decision_reason:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    VerificationDocument:
+      type: object
+      additionalProperties: false
+      required: [id, document_type, version, status, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        document_type:
+          type: string
+        version:
+          type: integer
+          format: int32
+        status:
+          type: string
+        expires_on:
+          type: string
+          format: date
+        rejection_reason:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    VerificationRequirement:
+      type: object
+      additionalProperties: false
+      required: [document_type, label, required, requires_expiry]
+      properties:
+        document_type:
+          type: string
+        label:
+          type: string
+        required:
+          type: boolean
+        requires_expiry:
+          type: boolean
+        document:
+          $ref: "#/components/schemas/VerificationDocument"
+
+    VerificationStatus:
+      type: object
+      additionalProperties: false
+      required: [driver_status, requirements]
+      properties:
+        driver_status:
+          type: string
+        plate_number:
+          type: string
+        application:
+          $ref: "#/components/schemas/VerificationApplication"
+        requirements:
+          type: array
+          items:
+            $ref: "#/components/schemas/VerificationRequirement"
+
+    VerificationQueueItem:
+      type: object
+      additionalProperties: false
+      required: [application, driver_id, driver_status, phone_masked]
+      properties:
+        application:
+          $ref: "#/components/schemas/VerificationApplication"
+        driver_id:
+          type: string
+          format: uuid
+        driver_status:
+          type: string
+        full_name:
+          type: string
+        plate_number:
+          type: string
+        phone_masked:
+          type: string
+
+    VerificationQueue:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/VerificationQueueItem"
+
+    ReviewableDocument:
+      type: object
+      additionalProperties: false
+      required: [document, content_type, scan_status]
+      properties:
+        document:
+          $ref: "#/components/schemas/VerificationDocument"
+        content_type:
+          type: string
+        scan_status:
+          type: string
+
+    VerificationApplicationDetail:
+      type: object
+      additionalProperties: false
+      required: [summary, documents]
+      properties:
+        summary:
+          $ref: "#/components/schemas/VerificationQueueItem"
+        documents:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewableDocument"
+
+    ReviewRequest:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [approve, reject, request_resubmission, suspend]
+        reason:
+          type: string
+          maxLength: 500
+
+    SignedDownload:
+      type: object
+      additionalProperties: false
+      required: [url, expires_at]
+      properties:
+        url:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+
+    Notification:
+      type: object
+      additionalProperties: false
+      required: [id, event_type, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        event_type:
+          type: string
+        ride_id:
+          type: string
+          format: uuid
+        offer_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        acked_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+    NotificationList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Notification"
+
+    NotificationSummary:
+      type: object
+      additionalProperties: false
+      required: [unread]
+      properties:
+        unread:
+          type: integer
+          format: int64
+
+    PushTokenRegistration:
+      type: object
+      additionalProperties: false
+      required: [token, platform]
+      properties:
+        token:
+          type: string
+          maxLength: 4096
+        platform:
+          type: string
+          enum: [android, ios]
+
+    PushTokenRevocation:
+      type: object
+      additionalProperties: false
+      required: [token]
+      properties:
+        token:
+          type: string
+          maxLength: 4096
+
+    ReportCategory:
+      type: object
+      additionalProperties: false
+      required: [slug, label, applies_to]
+      properties:
+        slug: {type: string}
+        label: {type: string}
+        applies_to: {type: string}
+    ReportCategoryList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/ReportCategory"}
+    ReportSubmission:
+      type: object
+      additionalProperties: false
+      required: [ride_id, category, description]
+      properties:
+        ride_id: {type: string, format: uuid}
+        category: {type: string}
+        description: {type: string, maxLength: 2000}
+    FiledCase:
+      type: object
+      additionalProperties: false
+      required: [id, status, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        status: {type: string}
+        created_at: {type: string, format: date-time}
+    ReportSummary:
+      type: object
+      additionalProperties: false
+      required: [id, reported_id, category, status, severity, source, incident_type, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        reporter_id: {type: string, format: uuid}
+        reported_id: {type: string, format: uuid}
+        category: {type: string}
+        status: {type: string}
+        severity: {type: integer, format: int32}
+        source: {type: string}
+        incident_type: {type: string}
+        ride_id: {type: string, format: uuid}
+        created_at: {type: string, format: date-time}
+    ReportList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/ReportSummary"}
+    ReportDetail:
+      type: object
+      additionalProperties: false
+      required: [summary, description]
+      properties:
+        summary: {$ref: "#/components/schemas/ReportSummary"}
+        description: {type: string}
+        outcome: {type: string}
+    TriageRequest:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: {type: string, enum: [triaged, under_review]}
+    ReportReviewRequest:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [needs_more_info, no_action, warning, temporary_suspension, permanent_ban, escalate, dismiss]
+        reason_code: {type: string, maxLength: 100}
+        notes: {type: string, maxLength: 1000}
+        ends_at: {type: string, format: date-time}
+    EnforcementRequest:
+      type: object
+      additionalProperties: false
+      required: [user_id, action, reason_code]
+      properties:
+        user_id: {type: string, format: uuid}
+        action: {type: string, enum: [warning, feature_restriction, temporary_suspension, permanent_ban]}
+        reason_code: {type: string, maxLength: 100}
+        reason_text: {type: string, maxLength: 1000}
+        ends_at: {type: string, format: date-time}
+        scope: {type: string, enum: [platform, communication]}
+    Enforcement:
+      type: object
+      additionalProperties: false
+      required: [id, user_id, action, status, reason_code, starts_at]
+      properties:
+        id: {type: string, format: uuid}
+        user_id: {type: string, format: uuid}
+        report_id: {type: string, format: uuid}
+        action: {type: string}
+        status: {type: string}
+        reason_code: {type: string}
+        starts_at: {type: string, format: date-time}
+        ends_at: {type: string, format: date-time}
+        lifted_at: {type: string, format: date-time}
+    EnforcementList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/Enforcement"}
+    PendingRating:
+      type: object
+      additionalProperties: false
+      required: [ride_id, rater_role, due_at]
+      properties:
+        ride_id: {type: string, format: uuid}
+        rater_role: {type: string}
+        due_at: {type: string, format: date-time}
+        completed_at: {type: string, format: date-time}
+    PendingRatingList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/PendingRating"}
+    RatingSubmission:
+      type: object
+      additionalProperties: false
+      required: [score]
+      properties:
+        score: {type: integer, format: int32, minimum: 1, maximum: 5}
+        reason_tags:
+          type: array
+          maxItems: 5
+          items: {type: string, maxLength: 40}
+        comment: {type: string, maxLength: 200}
+    Rating:
+      type: object
+      additionalProperties: false
+      required: [id, ride_id, rated_by, rated_user, score, reason_tags, include_in_score, submitted_at]
+      properties:
+        id: {type: string, format: uuid}
+        ride_id: {type: string, format: uuid}
+        rated_by: {type: string, format: uuid}
+        rated_user: {type: string, format: uuid}
+        score: {type: integer, format: int32}
+        reason_tags:
+          type: array
+          items: {type: string}
+        comment: {type: string}
+        include_in_score: {type: boolean}
+        exclusion_reason: {type: string}
+        nullified_at: {type: string, format: date-time}
+        submitted_at: {type: string, format: date-time}
+    RatingList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/Rating"}
+    NullifyRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: {type: string, maxLength: 200}
+    DisputeSubmission:
+      type: object
+      additionalProperties: false
+      required: [ride_id, dispute_type, description]
+      properties:
+        ride_id: {type: string, format: uuid}
+        dispute_type:
+          type: string
+          enum: [fare_dispute, driver_not_arrived, wrong_route, safety_incident, lost_item, payment_not_received, wrong_driver, app_error, other]
+        description: {type: string, maxLength: 2000}
+        requested_resolution: {type: string, maxLength: 200}
+    MyDispute:
+      type: object
+      additionalProperties: false
+      required: [id, dispute_type, status, opened_by_me, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        ride_id: {type: string, format: uuid}
+        dispute_type: {type: string}
+        status: {type: string}
+        outcome: {type: string}
+        opened_by_me: {type: boolean}
+        created_at: {type: string, format: date-time}
+    MyDisputeList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/MyDispute"}
+    DisputeCase:
+      type: object
+      additionalProperties: false
+      required: [id, reported_id, dispute_type, status, severity, incident_type, description, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        reporter_id: {type: string, format: uuid}
+        reported_id: {type: string, format: uuid}
+        ride_id: {type: string, format: uuid}
+        dispute_type: {type: string}
+        status: {type: string}
+        severity: {type: integer, format: int32}
+        incident_type: {type: string}
+        requested_resolution: {type: string}
+        description: {type: string}
+        created_at: {type: string, format: date-time}
+    DisputeCaseList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/DisputeCase"}
+    DisputeResolution:
+      type: object
+      additionalProperties: false
+      required: [outcome]
+      properties:
+        outcome: {type: string, enum: [dismissed, no_action, refund_full, refund_partial, credit_note, escalate]}
+        amount_kes: {type: integer, format: int32, minimum: 1}
+        summary: {type: string, maxLength: 1000}
+    Compensation:
+      type: object
+      additionalProperties: false
+      required: [id, report_id, ride_id, beneficiary_id, compensation_type, status, amount_kes, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        report_id: {type: string, format: uuid}
+        ride_id: {type: string, format: uuid}
+        beneficiary_id: {type: string, format: uuid}
+        compensation_type: {type: string}
+        status: {type: string}
+        amount_kes: {type: integer, format: int32}
+        processing_channel: {type: string}
+        processing_reference: {type: string}
+        processed_at: {type: string, format: date-time}
+        created_at: {type: string, format: date-time}
+    CompensationList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/Compensation"}
+    MarkPaidRequest:
+      type: object
+      additionalProperties: false
+      required: [channel, reference]
+      properties:
+        channel: {type: string, enum: [manual_ops, mpesa_reversal, wallet_credit, bank_transfer]}
+        reference: {type: string, maxLength: 200}
+
+    QuickAction:
+      type: object
+      additionalProperties: false
+      required: [code, english, swahili]
+      properties:
+        code: {type: string}
+        english: {type: string}
+        swahili: {type: string}
+    QuickActionList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/QuickAction"}
+    RideMessage:
+      type: object
+      additionalProperties: false
+      required: [seq, id, sender_id, sender_role, message_type, body, created_at]
+      properties:
+        seq: {type: integer, format: int64}
+        id: {type: string, format: uuid}
+        sender_id: {type: string, format: uuid}
+        sender_role: {type: string}
+        message_type: {type: string}
+        quick_action_code: {type: string}
+        body: {type: string}
+        read_at: {type: string, format: date-time}
+        created_at: {type: string, format: date-time}
+    MessageThread:
+      type: object
+      additionalProperties: false
+      required: [data, next_seq, unread]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/RideMessage"}
+        next_seq: {type: integer, format: int64}
+        unread: {type: integer, format: int64}
+    MessageDraft:
+      type: object
+      additionalProperties: false
+      properties:
+        body: {type: string, maxLength: 1000}
+        quick_action_code: {type: string}
+    MessageReport:
+      type: object
+      additionalProperties: false
+      properties:
+        category: {type: string}
+    FiledMessageReport:
+      type: object
+      additionalProperties: false
+      required: [report_id]
+      properties:
+        report_id: {type: string, format: uuid}
+    DeliveryRequest:
+      type: object
+      additionalProperties: false
+      required: [quote_id, sender_name, recipient_name, recipient_phone, item_description, item_size, payer, payment_timing]
+      properties:
+        quote_id: {type: string, format: uuid}
+        sender_name: {type: string, maxLength: 100}
+        recipient_name: {type: string, maxLength: 100}
+        recipient_phone: {type: string}
+        item_description: {type: string, maxLength: 500}
+        item_size: {type: string, enum: [small, medium, large]}
+        payer: {type: string, enum: [sender, recipient]}
+        payment_timing: {type: string, enum: [before, after]}
+        item_value_kes: {type: integer, format: int32, minimum: 0}
+        special_instructions: {type: string, maxLength: 500}
+        liability_acknowledged: {type: boolean}
+    Delivery:
+      type: object
+      additionalProperties: false
+      required: [ride_id, sender_name, recipient_name, item_description, item_size, payer, payment_timing, status]
+      properties:
+        ride_id: {type: string, format: uuid}
+        sender_name: {type: string}
+        recipient_name: {type: string}
+        recipient_phone: {type: string}
+        item_description: {type: string}
+        item_size: {type: string}
+        payer: {type: string}
+        payment_timing: {type: string}
+        special_instructions: {type: string}
+        status: {type: string}
+        pickup_proof_at: {type: string, format: date-time}
+        dropoff_proof_at: {type: string, format: date-time}
+        confirmed_at: {type: string, format: date-time}
+    ProofUploadRequest:
+      type: object
+      additionalProperties: false
+      required: [proof_kind, content_type, size_bytes]
+      properties:
+        proof_kind: {type: string, enum: [pickup, dropoff]}
+        content_type: {type: string, enum: [image/jpeg, image/png]}
+        size_bytes: {type: integer, format: int64, minimum: 1, maximum: 10485760}
+    ProofUpload:
+      type: object
+      additionalProperties: false
+      required: [upload_id, upload_url, headers, expires_at]
+      properties:
+        upload_id: {type: string, format: uuid}
+        upload_url: {type: string}
+        headers:
+          type: object
+          additionalProperties: {type: string}
+        expires_at: {type: string, format: date-time}
+    ProofSubmission:
+      type: object
+      additionalProperties: false
+      required: [upload_id]
+      properties:
+        upload_id: {type: string, format: uuid}
+    ProhibitedItem:
+      type: object
+      additionalProperties: false
+      required: [keyword, severity, message, active]
+      properties:
+        keyword: {type: string, maxLength: 100}
+        severity: {type: string, enum: [block, warn]}
+        message: {type: string, maxLength: 300}
+        active: {type: boolean}
+    ProhibitedItemList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/ProhibitedItem"}
+
+    PickupHealth:
+      type: object
+      additionalProperties: false
+      required: [location_stale, late, no_progress, moving_away, recommend_reassign]
+      properties:
+        location_stale: {type: boolean}
+        late: {type: boolean}
+        no_progress: {type: boolean}
+        moving_away: {type: boolean}
+        recommend_reassign: {type: boolean}
+    DestinationChangeRequest:
+      type: object
+      additionalProperties: false
+      required: [dropoff, reason_code]
+      properties:
+        dropoff: {$ref: "#/components/schemas/Coordinates"}
+        reason_code: {type: string, enum: [rider_changed_plan, wrong_dropoff_selected, traffic_or_safety, intermediate_stop, other]}
+        notes: {type: string, maxLength: 300}
+    DestinationRejection:
+      type: object
+      additionalProperties: false
+      properties:
+        reason_code: {type: string, enum: [driver_declined, unsafe_request, route_unserviceable, other]}
+    DestinationChange:
+      type: object
+      additionalProperties: false
+      required: [id, dropoff, old_fare_kes, new_fare_kes, status, reason_code, requested_at]
+      properties:
+        id: {type: string, format: uuid}
+        dropoff: {$ref: "#/components/schemas/Coordinates"}
+        old_fare_kes: {type: integer, format: int32}
+        new_fare_kes: {type: integer, format: int32}
+        status: {type: string}
+        reason_code: {type: string}
+        requested_at: {type: string, format: date-time}
+        responded_at: {type: string, format: date-time}
+    DestinationChangeList:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/DestinationChange"}
+    RideHistoryItem:
+      type: object
+      additionalProperties: false
+      required: [id, status, category, fare_kes, requested_at]
+      properties:
+        id: {type: string, format: uuid}
+        status: {type: string}
+        category: {type: string}
+        fare_kes: {type: integer, format: int32}
+        payment_mode: {type: string}
+        requested_at: {type: string, format: date-time}
+        completed_at: {type: string, format: date-time}
+        cancelled_at: {type: string, format: date-time}
+    RideHistory:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/RideHistoryItem"}
+    RideTimelineEntry:
+      type: object
+      additionalProperties: false
+      required: [to_status, occurred_at]
+      properties:
+        from_status: {type: string}
+        to_status: {type: string}
+        reason: {type: string}
+        occurred_at: {type: string, format: date-time}
+    RideTimeline:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/RideTimelineEntry"}
+
+    IntegrityStanding:
+      type: object
+      additionalProperties: false
+      required: [rider_strikes, driver_strikes, threshold]
+      properties:
+        rider_strikes: {type: integer, format: int64}
+        driver_strikes: {type: integer, format: int64}
+        threshold: {type: integer, format: int32}
+        booking_restricted_until: {type: string, format: date-time}
+    IntegrityEvent:
+      type: object
+      additionalProperties: false
+      required: [ride_id, role, kind, reason, occurred_at]
+      properties:
+        ride_id: {type: string, format: uuid}
+        role: {type: string}
+        kind: {type: string}
+        reason: {type: string}
+        occurred_at: {type: string, format: date-time}
+    IntegrityDetail:
+      type: object
+      additionalProperties: false
+      required: [standing, recent]
+      properties:
+        standing: {$ref: "#/components/schemas/IntegrityStanding"}
+        recent:
+          type: array
+          items: {$ref: "#/components/schemas/IntegrityEvent"}
+
+    EmailOtpRequest:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        email: {type: string, maxLength: 254}
+    GoogleSignIn:
+      type: object
+      additionalProperties: false
+      required: [id_token]
+      properties:
+        id_token: {type: string, maxLength: 8192}
+    PaymentDetail:
+      type: object
+      additionalProperties: false
+      required: [id, driver_id, channel, status, amount_kes, phone_masked, requested_at]
+      properties:
+        id: {type: string, format: uuid}
+        driver_id: {type: string, format: uuid}
+        channel: {type: string}
+        status: {type: string}
+        amount_kes: {type: integer, format: int32}
+        phone_masked: {type: string}
+        receipt: {type: string}
+        requested_at: {type: string, format: date-time}
+        paid_at: {type: string, format: date-time}
+    DriverSubscriptionDetail:
+      type: object
+      additionalProperties: false
+      required: [status, amount_kes, reference, payments]
+      properties:
+        status: {type: string}
+        amount_kes: {type: integer, format: int32}
+        reference: {type: string}
+        payments:
+          type: array
+          items: {$ref: "#/components/schemas/SubscriptionPayment"}
+
+    SharedCancel:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: {type: string}
+    SharedMember:
+      type: object
+      additionalProperties: false
+      required: [id, status, is_self]
+      properties:
+        id: {type: string, format: uuid}
+        status: {type: string}
+        is_self: {type: boolean}
+        fare_kes: {type: integer, format: int32}
+    SharedStop:
+      type: object
+      additionalProperties: false
+      required: [member_id, kind, point]
+      properties:
+        member_id: {type: string, format: uuid}
+        kind: {type: string, enum: [pickup, dropoff]}
+        point: {$ref: "#/components/schemas/Coordinates"}
+    SharedRide:
+      type: object
+      additionalProperties: false
+      required: [ride_id, status, members, stops]
+      properties:
+        ride_id: {type: string, format: uuid}
+        status: {type: string}
+        members:
+          type: array
+          items: {$ref: "#/components/schemas/SharedMember"}
+        stops:
+          type: array
+          items: {$ref: "#/components/schemas/SharedStop"}
+        earnings_kes: {type: integer, format: int32}
+
+    AuthMethods:
+      type: object
+      additionalProperties: false
+      required: [methods]
+      properties:
+        methods:
+          type: array
+          items: {type: string, enum: [phone_otp, email_otp, google]}
+    RideDelivery:
+      type: object
+      additionalProperties: false
+      required: [id, user_id, event_type, push_status, attempts, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        user_id: {type: string, format: uuid}
+        event_type: {type: string}
+        status: {type: string}
+        push_status: {type: string}
+        attempts: {type: integer, format: int32}
+        acked_at: {type: string, format: date-time}
+        created_at: {type: string, format: date-time}
+    RideDeliveries:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/RideDelivery"}
+    WatchdogSummary:
+      type: object
+      additionalProperties: false
+      required: [reassigned, rider_reassigned, cancelled]
+      properties:
+        reassigned: {type: integer, format: int64}
+        rider_reassigned: {type: integer, format: int64}
+        cancelled: {type: integer, format: int64}
+    EnforcementMetric:
+      type: object
+      additionalProperties: false
+      required: [action, status, total]
+      properties:
+        action: {type: string}
+        status: {type: string}
+        total: {type: integer, format: int64}
+    EnforcementMetrics:
+      type: object
+      additionalProperties: false
+      required: [data, overdue_suspensions]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/EnforcementMetric"}
+        overdue_suspensions: {type: integer, format: int64}
+    RatingGuardrail:
+      type: object
+      additionalProperties: false
+      required: [recent, minimum, window_days]
+      properties:
+        recent: {type: integer, format: int64}
+        minimum: {type: integer, format: int64}
+        window_days: {type: integer, format: int32}
+    BulkReviewRequest:
+      type: object
+      additionalProperties: false
+      required: [document_ids, decision]
+      properties:
+        document_ids:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: {type: string, format: uuid}
+        decision: {type: string, enum: [approve, reject, request_resubmission]}
+        reason: {type: string, maxLength: 500}
+    BulkReviewResult:
+      type: object
+      additionalProperties: false
+      required: [document_id, ok]
+      properties:
+        document_id: {type: string, format: uuid}
+        ok: {type: boolean}
+        code: {type: string}
+    BulkReviewResults:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items: {$ref: "#/components/schemas/BulkReviewResult"}

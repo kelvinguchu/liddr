@@ -1,27 +1,14 @@
-# Legacy nested git metadata backup
-/.git_api_legacy_backup/
-
 # Environment files
 .env
 .env.*
-
-# API (Phoenix / Elixir)
-api/.env
-api/.env.*
-!api/.env.example
-api/_build/
-api/deps/
-api/cover/
-api/doc/
-api/tmp/
-api/erl_crash.dump
+!apps/api/.env.example
 
 # Android
-android/.gradle/
-android/.idea/
-android/build/
-android/app/build/
-android/local.properties
+apps/android/.gradle/
+apps/android/.idea/
+apps/android/build/
+apps/android/app/build/
+apps/android/local.properties
 
 # iOS
 ios/DerivedData/
@@ -35,3 +22,5 @@ ios/**/*.xcuserstate
 Thumbs.db
 
 secrets
+# Google service account keys
+*-firebase-adminsdk-*.json

@@ -1,0 +1,205 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Plus Jakarta Sans, Liddr's typeface, self-hosted: the page's policy allows
+   font-src 'self' only. OFL licence in src/fonts/OFL.txt. */
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("./fonts/plus_jakarta_sans_regular.ttf") format("truetype");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("./fonts/plus_jakarta_sans_semibold.ttf") format("truetype");
+  font-weight: 500 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("./fonts/plus_jakarta_sans_bold.ttf") format("truetype");
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("./fonts/plus_jakarta_sans_extrabold.ttf") format("truetype");
+  font-weight: 800;
+  font-display: swap;
+}
+
+@theme inline {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* The type scale. Every size in the app is one of these. */
+  --text-micro: 0.71875rem; /* 11.5px: badges, counts */
+  --text-micro--line-height: 1rem;
+  --text-meta: 0.75rem; /* 12px: labels, meta, hints */
+  --text-meta--line-height: 1.0625rem;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.0625rem;
+  --text-cell: 0.84375rem; /* 13.5px: table cells, detail rows */
+  --text-cell--line-height: 1.25rem;
+  --text-body: 0.875rem; /* 14px: running text */
+  --text-body--line-height: 1.375rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.375rem;
+  --text-section: 0.9375rem; /* 15px: section and dialog titles */
+  --text-section--line-height: 1.375rem;
+  --text-title: 1.25rem; /* 20px: the page title */
+  --text-title--line-height: 1.75rem;
+  --text-figure-sm: 1.125rem; /* 18px: figures in a stats strip */
+  --text-figure-sm--line-height: 1.5rem;
+  --text-figure: 1.5rem;
+  --text-figure--line-height: 2rem;
+
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chrome: var(--chrome);
+  --color-faint: var(--faint);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-ink: var(--brand-ink);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-crit: var(--crit);
+  --color-info: var(--info);
+}
+
+:root {
+  --radius: 0.5rem;
+  /* Liddr's Clear palette. Navy carries actions, teal marks where you are and
+     what needs you, status colours mark state. Text tokens meet WCAG AA on
+     background, card and muted in both themes. */
+  --background: #ffffff;
+  --foreground: #0b2545;
+  --card: #ffffff;
+  --card-foreground: #0b2545;
+  --popover: #ffffff;
+  --popover-foreground: #0b2545;
+  --primary: #0b2545;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f4f8;
+  --secondary-foreground: #0b2545;
+  --muted: #f1f4f8;
+  --muted-foreground: #56677d;
+  --faint: #6b7a8d;
+  --accent: #e9eef5;
+  --accent-foreground: #0b2545;
+  --destructive: #c2362f;
+  --border: #e2e7ee;
+  --border-strong: #c3ccd8;
+  --input: #d5dde7;
+  --ring: #12b5a6;
+  /* The frame around the working panel: sidebar and top bar. */
+  --chrome: #f1f5f9;
+  /* Teal fill with navy text (6:1), and teal for text on white (4.9:1). */
+  --brand: #12b5a6;
+  --brand-foreground: #0b2545;
+  --brand-ink: #087f74;
+  --ok: #0b7356;
+  --warn: #8f5500;
+  --crit: #b42318;
+  --info: #1f4fb8;
+}
+
+.dark {
+  --background: #0b1628;
+  --foreground: #e8eef6;
+  --card: #0e1b30;
+  --card-foreground: #e8eef6;
+  --popover: #0e1b30;
+  --popover-foreground: #e8eef6;
+  --primary: #12b5a6;
+  --primary-foreground: #04201d;
+  --secondary: #13223a;
+  --secondary-foreground: #e8eef6;
+  --muted: #13223a;
+  --muted-foreground: #95a5ba;
+  --faint: #8395ac;
+  --accent: #172a46;
+  --accent-foreground: #e8eef6;
+  --destructive: #f07068;
+  --border: #1d2e48;
+  --border-strong: #2f4566;
+  --input: #263a58;
+  --ring: #12b5a6;
+  --chrome: #060f1d;
+  --brand: #12b5a6;
+  --brand-foreground: #04201d;
+  --brand-ink: #5fd6ca;
+  --ok: #6eddb7;
+  --warn: #f2c063;
+  --crit: #f79a93;
+  --info: #93b4f2;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+  }
+  button:not(:disabled),
+  [role="button"],
+  summary,
+  a[href],
+  label:has(> input:not(:disabled)) {
+    cursor: pointer;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--brand) 30%, transparent);
+  }
+}
+
+@layer utilities {
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

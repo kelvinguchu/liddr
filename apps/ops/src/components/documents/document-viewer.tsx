@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { CheckIcon, ExternalLinkIcon } from "lucide-react";
 import { docName, type DocumentDecision } from "@/components/documents/decisions";
+import { DocumentImage } from "@/components/documents/document-image";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -39,7 +40,7 @@ export function DocumentViewer({ doc, canDecide, onClose, onDecide }: { doc: Sch
           ) : link.isError ? (
             <p className="text-cell text-destructive">{problemText(link.error)}</p>
           ) : image ? (
-            <img src={link.data.url} alt={name} referrerPolicy="no-referrer" className="max-h-full max-w-full rounded-md object-contain sm:max-h-[calc(100dvh-14rem)]" />
+            <DocumentImage key={link.data.url} src={link.data.url} alt={name} documentType={doc?.document.document_type ?? ""} />
           ) : (
             <p className="text-cell text-muted-foreground">This document is a PDF. Open it in a new tab to read it.</p>
           )}

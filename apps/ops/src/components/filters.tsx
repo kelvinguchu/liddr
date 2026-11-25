@@ -62,7 +62,7 @@ export function Filters({ filters, onApply }: { filters: Filter[]; onApply: (val
           type="button"
           aria-label={active ? `Filters, ${active} active` : "Filters"}
           onClick={() => setOpen(true)}
-          className="relative grid size-14 place-items-center rounded-full bg-brand text-brand-foreground shadow-lg shadow-brand/30 transition-colors active:brightness-95"
+          className="relative grid size-14 place-items-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/25 transition-colors active:brightness-95"
         >
           <SlidersHorizontalIcon className="size-5" />
           {active > 0 ? (

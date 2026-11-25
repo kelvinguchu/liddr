@@ -34,7 +34,7 @@ function ReportsPage() {
 
   return (
     <div className="flex flex-col gap-4 pb-28 md:pb-0">
-      <PageHeader title="Reports" description="Most severe first. Start a review before looking into a case, so two people do not work it at once." refreshing={list.isRefetching} onRefresh={() => list.refetch()} />
+      <PageHeader title="Reports" refreshing={list.isRefetching} onRefresh={() => list.refetch()} />
       <Filters filters={[{ key: "status", label: "Status", options: STATUSES, value: status, fallback: "submitted" }]} onApply={(v) => navigate({ search: { status: oneOf(v.status, STATUSES, "submitted") } })} />
       <RecordList<Schemas["ReportSummary"]>
         query={list}

@@ -89,8 +89,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 function Logo() {
   return (
     <>
-      <img src="/logo-for-light-mode.svg" alt="liddr" width={74} height={32} className="h-7 w-auto dark:hidden" />
-      <img src="/logo-for-dark-mode.svg" alt="liddr" width={74} height={32} className="hidden h-7 w-auto dark:block" />
+      <img src="/logo-for-light-mode.svg?v=fleet" alt="liddr" width={74} height={32} className="h-7 w-auto dark:hidden" />
+      <img src="/logo-for-dark-mode.svg?v=fleet" alt="liddr" width={74} height={32} className="hidden h-7 w-auto dark:block" />
     </>
   );
 }
@@ -112,7 +112,7 @@ function Sidebar() {
                   key={item.to}
                   to={item.to}
                   className="flex items-center gap-3 rounded-lg px-3 py-2 text-body font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                  activeProps={{ className: "!bg-brand !text-brand-foreground font-semibold shadow-sm shadow-brand/30", "aria-current": "page" }}
+                  activeProps={{ className: "!bg-primary !text-primary-foreground font-semibold", "aria-current": "page" }}
                 >
                   <item.icon className="size-[18px] shrink-0" />
                   <span>{item.label}</span>

@@ -55,7 +55,6 @@ function PenaltiesPage() {
     <div className="flex flex-col gap-4 pb-28 md:pb-0">
       <PageHeader
         title="Penalties"
-        description="Every penalty carries a reason and the staff member who applied it."
         refreshing={list.isRefetching || metrics.isRefetching}
         onRefresh={() => {
           void metrics.refetch();

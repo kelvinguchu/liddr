@@ -11,15 +11,15 @@ export interface PageAction {
 }
 
 // The page's title row. Refresh is always its own icon button. Page actions
-// are buttons from tablet width up and sit behind ⋯ on a phone. The
-// description is guidance for wide screens and is dropped on a phone.
-export function PageHeader({ title, description, refreshing, onRefresh, actions = [] }: { title: string; description?: string; refreshing?: boolean; onRefresh?: () => void; actions?: PageAction[] }) {
+// are buttons from tablet width up and sit behind ⋯ on a phone. The title
+// stands alone: staff know their tools, and an explanation under every title
+// is noise.
+export function PageHeader({ title, refreshing, onRefresh, actions = [] }: { title: string; refreshing?: boolean; onRefresh?: () => void; actions?: PageAction[] }) {
   const [menu, setMenu] = useState(false);
   return (
     <header className="flex items-start justify-between gap-4">
       <div className="min-w-0 flex-1">
         <h1 className="truncate text-title font-semibold tracking-tight">{title}</h1>
-        {description ? <p className="mt-0.5 hidden text-cell text-muted-foreground sm:block">{description}</p> : null}
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {onRefresh ? (

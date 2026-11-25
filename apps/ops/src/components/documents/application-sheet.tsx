@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { EyeIcon } from "lucide-react";
+import { EyeIcon, MessageSquareIcon, PhoneIcon } from "lucide-react";
 import { toast } from "sonner";
 import { DetailRows, DetailSection, DetailSheet, DetailStats, Mono } from "@/components/detail-sheet";
 import { DocumentViewer } from "@/components/documents/document-viewer";
@@ -9,7 +9,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { api, problemText, type Schemas } from "@/lib/api";
-import { day, label, when } from "@/lib/format";
+import { day, dialable, label, phone, when } from "@/lib/format";
 import { StepUpCancelled } from "@/lib/step-up";
 
 type Doc = Schemas["ReviewableDocument"];
@@ -68,7 +68,7 @@ export function ApplicationSheet({ id, onClose }: { id?: string; onClose: () => 
         onClose={onClose}
         eyebrow="Driver application"
         title={s ? s.full_name || "Name not given" : undefined}
-        subtitle={s ? [s.plate_number, s.phone_masked, `submitted ${when(s.application.created_at)}`].filter(Boolean).join(" · ") : undefined}
+        subtitle={s ? [s.plate_number, phone(app?.phone), `submitted ${when(s.application.created_at)}`].filter(Boolean).join(" · ") : undefined}
         error={detail.error}
         onRetry={() => detail.refetch()}
         actions={
@@ -166,7 +166,24 @@ export function ApplicationSheet({ id, onClose }: { id?: string; onClose: () => 
               <DetailRows
                 rows={[
                   ["Driver ID", <Mono key="id">{s.driver_id}</Mono>],
-                  ["Phone", s.phone_masked],
+                  [
+                    "Phone",
+                    app?.phone ? (
+                      <span key="phone" className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span className="tnum">{phone(app.phone)}</span>
+                        <a href={`tel:${dialable(app.phone)}`} className="inline-flex items-center gap-1 font-semibold text-brand-ink hover:underline">
+                          <PhoneIcon className="size-3.5" />
+                          Call
+                        </a>
+                        <a href={`sms:${dialable(app.phone)}`} className="inline-flex items-center gap-1 font-semibold text-brand-ink hover:underline">
+                          <MessageSquareIcon className="size-3.5" />
+                          Text
+                        </a>
+                      </span>
+                    ) : (
+                      s.phone_masked
+                    ),
+                  ],
                   ["Plate", s.plate_number],
                 ]}
               />

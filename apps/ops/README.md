@@ -2,7 +2,7 @@
 
 The staff console: driver document review, reports and penalties, disputes and
 payouts, and M-Pesa payment lookup. A TanStack Start app (React, TanStack
-Router and Query, Tailwind v4, shadcn conventions on Radix, Plus Jakarta Sans)
+Router and Query, Tailwind v4, shadcn conventions on Radix, Figtree)
 that runs as its own Node service next to the Go API, the way rootcat's `ui/`
 runs next to its receiver.
 
@@ -25,7 +25,7 @@ src/
   components/ui/   shadcn-style primitives, copied from rootcat's ui
   lib/             api (typed client), contract.gen.ts (generated), step-up,
                    session, format, csp, search, lists, access
-  fonts/           Plus Jakarta Sans (OFL)
+  fonts/           Figtree (OFL)
 public/            logos and icon
 ```
 

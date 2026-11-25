@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { initials, isUUID, kes, label, nairobiFuture, shortID, when } from "./format.ts";
+import { dialable, initials, isUUID, kes, label, nairobiFuture, phone, shortID, when } from "./format.ts";
 
 test("label turns snake_case into a sentence", () => {
   assert.equal(label("pending_review"), "Pending review");
@@ -31,4 +31,17 @@ test("ids", () => {
   assert.ok(!isUUID("733d3040"));
   assert.equal(initials("Wanjiru  Kamau"), "WK");
   assert.equal(initials(""), "ST");
+});
+
+test("phone shows a stored number the way people read it, and dialable gives the link form", () => {
+  const cases: [string, string, string][] = [
+    ["254711111111", "+254 711 111 111", "+254711111111"],
+    ["+254712345678", "+254 712 345 678", "+254712345678"],
+    ["0712345678", "0712345678", "0712345678"],
+  ];
+  for (const [stored, shown, link] of cases) {
+    assert.equal(phone(stored), shown, stored);
+    assert.equal(dialable(stored), link, stored);
+  }
+  assert.equal(phone(""), "—");
 });

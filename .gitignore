@@ -24,3 +24,7 @@ Thumbs.db
 secrets
 # Google service account keys
 *-firebase-adminsdk-*.json
+
+# Claude Code: local settings and worktrees stay on each machine
+.claude/settings.local.json
+.claude/worktrees/

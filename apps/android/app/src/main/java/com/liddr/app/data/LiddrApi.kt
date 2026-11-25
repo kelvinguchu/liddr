@@ -25,8 +25,14 @@ private data class CodeCheck(@SerialName("challenge_id") val challengeId: String
 
 /** The API routes the app uses, named as the contract names them. */
 class LiddrApi(private val transport: Transport, private val session: SessionManager) {
-    suspend fun requestOtp(phone: String, role: String): Challenge = decode(
-        transport.send("POST", "/v1/auth/otp/request", json = apiJson.encodeToString(PhoneCodeRequest(phone, role))),
+    /** [appHash] makes the SMS end with this app's hash, so Android hands it to the app. */
+    suspend fun requestOtp(phone: String, role: String, appHash: String? = null): Challenge = decode(
+        transport.send(
+            "POST",
+            "/v1/auth/otp/request",
+            json = apiJson.encodeToString(PhoneCodeRequest(phone, role)),
+            headers = appHash?.let { mapOf("X-Liddr-Otp-App-Hash" to it) }.orEmpty(),
+        ),
     )
 
     suspend fun verifyOtp(challengeId: String, code: String) = signIn("/v1/auth/otp/verify", challengeId, code)
@@ -86,6 +92,11 @@ class LiddrApi(private val transport: Transport, private val session: SessionMan
         return if (RideStatus.isActive(latest.status)) getRide(latest.id) else null
     }
 
+    /** The rider's latest trips, newest first. */
+    suspend fun listRecentTrips(limit: Int = RECENT_TRIPS): List<HistoryItem> = session.withAccess { token ->
+        decode<RideHistory>(transport.send("GET", "/v1/rides/history?as=rider&limit=$limit", bearer = token)).data
+    }
+
     suspend fun listPendingRatings(): List<PendingRating> = session.withAccess { token ->
         decode<PendingRatingList>(transport.send("GET", "/v1/ratings/pending", bearer = token)).data
     }
@@ -110,3 +121,5 @@ class LiddrApi(private val transport: Transport, private val session: SessionMan
 
     private inline fun <reified T> decode(text: String): T = apiJson.decodeFromString(text)
 }
+
+private const val RECENT_TRIPS = 5

@@ -23,6 +23,7 @@ var smsCode = regexp.MustCompile(`code is: (\d{6})`)
 type smsStub struct {
 	mu   sync.Mutex
 	code string
+	text string
 }
 
 func (s *smsStub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -35,11 +36,12 @@ func (s *smsStub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	if match := smsCode.FindStringSubmatch(sent.MessageParameters[0].Text); match != nil {
-		s.mu.Lock()
+	s.mu.Lock()
+	s.text = sent.MessageParameters[0].Text
+	if match := smsCode.FindStringSubmatch(s.text); match != nil {
 		s.code = match[1]
-		s.mu.Unlock()
 	}
+	s.mu.Unlock()
 	_, _ = w.Write([]byte(`{"ErrorCode":0,"ErrorDescription":"Success"}`))
 }
 
@@ -47,6 +49,12 @@ func (s *smsStub) lastCode() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.code
+}
+
+func (s *smsStub) lastText() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.text
 }
 
 type response struct {

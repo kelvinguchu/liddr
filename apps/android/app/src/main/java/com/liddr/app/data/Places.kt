@@ -11,9 +11,11 @@ import android.os.CancellationSignal
 import java.io.IOException
 import java.util.Locale
 import kotlin.coroutines.resume
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** A place. Search results from Google Places carry an [id] and get their point when chosen. */
 data class Place(val title: String, val detail: String, val point: Coordinates?, val id: String? = null)
@@ -30,6 +32,24 @@ interface PlaceFinder {
 }
 
 class PlaceSearchUnavailable : Exception("Place search isn't available right now. Please try again.")
+
+/** The address under a place's name, without the name repeated at its start. */
+internal fun placeDetail(title: String, full: String): String =
+    if (full.equals(title, ignoreCase = true)) "" else full.removePrefixIgnoringCase("$title, ")
+
+private fun String.removePrefixIgnoringCase(prefix: String) = if (startsWith(prefix, ignoreCase = true)) substring(prefix.length) else this
+
+/**
+ * Runs a call to a place provider, turning its failures into [PlaceSearchUnavailable].
+ * Cancellation passes through: a search replaced by the next keystroke is not an outage.
+ */
+internal suspend fun <T> placeLookup(call: suspend () -> T): T = try {
+    call()
+} catch (e: CancellationException) {
+    throw e
+} catch (e: Exception) {
+    throw PlaceSearchUnavailable()
+}
 
 /** Finds places in Kenya using the search built into the phone. It needs no key, but knows fewer landmarks. */
 class GeocoderPlaceFinder(context: Context) : PlaceFinder {
@@ -62,23 +82,66 @@ class GeocoderPlaceFinder(context: Context) : PlaceFinder {
     }
 }
 
+/** Names the street at a point, using the lookup built into the phone. */
+class AddressLookup(context: Context) {
+    private val geocoder = Geocoder(context.applicationContext, Locale.Builder().setLanguage("en").setRegion("KE").build())
+
+    /** Returns the place at [point], or null when the phone has no name for it. */
+    @Suppress("DEPRECATION") // The callback version needs Android 13, and the app supports older phones.
+    suspend fun describe(point: Coordinates): Place? = withContext(Dispatchers.IO) {
+        if (!Geocoder.isPresent()) return@withContext null
+        val address = try {
+            geocoder.getFromLocation(point.lat, point.lng, 1)?.firstOrNull()
+        } catch (e: IOException) {
+            null
+        } ?: return@withContext null
+        val line = address.getAddressLine(0).orEmpty()
+        // Plus Codes such as "QVCH+MCG" mean nothing to riders, so fall back to the area.
+        val area = (address.subLocality ?: address.locality)?.takeIf(String::isNotBlank)
+        val title = address.thoroughfare?.takeIf(String::isNotBlank)
+            ?: address.featureName?.takeUnless { it.isBlank() || it.all(Char::isDigit) || '+' in it }
+            ?: area?.let { "Near $it" }
+            ?: line.split(',').map(String::trim).firstOrNull { it.isNotEmpty() && '+' !in it }
+        title?.let { Place(it, line.split(',').map(String::trim).filterNot { part -> '+' in part }.joinToString(", "), point) }
+    }
+}
+
 /** Gets the phone's position once. The app does not track riders in the background. */
 class Locator(context: Context) {
     private val app = context.applicationContext
     private val manager = app.getSystemService(LocationManager::class.java)
 
-    /** Returns the position, or null if the phone could not get one in time. */
+    /** Returns the position, or null if no provider could get one in time. */
     @SuppressLint("MissingPermission") // The screen asks for permission before calling this.
     suspend fun current(): Coordinates? {
-        val provider = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
-            .firstOrNull { manager.isProviderEnabled(it) } ?: return null
-        val fix = suspendCancellableCoroutine<Location?> { waiter ->
-            val signal = CancellationSignal()
-            waiter.invokeOnCancellation { signal.cancel() }
-            LocationManagerCompat.getCurrentLocation(manager, provider, signal, ContextCompat.getMainExecutor(app)) {
-                if (waiter.isActive) waiter.resume(it)
-            }
+        for (provider in locationProviders(manager.getProviders(true))) {
+            val fix = withTimeoutOrNull(PROVIDER_WAIT_MS) { fixFrom(provider) }
+            if (fix != null) return Coordinates(fix.latitude, fix.longitude)
         }
-        return fix?.let { Coordinates(it.latitude, it.longitude) }
+        return null
+    }
+
+    @SuppressLint("MissingPermission")
+    private suspend fun fixFrom(provider: String): Location? = suspendCancellableCoroutine { waiter ->
+        val signal = CancellationSignal()
+        waiter.invokeOnCancellation { signal.cancel() }
+        LocationManagerCompat.getCurrentLocation(manager, provider, signal, ContextCompat.getMainExecutor(app)) {
+            if (waiter.isActive) waiter.resume(it)
+        }
+    }
+
+    private companion object {
+        const val PROVIDER_WAIT_MS = 10_000L
     }
 }
+
+/**
+ * The enabled providers to ask for a position, best first. Fused and network
+ * answer from Wi-Fi and cell towers in seconds; GPS can take minutes indoors or
+ * never answer, so it comes last.
+ */
+internal fun locationProviders(enabled: Collection<String>): List<String> =
+    listOf(FUSED_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER).filter { it in enabled }
+
+// LocationManager.FUSED_PROVIDER, which the SDK only names from Android 12.
+private const val FUSED_PROVIDER = "fused"

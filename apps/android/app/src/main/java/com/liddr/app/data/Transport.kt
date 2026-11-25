@@ -48,13 +48,20 @@ class Transport(
     private val io: CoroutineDispatcher = Dispatchers.IO,
 ) {
     /** Runs away from the main thread, because reading a response body is network I/O. */
-    suspend fun send(method: String, path: String, bearer: String? = null, json: String? = null): String = withContext(io) {
+    suspend fun send(
+        method: String,
+        path: String,
+        bearer: String? = null,
+        json: String? = null,
+        headers: Map<String, String> = emptyMap(),
+    ): String = withContext(io) {
         val body = json?.toRequestBody(JSON_TYPE)
             ?: if (method == "GET") null else ByteArray(0).toRequestBody(JSON_TYPE)
         val request = Request.Builder()
             .url(baseUrl.trimEnd('/') + path)
             .method(method, body)
             .apply { bearer?.let { header("Authorization", "Bearer $it") } }
+            .apply { headers.forEach { (name, value) -> header(name, value) } }
             .build()
         val response = try {
             client.newCall(request).await()

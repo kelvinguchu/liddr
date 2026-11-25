@@ -16,12 +16,12 @@ func TestMpesaWebhookRequiresTheToken(t *testing.T) {
 		"CheckoutRequestID": "ws_unknown", "ResultCode": 0, "ResultDesc": "ok",
 	}}}
 
-	refused := send(t, http.MethodPost, baseURL+"/v1/webhooks/mpesa/wrong-token/stk", "", callback)
+	refused := send(t, http.MethodPost, baseURL+"/v1/webhooks/payments/wrong-token/stk", "", callback)
 	if refused.status != http.StatusUnauthorized {
 		t.Errorf("wrong token = %d %v, want 401", refused.status, refused.body)
 	}
 
-	accepted := send(t, http.MethodPost, baseURL+"/v1/webhooks/mpesa/"+testCallbackToken+"/stk", "", callback)
+	accepted := send(t, http.MethodPost, baseURL+"/v1/webhooks/payments/"+testCallbackToken+"/stk", "", callback)
 	if accepted.status != http.StatusOK || accepted.body["ResultDesc"] != "Accepted" {
 		t.Errorf("right token = %d %v", accepted.status, accepted.body)
 	}
@@ -29,7 +29,7 @@ func TestMpesaWebhookRequiresTheToken(t *testing.T) {
 		t.Errorf("ResultCode = %v, want the 0 Daraja expects", accepted.body["ResultCode"])
 	}
 
-	bad := send(t, http.MethodPost, baseURL+"/v1/webhooks/mpesa/"+testCallbackToken+"/stk", "", map[string]any{})
+	bad := send(t, http.MethodPost, baseURL+"/v1/webhooks/payments/"+testCallbackToken+"/stk", "", map[string]any{})
 	if bad.status != http.StatusBadRequest {
 		t.Errorf("unreadable callback = %d %v", bad.status, bad.body)
 	}

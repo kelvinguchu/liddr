@@ -43,15 +43,18 @@ func (c *clock) Advance(d time.Duration) { c.Set(c.Now().Add(d)) }
 
 // daraja stands in for Safaricom, the only third-party network here.
 type daraja struct {
-	mu          sync.Mutex
-	stkStatus   int
-	stkBody     string
-	queryStatus int
-	queryBody   string
-	lastAmount  float64
-	lastPhone   string
-	stkCalls    atomic.Int32
-	counter     atomic.Int32
+	mu              sync.Mutex
+	stkStatus       int
+	stkBody         string
+	queryStatus     int
+	queryBody       string
+	lastAmount      float64
+	lastPhone       string
+	lastCallbackURL string
+	lastDescription string
+	lastReference   string
+	stkCalls        atomic.Int32
+	counter         atomic.Int32
 }
 
 func (d *daraja) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -65,11 +68,15 @@ func (d *daraja) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(d.queryBody))
 	case strings.Contains(r.URL.Path, "stkpush"):
 		var body struct {
-			Amount float64
-			PartyA string
+			Amount           float64
+			PartyA           string
+			CallBackURL      string
+			TransactionDesc  string
+			AccountReference string
 		}
 		_ = json.NewDecoder(r.Body).Decode(&body) // Tests assert on what was parsed.
-		d.lastAmount, d.lastPhone = body.Amount, body.PartyA
+		d.lastAmount, d.lastPhone, d.lastCallbackURL = body.Amount, body.PartyA, body.CallBackURL
+		d.lastDescription, d.lastReference = body.TransactionDesc, body.AccountReference
 		d.stkCalls.Add(1)
 		w.WriteHeader(d.stkStatus)
 		reply := d.stkBody

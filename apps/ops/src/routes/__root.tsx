@@ -21,7 +21,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     meta: [{ charSet: "utf-8" }, { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" }, { name: "robots", content: "noindex" }, { title: "Liddr Ops" }],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "icon", href: "/icon.svg", type: "image/svg+xml" },
+      { rel: "icon", href: "/icon.svg?v=fleet", type: "image/svg+xml" },
     ],
   }),
   shellComponent: RootDocument,

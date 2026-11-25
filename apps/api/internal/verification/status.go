@@ -119,8 +119,10 @@ func (s *Service) ListApplications(ctx context.Context, status string, limit, of
 }
 
 // ApplicationDetail is one application and the driver's current documents.
+// Phone is the applicant's full number, so the reviewer can reach them.
 type ApplicationDetail struct {
 	QueueItem
+	Phone     string
 	Documents []ReviewDocument
 }
 
@@ -131,8 +133,9 @@ type ReviewDocument struct {
 	ScanStatus  string
 }
 
-// GetApplication loads an application for review.
-func (s *Service) GetApplication(ctx context.Context, id uuid.UUID) (ApplicationDetail, error) {
+// GetApplication loads an application for review and records who looked: it
+// carries the applicant's full number and the list of their documents.
+func (s *Service) GetApplication(ctx context.Context, id uuid.UUID, actor Actor) (ApplicationDetail, error) {
 	row, err := s.queries.GetApplication(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ApplicationDetail{}, ErrNotFound
@@ -151,10 +154,19 @@ func (s *Service) GetApplication(ctx context.Context, id uuid.UUID) (Application
 		PlateNumber:  row.PlateNumber,
 		FullName:     row.DisplayName,
 		PhoneMasked:  maskPhone(row.Phone),
+		Phone:        row.Phone,
 		Documents:    make([]ReviewDocument, len(live)),
 	}
 	for i, doc := range live {
 		out.Documents[i] = ReviewDocument{Document: documentFromLive(doc), ContentType: doc.ContentType, ScanStatus: doc.ScanStatus}
+	}
+	target := "verification_application:" + id.String()
+	err = s.queries.InsertAuditEventWithTarget(ctx, store.InsertAuditEventWithTargetParams{
+		Action: "verification.application_viewed", UserID: new(actor.UserID), RequestID: actor.RequestID,
+		Ip: actor.IP, Target: new(target), Now: s.now(),
+	})
+	if err != nil {
+		return ApplicationDetail{}, fmt.Errorf("audit application view: %w", err)
 	}
 	return out, nil
 }
@@ -162,6 +174,22 @@ func (s *Service) GetApplication(ctx context.Context, id uuid.UUID) (Application
 // DownloadURL returns a short-lived link to a document's file and records who
 // asked. Only files that passed scanning can be opened by staff.
 func (s *Service) DownloadURL(ctx context.Context, documentID uuid.UUID, actor Actor) (string, time.Time, error) {
+	return s.signedLink(ctx, documentID, actor, linkRequest{action: "verification.document_viewed"})
+}
+
+// OwnDownloadURL is DownloadURL for the driver who sent the document, so they
+// can see what they submitted. Any other driver's document reads as not found,
+// so its existence is not revealed.
+func (s *Service) OwnDownloadURL(ctx context.Context, documentID uuid.UUID, actor Actor) (string, time.Time, error) {
+	return s.signedLink(ctx, documentID, actor, linkRequest{action: "verification.own_document_viewed", ownerOnly: true})
+}
+
+type linkRequest struct {
+	action    string
+	ownerOnly bool
+}
+
+func (s *Service) signedLink(ctx context.Context, documentID uuid.UUID, actor Actor, req linkRequest) (string, time.Time, error) {
 	if s.storage == nil {
 		return "", time.Time{}, ErrUnavailable
 	}
@@ -171,6 +199,10 @@ func (s *Service) DownloadURL(ctx context.Context, documentID uuid.UUID, actor A
 	}
 	if err != nil {
 		return "", time.Time{}, fmt.Errorf("load document: %w", err)
+	}
+	// Ownership is checked before anything else, so another driver learns nothing.
+	if req.ownerOnly && doc.DriverID != actor.UserID {
+		return "", time.Time{}, ErrNotFound
 	}
 	if doc.ScanStatus != scanClean {
 		return "", time.Time{}, ErrDocumentNotReady
@@ -185,7 +217,7 @@ func (s *Service) DownloadURL(ctx context.Context, documentID uuid.UUID, actor A
 	now := s.now()
 	target := "verification_document:" + documentID.String()
 	err = s.queries.InsertAuditEventWithTarget(ctx, store.InsertAuditEventWithTargetParams{
-		Action: "verification.document_viewed", UserID: new(actor.UserID), RequestID: actor.RequestID,
+		Action: req.action, UserID: new(actor.UserID), RequestID: actor.RequestID,
 		Ip: actor.IP, Target: new(target), Now: now,
 	})
 	if err != nil {

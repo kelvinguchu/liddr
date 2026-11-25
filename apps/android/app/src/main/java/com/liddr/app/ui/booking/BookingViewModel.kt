@@ -6,6 +6,7 @@ import com.liddr.app.data.Coordinates
 import com.liddr.app.data.Delivery
 import com.liddr.app.data.DeliveryRequest
 import com.liddr.app.data.LiddrApi
+import com.liddr.app.data.AddressLookup
 import com.liddr.app.data.Locator
 import com.liddr.app.data.OfflineException
 import com.liddr.app.data.Place
@@ -19,6 +20,7 @@ import com.liddr.app.data.Ride
 import com.liddr.app.data.RideStatus
 import com.liddr.app.data.SendApi
 import com.liddr.app.data.VehicleCategory
+import com.liddr.app.ui.kit.Notices
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,7 +40,6 @@ data class BookingUiState(
     val pickup: Place? = null,
     val dropoff: Place? = null,
     val locating: Boolean = false,
-    val locationError: String? = null,
     val target: SearchTarget = SearchTarget.DROPOFF,
     val query: String = "",
     val searching: Boolean = false,
@@ -57,6 +58,10 @@ data class BookingUiState(
     val needsAcknowledgement: Boolean = false,
     val sharedQuote: Quote? = null,
     val sharing: Boolean = false,
+    /** The type tapped on home, chosen first when the fares arrive. */
+    val preferred: String? = null,
+    /** The booked quote's road route, drawn on the map for the whole trip. */
+    val tripRoute: String? = null,
 )
 
 class BookingViewModel(
@@ -64,7 +69,9 @@ class BookingViewModel(
     private val send: SendApi,
     private val places: PlaceFinder,
     private val locator: Locator,
+    private val addresses: AddressLookup,
     private val realtime: Realtime,
+    private val notices: Notices,
 ) : ViewModel() {
     private val _ui = MutableStateFlow(BookingUiState())
     val ui: StateFlow<BookingUiState> = _ui.asStateFlow()
@@ -91,17 +98,24 @@ class BookingViewModel(
 
     fun useCurrentLocation() {
         if (_ui.value.locating) return
-        _ui.update { it.copy(locating = true, locationError = null) }
+        _ui.update { it.copy(locating = true) }
         viewModelScope.launch {
             val point = runCatching { locator.current() }.getOrNull()
-            _ui.update {
-                if (point != null) {
-                    it.copy(locating = false, pickup = Place(CURRENT_LOCATION, "", point))
-                } else {
-                    it.copy(locating = false, locationError = "We couldn't find your location. Check that location is on, or enter your pickup.")
-                }
-            }
+            _ui.update { if (point != null) it.copy(locating = false, pickup = Place(CURRENT_LOCATION, "", point)) else it.copy(locating = false) }
+            if (point == null) notices.show("We couldn't find your location. Check that location is on, or set your pickup.", "Try again", ::useCurrentLocation)
+            // Name the spot once the phone can, without holding up the pickup.
+            val named = point?.let { addresses.describe(it) } ?: return@launch
+            _ui.update { if (it.pickup?.point == point) it.copy(pickup = named) else it }
         }
+    }
+
+    /** The vehicle type picked on home, chosen first when the fares arrive. Tapping it again clears it. */
+    fun prefer(slug: String) = _ui.update { it.copy(preferred = slug.takeIf { s -> s != it.preferred }) }
+
+    /** Books a past trip's destination again, from wherever the rider is now. */
+    fun rebook(destination: Place, category: String) {
+        _ui.update { it.copy(dropoff = destination, preferred = category) }
+        if (_ui.value.pickup?.point != null) loadOptions() else openSearch(SearchTarget.PICKUP)
     }
 
     fun openSearch(target: SearchTarget) {
@@ -132,12 +146,15 @@ class BookingViewModel(
             _ui.update { it.copy(searching = true) }
             try {
                 val found = places.search(query.trim())
-                _ui.update { it.copy(results = found, searching = false) }
+                _ui.update { it.copy(results = found, searching = false, searchError = null) }
             } catch (e: PlaceSearchUnavailable) {
                 _ui.update { it.copy(searchError = e.message, searching = false) }
             }
         }
     }
+
+    /** Runs the last search again after it failed. */
+    fun retrySearch() = onQueryChanged(_ui.value.query)
 
     fun choosePlace(chosen: Place) {
         searchJob?.cancel()
@@ -156,7 +173,7 @@ class BookingViewModel(
         _ui.update { it.copy(searching = false) }
         val target = _ui.value.target
         _ui.update {
-            if (target == SearchTarget.PICKUP) it.copy(pickup = place, stage = Stage.HOME, locationError = null) else it.copy(dropoff = place, stage = Stage.HOME)
+            if (target == SearchTarget.PICKUP) it.copy(pickup = place, stage = Stage.HOME) else it.copy(dropoff = place, stage = Stage.HOME)
         }
         val state = _ui.value
         if (state.pickup != null && state.dropoff != null) loadOptions()
@@ -170,7 +187,8 @@ class BookingViewModel(
         viewModelScope.launch {
             try {
                 val options = fetchOptions(pickup, dropoff)
-                _ui.update { it.copy(options = options, selected = options.firstOrNull()?.category?.slug) }
+                val preferred = options.firstOrNull { it.category.slug == _ui.value.preferred } ?: options.firstOrNull()
+                _ui.update { it.copy(options = options, selected = preferred?.category?.slug) }
             } catch (e: ProblemException) {
                 _ui.update { it.copy(error = e.message) }
             } catch (e: OfflineException) {
@@ -207,6 +225,7 @@ class BookingViewModel(
             _ui.update { it.copy(stage = Stage.SEND_DETAILS, error = null) }
             return
         }
+        _ui.update { it.copy(tripRoute = quote.polyline) }
         act {
             try {
                 showRide(api.bookRide(quote.id))
@@ -224,7 +243,7 @@ class BookingViewModel(
     fun sendPackage(details: DeliveryRequest) {
         val state = _ui.value
         val quote = state.options.firstOrNull { it.category.slug == SEND_CATEGORY }?.quote ?: return
-        act {
+        act(inline = true) {
             try {
                 showRide(send.book(details.copy(quoteId = quote.id, liabilityAcknowledged = state.needsAcknowledgement && details.liabilityAcknowledged)))
             } catch (e: ProblemException) {
@@ -243,7 +262,7 @@ class BookingViewModel(
     /** Leaves a finished trip. The places stay, so booking again is quick. */
     fun finishTrip() {
         pollJob?.cancel()
-        _ui.update { it.copy(stage = Stage.HOME, ride = null, driverPhoto = null, options = emptyList(), dropoff = null, error = null, delivery = null, needsAcknowledgement = false) }
+        _ui.update { it.copy(stage = Stage.HOME, ride = null, driverPhoto = null, options = emptyList(), dropoff = null, error = null, delivery = null, needsAcknowledgement = false, preferred = null, tripRoute = null) }
     }
 
     fun submitRating(score: Int, tags: List<String>, comment: String) {
@@ -346,19 +365,28 @@ class BookingViewModel(
         }
     }
 
-    private fun act(block: suspend () -> Unit) {
+    /**
+     * Runs an action the rider started. A failure goes to the message bar, or
+     * under the form when [inline], because the sender has fields to fix.
+     */
+    private fun act(inline: Boolean = false, block: suspend () -> Unit) {
         _ui.update { it.copy(busy = true, error = null) }
         viewModelScope.launch {
             try {
                 block()
             } catch (e: ProblemException) {
-                _ui.update { it.copy(error = e.message) }
+                failed(e.message, inline)
             } catch (e: OfflineException) {
-                _ui.update { it.copy(error = e.message) }
+                failed(e.message, inline)
             } finally {
                 _ui.update { it.copy(busy = false) }
             }
         }
+    }
+
+    private fun failed(message: String?, inline: Boolean) {
+        val text = message ?: "Something went wrong. Please try again."
+        if (inline) _ui.update { it.copy(error = text) } else notices.show(text)
     }
 
     private companion object {

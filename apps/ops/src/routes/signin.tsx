@@ -53,9 +53,9 @@ function SignIn() {
 
   return (
     <div className="flex min-h-dvh bg-background">
-      <div className="relative hidden w-[45%] items-center justify-center bg-[linear-gradient(140deg,#0b2545,#13315c_70%,#0e3b58)] text-white lg:flex">
+      <div className="relative hidden w-[45%] items-center justify-center bg-[#242e3f] text-white lg:flex">
         <div className="flex flex-col items-center gap-4">
-          <img src="/logo-for-dark-mode.svg" alt="liddr" width={148} height={64} className="h-14 w-auto" />
+          <img src="/logo-for-dark-mode.svg?v=fleet" alt="liddr" width={148} height={64} className="h-14 w-auto" />
           <p className="text-cell text-white/70">Operations console</p>
         </div>
         <p className="absolute bottom-6 text-meta text-white/55">For Liddr staff only. Every action is recorded.</p>
@@ -63,14 +63,13 @@ function SignIn() {
       <div className="flex min-w-0 flex-1 overflow-y-auto">
         <div className="m-auto flex w-full max-w-sm flex-col gap-6 px-4 py-10">
           <div className="flex justify-center lg:hidden">
-            <img src="/logo-for-light-mode.svg" alt="liddr" width={74} height={32} className="h-9 w-auto dark:hidden" />
-            <img src="/logo-for-dark-mode.svg" alt="liddr" width={74} height={32} className="hidden h-9 w-auto dark:block" />
+            <img src="/logo-for-light-mode.svg?v=fleet" alt="liddr" width={74} height={32} className="h-9 w-auto dark:hidden" />
+            <img src="/logo-for-dark-mode.svg?v=fleet" alt="liddr" width={74} height={32} className="hidden h-9 w-auto dark:block" />
           </div>
           {!challenge ? (
             <form className="flex flex-col gap-5" onSubmit={(e) => run(e, async () => setChallenge(await requestCode(phone.trim())))}>
               <div className="flex flex-col gap-1">
                 <h1 className="text-[1.5rem] leading-8 font-semibold tracking-tight">Sign in</h1>
-                <p className="text-cell text-muted-foreground">Use the phone number your admin gave staff access to.</p>
               </div>
               <label className="flex flex-col gap-1.5">
                 <span className="text-cell font-medium">Phone number</span>

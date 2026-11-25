@@ -58,3 +58,16 @@ export function initials(name: string): string {
   if (parts.length === 0) return "ST";
   return (parts.length === 1 ? parts[0].slice(0, 2) : parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
+
+/** A stored Kenyan number (2547…) as people read it: +254 712 345 678. */
+export function phone(value: string | null | undefined): string {
+  if (!value) return "—";
+  const digits = value.replace(/^\+/, "");
+  const kenyan = /^254(\d{3})(\d{3})(\d{3})$/.exec(digits);
+  return kenyan ? `+254 ${kenyan[1]} ${kenyan[2]} ${kenyan[3]}` : value;
+}
+
+/** A stored number in the form tel: and sms: links need. */
+export function dialable(value: string): string {
+  return /^254\d{9}$/.test(value) ? `+${value}` : value;
+}

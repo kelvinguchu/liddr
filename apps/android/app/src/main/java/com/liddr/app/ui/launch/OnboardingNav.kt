@@ -23,22 +23,23 @@ fun OnboardingNav(viewModel: AuthViewModel) {
         var role by rememberSaveable { mutableStateOf<AccountRoleUi?>(null) }
         var methodKey by rememberSaveable { mutableStateOf<String?>(null) }
 
+        // Sign-in starts with the phone number; riders may switch to email.
         val step =
                 when {
                         role == null -> 0
-                        methodKey == null -> 1
-                        state.challengeId == null -> 2
-                        else -> 3
+                        state.challengeId == null -> 1
+                        else -> 2
                 }
-        val method = allOnboardingMethods.firstOrNull { it.method == methodKey }
+        val method = allOnboardingMethods.firstOrNull { it.method == methodKey } ?: allOnboardingMethods.first()
+        val email = allOnboardingMethods.firstOrNull { it.method == "email_otp" }
         val back: () -> Unit = {
                 when (step) {
-                        3 -> viewModel.editDestination()
-                        2 -> {
+                        2 -> viewModel.editDestination()
+                        else -> {
                                 viewModel.clearError()
                                 methodKey = null
+                                role = null
                         }
-                        else -> role = null
                 }
         }
         BackHandler(enabled = step > 0, onBack = back)
@@ -97,27 +98,25 @@ fun OnboardingNav(viewModel: AuthViewModel) {
         ) { s ->
                 when (s) {
                         0 -> FirstScreen(onRoleSelected = { role = it })
-                        1 ->
-                                AuthGatewayScreen(
-                                        role = role ?: AccountRoleUi.RIDER,
-                                        onBack = back,
-                                        onMethodSelected = { methodKey = it.method }
-                                )
-                        2 ->
+                        1 -> {
+                                val chosen = role ?: AccountRoleUi.RIDER
+                                val canSwitch = email != null && chosen in email.allowedRoles
                                 AuthMethodEntryScreen(
-                                        role = role ?: AccountRoleUi.RIDER,
-                                        method = method ?: allOnboardingMethods.first(),
+                                        role = chosen,
+                                        method = method,
                                         state = state,
                                         onBack = back,
                                         onValueEdited = viewModel::clearError,
-                                        onContinue = { entered ->
-                                                viewModel.sendCode(
-                                                        role ?: AccountRoleUi.RIDER,
-                                                        method ?: allOnboardingMethods.first(),
-                                                        entered
-                                                )
-                                        }
+                                        onContinue = { entered -> viewModel.sendCode(chosen, method, entered) },
+                                        onSwitchMethod =
+                                                if (canSwitch) {
+                                                        {
+                                                                viewModel.clearError()
+                                                                methodKey = if (method.method == "phone_otp") "email_otp" else "phone_otp"
+                                                        }
+                                                } else null,
                                 )
+                        }
                         else ->
                                 CodeEntryScreen(
                                         state = state,

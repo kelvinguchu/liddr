@@ -15,11 +15,14 @@ import (
 )
 
 const (
-	workerInterval   = 30 * time.Second
-	reconcileAfter   = 90 * time.Second
-	recheckAfter     = time.Minute
-	reconcileBatch   = 50
-	givenUpAfter     = 30 * time.Minute
+	workerInterval = 30 * time.Second
+	reconcileAfter = 90 * time.Second
+	recheckAfter   = time.Minute
+	reconcileBatch = 50
+	// A prompt expires on the phone within about a minute, so a payment M-Pesa
+	// still calls "processing" after three is given up and the driver can try
+	// again. A success that arrives later still counts.
+	givenUpAfter     = 3 * time.Minute
 	unknownOutcomeBy = 5 * time.Minute
 	graceAfterWeek   = 6 * time.Hour
 )

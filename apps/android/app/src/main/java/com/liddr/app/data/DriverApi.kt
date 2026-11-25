@@ -16,7 +16,15 @@ data class DriverProfile(
 data class VerificationDocument(
     val status: String,
     @SerialName("rejection_reason") val rejectionReason: String? = null,
+    val id: String? = null,
+    val version: Int? = null,
+    @SerialName("expires_on") val expiresOn: String? = null,
+    @SerialName("created_at") val createdAt: String? = null,
 )
+
+/** A short-lived link to one of the driver's own files. */
+@Serializable
+data class SignedDownload(val url: String)
 
 @Serializable
 data class Requirement(
@@ -121,6 +129,12 @@ class DriverApi(private val transport: Transport, private val session: SessionMa
         val ticket: UploadTicket = call("POST", "/v1/verification/uploads", apiJson.encodeToString(PrepareUpload(type, contentType, bytes.size.toLong())))
         transport.upload(ticket.uploadUrl, ticket.headers, contentType, bytes)
         send("POST", "/v1/verification/documents", apiJson.encodeToString(SubmitDocument(ticket.uploadId, expiresOn)))
+    }
+
+    /** The file the driver sent, fetched through a five-minute link the API audits. */
+    suspend fun openOwnDocument(id: String): ByteArray {
+        val link: SignedDownload = call("POST", "/v1/verification/documents/$id/download", null)
+        return transport.download(link.url)
     }
 
     suspend fun getSubscription(): Subscription = get("/v1/subscriptions/me")

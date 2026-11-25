@@ -547,7 +547,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/webhooks/mpesa/{token}/stk": {
+    "/v1/webhooks/payments/{token}/stk": {
         parameters: {
             query?: never;
             header?: never;
@@ -567,7 +567,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/webhooks/mpesa/{token}/c2b/validation": {
+    "/v1/webhooks/payments/{token}/c2b/validation": {
         parameters: {
             query?: never;
             header?: never;
@@ -587,7 +587,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/webhooks/mpesa/{token}/c2b/confirmation": {
+    "/v1/webhooks/payments/{token}/c2b/confirmation": {
         parameters: {
             query?: never;
             header?: never;
@@ -786,6 +786,26 @@ export interface paths {
         put?: never;
         /** Submit an uploaded file for checking */
         post: operations["submitVerificationDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/verification/documents/{document_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get a five-minute link to one of the driver's own files
+         * @description For showing a driver what they sent. Only the driver who sent the document can open it, and only once its safety scan has passed; any other document reads as not found. A POST because every request is written to the audit trail.
+         */
+        post: operations["downloadOwnVerificationDocument"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2550,6 +2570,8 @@ export interface components {
         };
         VerificationApplicationDetail: {
             summary: components["schemas"]["VerificationQueueItem"];
+            /** @description The applicant's full number, so the reviewer can call or text them. Every load of this detail is written to the audit trail, like opening a document. */
+            phone: string;
             documents: components["schemas"]["ReviewableDocument"][];
         };
         ReviewRequest: {
@@ -2952,9 +2974,12 @@ export interface components {
         DestinationChangeList: {
             data: components["schemas"]["DestinationChange"][];
         };
+        /** @description One trip. A rider's own history includes where each trip started and ended, so the app can book it again; a driver's history never does. */
         RideHistoryItem: {
             /** Format: uuid */
             id: string;
+            pickup?: components["schemas"]["Coordinates"];
+            dropoff?: components["schemas"]["Coordinates"];
             status: string;
             category: string;
             /** Format: int32 */
@@ -3135,6 +3160,8 @@ export interface components {
         };
     };
     parameters: {
+        /** @description The Android app's 11-character SMS Retriever hash. When it is valid, the code's SMS ends with it so the app can read the code itself; otherwise the SMS ends with the line browsers read. A malformed value is ignored. */
+        OtpAppHash: string;
         /** @description Sent by the staff console on every request. Pages on other sites cannot send it without the API's permission, which it never gives. */
         ConsoleHeader: "1";
         ReportId: string;
@@ -3238,7 +3265,10 @@ export interface operations {
     requestOtp: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description The Android app's 11-character SMS Retriever hash. When it is valid, the code's SMS ends with it so the app can read the code itself; otherwise the SMS ends with the line browsers read. A malformed value is ignored. */
+                "X-Liddr-Otp-App-Hash"?: components["parameters"]["OtpAppHash"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -4388,6 +4418,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VerificationDocument"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    downloadOwnVerificationDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: components["parameters"]["DocumentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A signed link. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignedDownload"];
                 };
             };
             default: components["responses"]["Problem"];

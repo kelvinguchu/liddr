@@ -3,35 +3,35 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Plus Jakarta Sans, Liddr's typeface, self-hosted: the page's policy allows
+/* Figtree, Liddr's typeface, self-hosted: the page's policy allows
    font-src 'self' only. OFL licence in src/fonts/OFL.txt. */
 @font-face {
-  font-family: "Plus Jakarta Sans";
-  src: url("./fonts/plus_jakarta_sans_regular.ttf") format("truetype");
+  font-family: "Figtree";
+  src: url("./fonts/figtree_regular.ttf") format("truetype");
   font-weight: 400;
   font-display: swap;
 }
 @font-face {
-  font-family: "Plus Jakarta Sans";
-  src: url("./fonts/plus_jakarta_sans_semibold.ttf") format("truetype");
+  font-family: "Figtree";
+  src: url("./fonts/figtree_semibold.ttf") format("truetype");
   font-weight: 500 600;
   font-display: swap;
 }
 @font-face {
-  font-family: "Plus Jakarta Sans";
-  src: url("./fonts/plus_jakarta_sans_bold.ttf") format("truetype");
+  font-family: "Figtree";
+  src: url("./fonts/figtree_bold.ttf") format("truetype");
   font-weight: 700;
   font-display: swap;
 }
 @font-face {
-  font-family: "Plus Jakarta Sans";
-  src: url("./fonts/plus_jakarta_sans_extrabold.ttf") format("truetype");
+  font-family: "Figtree";
+  src: url("./fonts/figtree_extrabold.ttf") format("truetype");
   font-weight: 800;
   font-display: swap;
 }
 
 @theme inline {
-  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 
   /* The type scale. Every size in the app is one of these. */
@@ -94,69 +94,72 @@
 
 :root {
   --radius: 0.5rem;
-  /* Liddr's Clear palette. Navy carries actions, teal marks where you are and
-     what needs you, status colours mark state. Text tokens meet WCAG AA on
-     background, card and muted in both themes. */
+  /* Liddr's Fleet palette, the same as the Android app and the vehicles'
+     livery: navy for text and actions, warm pearl surfaces, and teal only as
+     a mark (focus, where you are, approved). Status colours carry state.
+     Text tokens meet WCAG AA on background, card and muted in both themes. */
   --background: #ffffff;
-  --foreground: #0b2545;
+  --foreground: #242e3f;
   --card: #ffffff;
-  --card-foreground: #0b2545;
+  --card-foreground: #242e3f;
   --popover: #ffffff;
-  --popover-foreground: #0b2545;
-  --primary: #0b2545;
+  --popover-foreground: #242e3f;
+  --primary: #242e3f;
   --primary-foreground: #ffffff;
-  --secondary: #f1f4f8;
-  --secondary-foreground: #0b2545;
-  --muted: #f1f4f8;
-  --muted-foreground: #56677d;
-  --faint: #6b7a8d;
-  --accent: #e9eef5;
-  --accent-foreground: #0b2545;
-  --destructive: #c2362f;
-  --border: #e2e7ee;
-  --border-strong: #c3ccd8;
-  --input: #d5dde7;
-  --ring: #12b5a6;
+  --secondary: #f5f3f1;
+  --secondary-foreground: #242e3f;
+  --muted: #f5f3f1;
+  --muted-foreground: #5b6472;
+  --faint: #6d7480;
+  --accent: #ece8e4;
+  --accent-foreground: #242e3f;
+  --destructive: #b73a3a;
+  --border: #e0dbd6;
+  --border-strong: #cdc6bf;
+  --input: #d8d2cc;
+  --ring: #069d95;
   /* The frame around the working panel: sidebar and top bar. */
-  --chrome: #f1f5f9;
-  /* Teal fill with navy text (6:1), and teal for text on white (4.9:1). */
-  --brand: #12b5a6;
-  --brand-foreground: #0b2545;
-  --brand-ink: #087f74;
-  --ok: #0b7356;
-  --warn: #8f5500;
-  --crit: #b42318;
+  --chrome: #f5f3f1;
+  /* The livery teal: a mark, rarely a fill. Ink is teal dark enough for text on white (5.3:1). */
+  --brand: #069d95;
+  --brand-foreground: #ffffff;
+  --brand-ink: #067a73;
+  --ok: #067a73;
+  --warn: #855a0c;
+  --crit: #a32d2d;
   --info: #1f4fb8;
 }
 
 .dark {
-  --background: #0b1628;
-  --foreground: #e8eef6;
-  --card: #0e1b30;
-  --card-foreground: #e8eef6;
-  --popover: #0e1b30;
-  --popover-foreground: #e8eef6;
-  --primary: #12b5a6;
-  --primary-foreground: #04201d;
-  --secondary: #13223a;
-  --secondary-foreground: #e8eef6;
-  --muted: #13223a;
-  --muted-foreground: #95a5ba;
-  --faint: #8395ac;
-  --accent: #172a46;
-  --accent-foreground: #e8eef6;
-  --destructive: #f07068;
-  --border: #1d2e48;
-  --border-strong: #2f4566;
-  --input: #263a58;
-  --ring: #12b5a6;
-  --chrome: #060f1d;
-  --brand: #12b5a6;
-  --brand-foreground: #04201d;
-  --brand-ink: #5fd6ca;
-  --ok: #6eddb7;
-  --warn: #f2c063;
-  --crit: #f79a93;
+  /* Night: a calm charcoal with a hint of navy, as in the app. Actions turn
+     pearl so they are the brightest thing on screen. */
+  --background: #0f141a;
+  --foreground: #eef2f6;
+  --card: #161c24;
+  --card-foreground: #eef2f6;
+  --popover: #161c24;
+  --popover-foreground: #eef2f6;
+  --primary: #eef2f6;
+  --primary-foreground: #242e3f;
+  --secondary: #1f2732;
+  --secondary-foreground: #eef2f6;
+  --muted: #1f2732;
+  --muted-foreground: #a9b4c2;
+  --faint: #8e99a8;
+  --accent: #29323f;
+  --accent-foreground: #eef2f6;
+  --destructive: #ff7a7a;
+  --border: #29323f;
+  --border-strong: #3a4555;
+  --input: #3a4555;
+  --ring: #2ec4b9;
+  --chrome: #0b0f14;
+  --brand: #2ec4b9;
+  --brand-foreground: #0f141a;
+  --brand-ink: #2ec4b9;
+  --ok: #5fd6cd;
+  --warn: #f2b544;
+  --crit: #ff7a7a;
   --info: #93b4f2;
 }
 

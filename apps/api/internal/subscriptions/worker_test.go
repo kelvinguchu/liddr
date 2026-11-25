@@ -1,6 +1,7 @@
 package subscriptions_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -81,6 +82,23 @@ func TestGivingUpStillAllowsALateSuccess(t *testing.T) {
 	if got := h.driverStatus(t, driver); got != "active" {
 		t.Errorf("driver = %q", got)
 	}
+}
+
+// A prompt dies on the phone within about a minute. If M-Pesa still says
+// "processing" well after that, the driver must be able to try again rather
+// than wait half an hour for the stuck prompt to be given up.
+func TestAStuckPromptIsReleasedForARetry(t *testing.T) {
+	h := newHarness(t)
+	driver, _ := h.newDriver(t, "approved")
+	payment := h.pay(t, driver)
+	h.daraja.setQuery(500, `{"errorCode":"500.001.1001"}`)
+
+	h.clock.Advance(3 * time.Minute)
+	h.reconcile(t)
+	if got := h.paymentStatus(t, payment.ID); got != "timeout" {
+		t.Fatalf("payment = %q after 3 minutes of processing, want timeout", got)
+	}
+	h.pay(t, driver)
 }
 
 func TestUnknownOutcomeIsReleasedEventually(t *testing.T) {
@@ -187,5 +205,44 @@ func TestPayingDuringGraceRestoresActive(t *testing.T) {
 	h.expire(t)
 	if got := h.driverStatus(t, driver); got != "active" {
 		t.Errorf("status = %q", got)
+	}
+}
+
+// Safaricom drops callbacks to addresses that name M-Pesa or Safaricom, or
+// look like commands, so none of the addresses Liddr hands it may.
+func TestCallbackAddressesAvoidWordsDarajaRefuses(t *testing.T) {
+	h := newHarness(t)
+	driver, _ := h.newDriver(t, "approved")
+	h.pay(t, driver)
+	h.daraja.mu.Lock()
+	stk := h.daraja.lastCallbackURL
+	h.daraja.mu.Unlock()
+	validation, confirmation := h.svc.C2BURLs()
+	for _, address := range []string{stk, validation, confirmation} {
+		if address == "" {
+			t.Fatal("no callback address was sent")
+		}
+		for _, word := range []string{"mpesa", "m-pesa", "safaricom", "exe", "cmd", "sql", "query"} {
+			if strings.Contains(strings.ToLower(address), word) {
+				t.Errorf("%s contains %q", address, word)
+			}
+		}
+	}
+}
+
+// Daraja allows at most 13 characters of description and 12 of account
+// reference on a prompt.
+func TestPromptFitsDarajaFieldLimits(t *testing.T) {
+	h := newHarness(t)
+	driver, _ := h.newDriver(t, "approved")
+	h.pay(t, driver)
+	h.daraja.mu.Lock()
+	description, reference := h.daraja.lastDescription, h.daraja.lastReference
+	h.daraja.mu.Unlock()
+	if n := len(description); n == 0 || n > 13 {
+		t.Errorf("TransactionDesc %q is %d characters, want 1 to 13", description, n)
+	}
+	if n := len(reference); n == 0 || n > 12 {
+		t.Errorf("AccountReference %q is %d characters, want 1 to 12", reference, n)
 	}
 }

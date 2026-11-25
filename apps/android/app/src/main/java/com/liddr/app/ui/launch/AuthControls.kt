@@ -1,5 +1,8 @@
 package com.liddr.app.ui.launch
 
+import com.liddr.app.ui.kit.PrimaryButton
+import com.liddr.app.ui.kit.Size
+import com.liddr.app.ui.kit.Space
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -25,27 +28,19 @@ fun AuthError(message: String?) {
         message,
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.error,
-        modifier = Modifier.padding(top = 10.dp).semantics { liveRegion = LiveRegionMode.Polite },
+        modifier = Modifier.padding(top = Space.sm).semantics { liveRegion = LiveRegionMode.Polite },
     )
 }
 
 @Composable
 fun AuthProgress(modifier: Modifier = Modifier) {
-    CircularProgressIndicator(modifier.size(24.dp), strokeWidth = 2.5.dp)
+    CircularProgressIndicator(modifier.size(Size.icon), strokeWidth = SpinnerStroke, color = MaterialTheme.colorScheme.secondary)
 }
 
 @Composable
 fun AuthPrimaryButton(label: String, enabled: Boolean, busy: Boolean, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = Modifier.fillMaxWidth().height(56.dp),
-        shape = RoundedCornerShape(16.dp),
-    ) {
-        if (busy) {
-            CircularProgressIndicator(Modifier.size(22.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.5.dp)
-        } else {
-            Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        }
-    }
+    // Kept for screens not yet rebuilt on the kit; it is the kit's button.
+    PrimaryButton(label, onClick = onClick, enabled = enabled, busy = busy)
 }
+
+private val SpinnerStroke = 2.5.dp

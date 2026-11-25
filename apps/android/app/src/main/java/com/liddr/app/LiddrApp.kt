@@ -7,7 +7,11 @@ import java.util.concurrent.atomic.AtomicInteger
 import com.liddr.app.data.DriverApi
 import com.liddr.app.data.KeystoreTokenStore
 import com.liddr.app.data.LiddrApi
+import com.liddr.app.data.AddressLookup
 import com.liddr.app.data.Locator
+import com.liddr.app.ui.theme.ThemeSetting
+import com.liddr.app.ui.kit.Notices
+import com.liddr.app.data.SmsCodeReader
 import com.liddr.app.data.GeocoderPlaceFinder
 import com.liddr.app.data.GooglePlaceFinder
 import com.liddr.app.data.PlaceFinder
@@ -49,6 +53,10 @@ class LiddrApp : Application() {
     val send: SendApi by lazy { SendApi(transport, session) }
     val drivers: DriverApi by lazy { DriverApi(transport, session) }
     val locator: Locator by lazy { Locator(this) }
+    val addresses: AddressLookup by lazy { AddressLookup(this) }
+    val theme: ThemeSetting by lazy { ThemeSetting(this) }
+    val notices = Notices()
+    val smsCodes: SmsCodeReader by lazy { SmsCodeReader(this) }
     val places: PlaceFinder by lazy {
         if (BuildConfig.MAPS_API_KEY.isBlank()) GeocoderPlaceFinder(this) else GooglePlaceFinder(this, BuildConfig.MAPS_API_KEY)
     }

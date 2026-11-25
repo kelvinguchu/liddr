@@ -58,7 +58,7 @@ function PaymentsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Payments" description="Driver subscriptions and M-Pesa payments. A recheck asks M-Pesa directly and can activate a driver who paid." />
+      <PageHeader title="Payments" />
       <form onSubmit={submit} className="flex flex-col gap-2.5 md:flex-row md:items-center md:gap-3">
         <div className="md:w-64">
           <NativeSelect name="kind" value={kind} onChange={(v) => setKind(v as Kind)} options={KINDS} />

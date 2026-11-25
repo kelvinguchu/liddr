@@ -43,7 +43,7 @@ function DocumentsPage() {
 
   return (
     <div className="flex flex-col gap-4 pb-28 md:pb-0">
-      <PageHeader title="Driver documents" description="Check every document against the driver, then decide on the application." refreshing={list.isRefetching} onRefresh={() => list.refetch()} />
+      <PageHeader title="Driver documents" refreshing={list.isRefetching} onRefresh={() => list.refetch()} />
       <Filters filters={[{ key: "status", label: "Status", options: STATUSES, value: status, fallback: "under_review" }]} onApply={(v) => navigate({ search: { status: oneOf(v.status, STATUSES, "under_review") } })} />
       <RecordList<Item>
         query={list}

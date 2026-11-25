@@ -82,7 +82,8 @@ func (s *Service) Pay(ctx context.Context, driverID uuid.UUID) (Payment, error) 
 		Phone:            phone,
 		CallbackURL:      s.callbackURL("/stk"),
 		AccountReference: reference,
-		Description:      "Liddr subscription",
+		// Daraja allows 13 characters here.
+		Description: "Liddr weekly",
 	})
 	// The prompt may be on the driver's phone by now, so these writes must not
 	// be abandoned just because the driver's connection dropped.

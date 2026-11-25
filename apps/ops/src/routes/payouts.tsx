@@ -69,7 +69,7 @@ function PayoutsPage() {
 
   return (
     <div className="flex flex-col gap-4 pb-28 md:pb-0">
-      <PageHeader title="Payouts" description="Send the money first, then record how it was paid and the reference." refreshing={list.isRefetching} onRefresh={() => list.refetch()} />
+      <PageHeader title="Payouts" refreshing={list.isRefetching} onRefresh={() => list.refetch()} />
       <Filters filters={[{ key: "status", label: "Status", options: STATUSES, value: status, fallback: "approved" }]} onApply={(v) => navigate({ search: { status: oneOf(v.status, STATUSES, "approved") } })} />
       <RecordList<Payout>
         query={list}

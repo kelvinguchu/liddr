@@ -45,10 +45,15 @@ func isAccountBlocked(err error) bool {
 
 // RequestOtp sends a sign-in code.
 func (a *API) RequestOtp(ctx context.Context, req RequestOtpRequestObject) (RequestOtpResponseObject, error) {
+	var appHash string
+	if req.Params.XLiddrOtpAppHash != nil {
+		appHash = *req.Params.XLiddrOtpAppHash
+	}
 	challenge, err := a.deps.Auth.RequestOTP(ctx, auth.OTPRequest{
-		Phone: req.Body.Phone,
-		Role:  auth.Role(req.Body.Role),
-		Meta:  requestMeta(ctx),
+		Phone:   req.Body.Phone,
+		Role:    auth.Role(req.Body.Role),
+		AppHash: appHash,
+		Meta:    requestMeta(ctx),
 	})
 	if limited, ok := errors.AsType[*auth.RateLimitError](err); ok {
 		return RequestOtp429JSONResponse{

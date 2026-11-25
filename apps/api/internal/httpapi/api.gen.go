@@ -1725,14 +1725,16 @@ type RideHistory struct {
 	Data []RideHistoryItem `json:"data"`
 }
 
-// RideHistoryItem defines model for RideHistoryItem.
+// RideHistoryItem One trip. A rider's own history includes where each trip started and ended, so the app can book it again; a driver's history never does.
 type RideHistoryItem struct {
 	CancelledAt *time.Time         `json:"cancelled_at,omitempty"`
 	Category    string             `json:"category"`
 	CompletedAt *time.Time         `json:"completed_at,omitempty"`
+	Dropoff     *Coordinates       `json:"dropoff,omitempty"`
 	FareKes     int32              `json:"fare_kes"`
 	Id          openapi_types.UUID `json:"id"`
 	PaymentMode *string            `json:"payment_mode,omitempty"`
+	Pickup      *Coordinates       `json:"pickup,omitempty"`
 	RequestedAt time.Time          `json:"requested_at"`
 	Status      string             `json:"status"`
 }
@@ -1957,8 +1959,11 @@ type VerificationApplication struct {
 
 // VerificationApplicationDetail defines model for VerificationApplicationDetail.
 type VerificationApplicationDetail struct {
-	Documents []ReviewableDocument  `json:"documents"`
-	Summary   VerificationQueueItem `json:"summary"`
+	Documents []ReviewableDocument `json:"documents"`
+
+	// Phone The applicant's full number, so the reviewer can call or text them. Every load of this detail is written to the audit trail, like opening a document.
+	Phone   string                `json:"phone"`
+	Summary VerificationQueueItem `json:"summary"`
 }
 
 // VerificationDocument defines model for VerificationDocument.
@@ -2043,6 +2048,9 @@ type OfferId = openapi_types.UUID
 // Offset defines model for Offset.
 type Offset = int32
 
+// OtpAppHash defines model for OtpAppHash.
+type OtpAppHash = string
+
 // RatingId defines model for RatingId.
 type RatingId = openapi_types.UUID
 
@@ -2067,6 +2075,12 @@ type consoleSessionContextKey string
 // BeginTotpSetupParams defines parameters for BeginTotpSetup.
 type BeginTotpSetupParams struct {
 	XStepUpToken *StepUpToken `json:"X-Step-Up-Token,omitempty"`
+}
+
+// RequestOtpParams defines parameters for RequestOtp.
+type RequestOtpParams struct {
+	// XLiddrOtpAppHash The Android app's 11-character SMS Retriever hash. When it is valid, the code's SMS ends with it so the app can read the code itself; otherwise the SMS ends with the line browsers read. A malformed value is ignored.
+	XLiddrOtpAppHash *OtpAppHash `json:"X-Liddr-Otp-App-Hash,omitempty"`
 }
 
 // ListMyDisputesParams defines parameters for ListMyDisputes.
@@ -2330,7 +2344,7 @@ type ServerInterface interface {
 	BeginTotpSetup(w http.ResponseWriter, r *http.Request, params BeginTotpSetupParams)
 	// RequestOtp Send a sign-in code to a Kenyan mobile number
 	// (POST /v1/auth/otp/request)
-	RequestOtp(w http.ResponseWriter, r *http.Request)
+	RequestOtp(w http.ResponseWriter, r *http.Request, params RequestOtpParams)
 	// VerifyOtp Exchange a sign-in code for a session, creating the account if new
 	// (POST /v1/auth/otp/verify)
 	VerifyOtp(w http.ResponseWriter, r *http.Request)
@@ -2643,6 +2657,9 @@ type ServerInterface interface {
 	// SubmitVerificationDocument Submit an uploaded file for checking
 	// (POST /v1/verification/documents)
 	SubmitVerificationDocument(w http.ResponseWriter, r *http.Request)
+	// DownloadOwnVerificationDocument Get a five-minute link to one of the driver's own files
+	// (POST /v1/verification/documents/{document_id}/download)
+	DownloadOwnVerificationDocument(w http.ResponseWriter, r *http.Request, documentId DocumentId)
 	// GetVerificationStatus Report the driver's verification progress
 	// (GET /v1/verification/status)
 	GetVerificationStatus(w http.ResponseWriter, r *http.Request)
@@ -2650,13 +2667,13 @@ type ServerInterface interface {
 	// (POST /v1/verification/uploads)
 	PrepareVerificationUpload(w http.ResponseWriter, r *http.Request)
 	// MpesaC2bConfirmation Receive a paybill payment from Safaricom
-	// (POST /v1/webhooks/mpesa/{token}/c2b/confirmation)
+	// (POST /v1/webhooks/payments/{token}/c2b/confirmation)
 	MpesaC2bConfirmation(w http.ResponseWriter, r *http.Request, token CallbackToken)
 	// MpesaC2bValidation Answer Safaricom's paybill validation
-	// (POST /v1/webhooks/mpesa/{token}/c2b/validation)
+	// (POST /v1/webhooks/payments/{token}/c2b/validation)
 	MpesaC2bValidation(w http.ResponseWriter, r *http.Request, token CallbackToken)
 	// MpesaStkCallback Receive an STK push result from Safaricom
-	// (POST /v1/webhooks/mpesa/{token}/stk)
+	// (POST /v1/webhooks/payments/{token}/stk)
 	MpesaStkCallback(w http.ResponseWriter, r *http.Request, token CallbackToken)
 }
 
@@ -2837,8 +2854,35 @@ func (siw *ServerInterfaceWrapper) BeginTotpSetup(w http.ResponseWriter, r *http
 // RequestOtp operation middleware
 func (siw *ServerInterfaceWrapper) RequestOtp(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RequestOtpParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Liddr-Otp-App-Hash" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Liddr-Otp-App-Hash")]; found {
+		var XLiddrOtpAppHash OtpAppHash
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Liddr-Otp-App-Hash", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Liddr-Otp-App-Hash", valueList[0], &XLiddrOtpAppHash, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Liddr-Otp-App-Hash", Err: err})
+			return
+		}
+
+		params.XLiddrOtpAppHash = &XLiddrOtpAppHash
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.RequestOtp(w, r)
+		siw.Handler.RequestOtp(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -6154,6 +6198,38 @@ func (siw *ServerInterfaceWrapper) SubmitVerificationDocument(w http.ResponseWri
 	handler.ServeHTTP(w, r)
 }
 
+// DownloadOwnVerificationDocument operation middleware
+func (siw *ServerInterfaceWrapper) DownloadOwnVerificationDocument(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "document_id" -------------
+	var documentId DocumentId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "document_id", r.PathValue("document_id"), &documentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "document_id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{"driver"})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DownloadOwnVerificationDocument(w, r, documentId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetVerificationStatus operation middleware
 func (siw *ServerInterfaceWrapper) GetVerificationStatus(w http.ResponseWriter, r *http.Request) {
 
@@ -6425,15 +6501,16 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/subscriptions/me", wrapper.GetSubscription)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/subscriptions/me/payments", wrapper.ListSubscriptionPayments)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/subscriptions/pay", wrapper.PaySubscription)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/webhooks/mpesa/{token}/stk", wrapper.MpesaStkCallback)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/webhooks/mpesa/{token}/c2b/validation", wrapper.MpesaC2bValidation)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/webhooks/mpesa/{token}/c2b/confirmation", wrapper.MpesaC2bConfirmation)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/webhooks/payments/{token}/stk", wrapper.MpesaStkCallback)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/webhooks/payments/{token}/c2b/validation", wrapper.MpesaC2bValidation)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/webhooks/payments/{token}/c2b/confirmation", wrapper.MpesaC2bConfirmation)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/auth/mfa/totp/setup", wrapper.BeginTotpSetup)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/auth/mfa/totp/confirm", wrapper.ConfirmTotpSetup)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/auth/step-up", wrapper.VerifyStepUp)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/verification/applications", wrapper.StartVerification)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/verification/uploads", wrapper.PrepareVerificationUpload)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/verification/documents", wrapper.SubmitVerificationDocument)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/verification/documents/{document_id}/download", wrapper.DownloadOwnVerificationDocument)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/verification/status", wrapper.GetVerificationStatus)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/ops/verification/applications", wrapper.ListVerificationApplications)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/ops/verification/applications/{application_id}", wrapper.GetVerificationApplication)
@@ -6817,7 +6894,8 @@ func (response BeginTotpSetupdefaultJSONResponse) VisitBeginTotpSetupResponse(w 
 }
 
 type RequestOtpRequestObject struct {
-	Body *RequestOtpJSONRequestBody
+	Params RequestOtpParams
+	Body   *RequestOtpJSONRequestBody
 }
 
 type RequestOtpResponseObject interface {
@@ -10785,6 +10863,45 @@ func (response SubmitVerificationDocumentdefaultJSONResponse) VisitSubmitVerific
 	return err
 }
 
+type DownloadOwnVerificationDocumentRequestObject struct {
+	DocumentId DocumentId `json:"document_id"`
+}
+
+type DownloadOwnVerificationDocumentResponseObject interface {
+	VisitDownloadOwnVerificationDocumentResponse(w http.ResponseWriter) error
+}
+
+type DownloadOwnVerificationDocument200JSONResponse SignedDownload
+
+func (response DownloadOwnVerificationDocument200JSONResponse) VisitDownloadOwnVerificationDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DownloadOwnVerificationDocumentdefaultJSONResponse struct {
+	Body       Error
+	StatusCode int
+}
+
+func (response DownloadOwnVerificationDocumentdefaultJSONResponse) VisitDownloadOwnVerificationDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetVerificationStatusRequestObject struct {
 }
 
@@ -11326,6 +11443,9 @@ type StrictServerInterface interface {
 	// SubmitVerificationDocument Submit an uploaded file for checking
 	// (POST /v1/verification/documents)
 	SubmitVerificationDocument(ctx context.Context, request SubmitVerificationDocumentRequestObject) (SubmitVerificationDocumentResponseObject, error)
+	// DownloadOwnVerificationDocument Get a five-minute link to one of the driver's own files
+	// (POST /v1/verification/documents/{document_id}/download)
+	DownloadOwnVerificationDocument(ctx context.Context, request DownloadOwnVerificationDocumentRequestObject) (DownloadOwnVerificationDocumentResponseObject, error)
 	// GetVerificationStatus Report the driver's verification progress
 	// (GET /v1/verification/status)
 	GetVerificationStatus(ctx context.Context, request GetVerificationStatusRequestObject) (GetVerificationStatusResponseObject, error)
@@ -11333,13 +11453,13 @@ type StrictServerInterface interface {
 	// (POST /v1/verification/uploads)
 	PrepareVerificationUpload(ctx context.Context, request PrepareVerificationUploadRequestObject) (PrepareVerificationUploadResponseObject, error)
 	// MpesaC2bConfirmation Receive a paybill payment from Safaricom
-	// (POST /v1/webhooks/mpesa/{token}/c2b/confirmation)
+	// (POST /v1/webhooks/payments/{token}/c2b/confirmation)
 	MpesaC2bConfirmation(ctx context.Context, request MpesaC2bConfirmationRequestObject) (MpesaC2bConfirmationResponseObject, error)
 	// MpesaC2bValidation Answer Safaricom's paybill validation
-	// (POST /v1/webhooks/mpesa/{token}/c2b/validation)
+	// (POST /v1/webhooks/payments/{token}/c2b/validation)
 	MpesaC2bValidation(ctx context.Context, request MpesaC2bValidationRequestObject) (MpesaC2bValidationResponseObject, error)
 	// MpesaStkCallback Receive an STK push result from Safaricom
-	// (POST /v1/webhooks/mpesa/{token}/stk)
+	// (POST /v1/webhooks/payments/{token}/stk)
 	MpesaStkCallback(ctx context.Context, request MpesaStkCallbackRequestObject) (MpesaStkCallbackResponseObject, error)
 }
 
@@ -11636,8 +11756,10 @@ func (sh *strictHandler) BeginTotpSetup(w http.ResponseWriter, r *http.Request, 
 }
 
 // RequestOtp operation middleware
-func (sh *strictHandler) RequestOtp(w http.ResponseWriter, r *http.Request) {
+func (sh *strictHandler) RequestOtp(w http.ResponseWriter, r *http.Request, params RequestOtpParams) {
 	var request RequestOtpRequestObject
+
+	request.Params = params
 
 	var body RequestOtpJSONRequestBody
 	if err := runtime.BindJSONBody(r, &body); err != nil {
@@ -14558,6 +14680,32 @@ func (sh *strictHandler) SubmitVerificationDocument(w http.ResponseWriter, r *ht
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SubmitVerificationDocumentResponseObject); ok {
 		if err := validResponse.VisitSubmitVerificationDocumentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DownloadOwnVerificationDocument operation middleware
+func (sh *strictHandler) DownloadOwnVerificationDocument(w http.ResponseWriter, r *http.Request, documentId DocumentId) {
+	var request DownloadOwnVerificationDocumentRequestObject
+
+	request.DocumentId = documentId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DownloadOwnVerificationDocument(ctx, request.(DownloadOwnVerificationDocumentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DownloadOwnVerificationDocument")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DownloadOwnVerificationDocumentResponseObject); ok {
+		if err := validResponse.VisitDownloadOwnVerificationDocumentResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

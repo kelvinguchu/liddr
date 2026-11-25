@@ -86,6 +86,18 @@ func TestBookedRideReachesDriverEndToEnd(t *testing.T) {
 	if seen.status != http.StatusOK || seen.body["driver_location"] == nil {
 		t.Errorf("rider view = %d %v", seen.status, seen.body)
 	}
+	// Riders see where their own trips went, so they can book one again. A
+	// driver's history never shows where riders were picked up or dropped off.
+	riderTrips := firstTrip(t, send(t, http.MethodGet, baseURL+"/v1/rides/history?as=rider", rider, nil))
+	if riderTrips["pickup"] == nil || riderTrips["dropoff"] == nil {
+		t.Errorf("rider history lacks places: %v", riderTrips)
+	}
+	driverTrips := firstTrip(t, send(t, http.MethodGet, baseURL+"/v1/rides/history?as=driver", driver, nil))
+	for _, field := range []string{"pickup", "dropoff"} {
+		if _, leaked := driverTrips[field]; leaked {
+			t.Errorf("driver history exposed the %s: %v", field, driverTrips)
+		}
+	}
 	missing := send(t, http.MethodPost, baseURL+"/v1/rides/not-a-uuid/cancel", rider, map[string]string{"reason": "emergency"})
 	if missing.status != http.StatusBadRequest {
 		t.Errorf("bad id = %d %v", missing.status, missing.body)
@@ -111,4 +123,15 @@ func waitForOffer(t *testing.T, baseURL, driver string) map[string]any {
 			}
 		}
 	}
+}
+
+// firstTrip returns the newest trip in a history response.
+func firstTrip(t *testing.T, got response) map[string]any {
+	t.Helper()
+	data, _ := got.body["data"].([]any)
+	if got.status != http.StatusOK || len(data) == 0 {
+		t.Fatalf("history = %d %v", got.status, got.body)
+	}
+	trip, _ := data[0].(map[string]any)
+	return trip
 }

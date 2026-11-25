@@ -1053,7 +1053,8 @@ func (q *Queries) ListRideHistoryForDriver(ctx context.Context, arg ListRideHist
 }
 
 const listRideHistoryForRider = `-- name: ListRideHistoryForRider :many
-SELECT r.id, r.status, r.fare_kes, r.payment_mode, r.requested_at, r.completed_at, r.cancelled_at, c.slug AS category
+SELECT r.id, r.status, r.fare_kes, r.payment_mode, r.requested_at, r.completed_at, r.cancelled_at, c.slug AS category,
+       r.pickup_lat, r.pickup_lng, r.dropoff_lat, r.dropoff_lng
 FROM rides AS r JOIN vehicle_categories AS c ON c.id = r.vehicle_category_id
 WHERE r.rider_id = $1 AND ($2::text IS NULL OR c.slug = $2)
 ORDER BY r.requested_at DESC, r.id
@@ -1076,6 +1077,10 @@ type ListRideHistoryForRiderRow struct {
 	CompletedAt *time.Time
 	CancelledAt *time.Time
 	Category    string
+	PickupLat   float64
+	PickupLng   float64
+	DropoffLat  float64
+	DropoffLng  float64
 }
 
 func (q *Queries) ListRideHistoryForRider(ctx context.Context, arg ListRideHistoryForRiderParams) ([]ListRideHistoryForRiderRow, error) {
@@ -1101,6 +1106,10 @@ func (q *Queries) ListRideHistoryForRider(ctx context.Context, arg ListRideHisto
 			&i.CompletedAt,
 			&i.CancelledAt,
 			&i.Category,
+			&i.PickupLat,
+			&i.PickupLng,
+			&i.DropoffLat,
+			&i.DropoffLng,
 		); err != nil {
 			return nil, err
 		}

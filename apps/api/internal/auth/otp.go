@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"regexp"
 	"time"
 
 	"github.com/google/uuid"
@@ -25,15 +26,30 @@ const (
 	maxCodesPerIP    = 60
 
 	deliveryFailureTimeout = 5 * time.Second
-	otpMessageFormat       = "Liddr Security Code\n\nYour verification code is: %s\n\n" +
-		"This code expires in 5 minutes. Do not share this code with anyone.\n\n@liddr.app #%s"
+	otpMessageBody         = "Your Liddr code is: %s\nIt expires in 5 minutes. Do not share it.\n\n"
 )
+
+// appHashPattern is Android's SMS Retriever hash: 11 characters of base64.
+var appHashPattern = regexp.MustCompile(`^[A-Za-z0-9+/]{11}$`)
+
+// otpMessage stays under the 140 bytes the SMS Retriever accepts. With the
+// app's hash as the last line, Android hands the message to the app; without
+// one, browsers read the code from the "@liddr.app #code" line.
+func otpMessage(code, appHash string) string {
+	body := fmt.Sprintf(otpMessageBody, code)
+	if appHashPattern.MatchString(appHash) {
+		return body + appHash
+	}
+	return body + "@liddr.app #" + code
+}
 
 // OTPRequest asks for a sign-in code.
 type OTPRequest struct {
 	Phone string
 	Role  Role
-	Meta  RequestMeta
+	// AppHash is the Android app's SMS Retriever hash. Malformed values are ignored.
+	AppHash string
+	Meta    RequestMeta
 }
 
 // Challenge identifies a sign-in code that was sent.
@@ -88,7 +104,7 @@ func (s *Service) RequestOTP(ctx context.Context, req OTPRequest) (Challenge, er
 	}
 
 	// Sent after commit: a slow provider must never hold a transaction open.
-	if err := s.sms.Send(ctx, phone, fmt.Sprintf(otpMessageFormat, code, code)); err != nil {
+	if err := s.sms.Send(ctx, phone, otpMessage(code, req.AppHash)); err != nil {
 		return Challenge{}, errors.Join(ErrDeliveryUnavailable, err, s.markDeliveryFailed(ctx, challenge.ID))
 	}
 	return challenge, nil

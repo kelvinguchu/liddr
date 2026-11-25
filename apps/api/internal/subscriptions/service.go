@@ -79,7 +79,7 @@ func (s *Service) VerifyCallbackToken(token string) bool {
 }
 
 func (s *Service) callbackURL(path string) string {
-	return s.baseURL + "/v1/webhooks/mpesa/" + s.token + path
+	return s.baseURL + "/v1/webhooks/payments/" + s.token + path
 }
 
 // C2BURLs returns the validation and confirmation URLs to register with Daraja.

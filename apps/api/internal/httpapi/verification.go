@@ -146,7 +146,11 @@ func (a *API) ListVerificationApplications(ctx context.Context, req ListVerifica
 
 // GetVerificationApplication loads one application.
 func (a *API) GetVerificationApplication(ctx context.Context, req GetVerificationApplicationRequestObject) (GetVerificationApplicationResponseObject, error) {
-	detail, err := a.deps.Verification.GetApplication(ctx, req.ApplicationId)
+	actor, err := staffActor(ctx)
+	if err != nil {
+		return nil, err
+	}
+	detail, err := a.deps.Verification.GetApplication(ctx, req.ApplicationId, actor)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +158,7 @@ func (a *API) GetVerificationApplication(ctx context.Context, req GetVerificatio
 	for i, d := range detail.Documents {
 		documents[i] = ReviewableDocument{Document: toDocument(d.Document), ContentType: d.ContentType, ScanStatus: d.ScanStatus}
 	}
-	return GetVerificationApplication200JSONResponse{Summary: toQueueItem(detail.QueueItem), Documents: documents}, nil
+	return GetVerificationApplication200JSONResponse{Summary: toQueueItem(detail.QueueItem), Phone: detail.Phone, Documents: documents}, nil
 }
 
 // ReviewVerificationApplication makes the final decision.
@@ -192,4 +196,18 @@ func (a *API) DownloadVerificationDocument(ctx context.Context, req DownloadVeri
 		return nil, err
 	}
 	return DownloadVerificationDocument200JSONResponse{Url: url, ExpiresAt: expiresAt}, nil
+}
+
+// DownloadOwnVerificationDocument returns a short-lived, audited link to one of the driver's own files.
+func (a *API) DownloadOwnVerificationDocument(ctx context.Context, req DownloadOwnVerificationDocumentRequestObject) (DownloadOwnVerificationDocumentResponseObject, error) {
+	// staffActor reads whoever is signed in; the contract allows only drivers here.
+	actor, err := staffActor(ctx)
+	if err != nil {
+		return nil, err
+	}
+	url, expiresAt, err := a.deps.Verification.OwnDownloadURL(ctx, req.DocumentId, actor)
+	if err != nil {
+		return nil, err
+	}
+	return DownloadOwnVerificationDocument200JSONResponse{Url: url, ExpiresAt: expiresAt}, nil
 }

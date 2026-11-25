@@ -65,6 +65,8 @@ paths:
       operationId: requestOtp
       summary: Send a sign-in code to a Kenyan mobile number
       security: []
+      parameters:
+        - $ref: "#/components/parameters/OtpAppHash"
       requestBody:
         required: true
         content:
@@ -649,7 +651,7 @@ paths:
         default:
           $ref: "#/components/responses/Problem"
 
-  /v1/webhooks/mpesa/{token}/stk:
+  /v1/webhooks/payments/{token}/stk:
     parameters:
       - $ref: "#/components/parameters/CallbackToken"
     post:
@@ -672,7 +674,7 @@ paths:
         default:
           $ref: "#/components/responses/Problem"
 
-  /v1/webhooks/mpesa/{token}/c2b/validation:
+  /v1/webhooks/payments/{token}/c2b/validation:
     parameters:
       - $ref: "#/components/parameters/CallbackToken"
     post:
@@ -695,7 +697,7 @@ paths:
         default:
           $ref: "#/components/responses/Problem"
 
-  /v1/webhooks/mpesa/{token}/c2b/confirmation:
+  /v1/webhooks/payments/{token}/c2b/confirmation:
     parameters:
       - $ref: "#/components/parameters/CallbackToken"
     post:
@@ -988,6 +990,29 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/VerificationDocument"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /v1/verification/documents/{document_id}/download:
+    post:
+      operationId: downloadOwnVerificationDocument
+      summary: Get a five-minute link to one of the driver's own files
+      description: >
+        For showing a driver what they sent. Only the driver who sent the
+        document can open it, and only once its safety scan has passed; any
+        other document reads as not found. A POST because every request is
+        written to the audit trail.
+      security:
+        - bearerAuth: [driver]
+      parameters:
+        - $ref: "#/components/parameters/DocumentId"
+      responses:
+        "200":
+          description: A signed link.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignedDownload"
         default:
           $ref: "#/components/responses/Problem"
 
@@ -2437,6 +2462,17 @@ paths:
 
 components:
   parameters:
+    OtpAppHash:
+      name: X-Liddr-Otp-App-Hash
+      in: header
+      required: false
+      description: >-
+        The Android app's 11-character SMS Retriever hash. When it is valid, the
+        code's SMS ends with it so the app can read the code itself; otherwise the
+        SMS ends with the line browsers read. A malformed value is ignored.
+      schema:
+        type: string
+        pattern: "^[A-Za-z0-9+/]{11}$"
     ConsoleHeader:
       name: X-Liddr-Console
       in: header
@@ -3548,10 +3584,16 @@ components:
     VerificationApplicationDetail:
       type: object
       additionalProperties: false
-      required: [summary, documents]
+      required: [summary, phone, documents]
       properties:
         summary:
           $ref: "#/components/schemas/VerificationQueueItem"
+        phone:
+          type: string
+          description: >
+            The applicant's full number, so the reviewer can call or text
+            them. Every load of this detail is written to the audit trail,
+            like opening a document.
         documents:
           type: array
           items:
@@ -4095,8 +4137,13 @@ components:
       type: object
       additionalProperties: false
       required: [id, status, category, fare_kes, requested_at]
+      description: >-
+        One trip. A rider's own history includes where each trip started and
+        ended, so the app can book it again; a driver's history never does.
       properties:
         id: {type: string, format: uuid}
+        pickup: {$ref: "#/components/schemas/Coordinates"}
+        dropoff: {$ref: "#/components/schemas/Coordinates"}
         status: {type: string}
         category: {type: string}
         fare_kes: {type: integer, format: int32}

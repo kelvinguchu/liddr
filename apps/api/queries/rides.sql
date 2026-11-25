@@ -210,7 +210,8 @@ SELECT id, new_dropoff_lat, new_dropoff_lng, old_fare_kes, new_fare_kes, status,
 FROM ride_destination_changes WHERE ride_id = sqlc.arg(ride_id) ORDER BY requested_at DESC;
 
 -- name: ListRideHistoryForRider :many
-SELECT r.id, r.status, r.fare_kes, r.payment_mode, r.requested_at, r.completed_at, r.cancelled_at, c.slug AS category
+SELECT r.id, r.status, r.fare_kes, r.payment_mode, r.requested_at, r.completed_at, r.cancelled_at, c.slug AS category,
+       r.pickup_lat, r.pickup_lng, r.dropoff_lat, r.dropoff_lng
 FROM rides AS r JOIN vehicle_categories AS c ON c.id = r.vehicle_category_id
 WHERE r.rider_id = sqlc.arg(user_id) AND (sqlc.narg(category)::text IS NULL OR c.slug = sqlc.narg(category))
 ORDER BY r.requested_at DESC, r.id

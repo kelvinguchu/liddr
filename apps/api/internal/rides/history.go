@@ -9,13 +9,17 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/kelvinguchu/liddr/apps/api/internal/geo"
 	"github.com/kelvinguchu/liddr/apps/api/internal/store"
 )
 
-// HistoryItem is one past or current trip. It holds no addresses, because a
-// list of them is a map of where someone lives and works.
+// HistoryItem is one past or current trip. Pickup and Dropoff are set only on
+// a rider's own history, so they can book a trip again; a driver's history
+// never carries where riders were picked up or dropped off.
 type HistoryItem struct {
 	ID          uuid.UUID
+	Pickup      *geo.Point
+	Dropoff     *geo.Point
 	Status      string
 	Category    string
 	FareKES     int32
@@ -44,7 +48,12 @@ func (s *Service) History(ctx context.Context, userID uuid.UUID, asDriver bool, 
 	}
 	out := make([]HistoryItem, len(rows))
 	for i, r := range rows {
-		out[i] = HistoryItem{ID: r.ID, Status: r.Status, Category: r.Category, FareKES: r.FareKes, PaymentMode: r.PaymentMode, RequestedAt: r.RequestedAt, CompletedAt: r.CompletedAt, CancelledAt: r.CancelledAt}
+		out[i] = HistoryItem{
+			ID: r.ID, Status: r.Status, Category: r.Category, FareKES: r.FareKes, PaymentMode: r.PaymentMode,
+			RequestedAt: r.RequestedAt, CompletedAt: r.CompletedAt, CancelledAt: r.CancelledAt,
+			Pickup:  &geo.Point{Lat: r.PickupLat, Lng: r.PickupLng},
+			Dropoff: &geo.Point{Lat: r.DropoffLat, Lng: r.DropoffLng},
+		}
 	}
 	return out, nil
 }

@@ -113,6 +113,10 @@ func (a *API) ListRideHistory(ctx context.Context, req ListRideHistoryRequestObj
 	data := make([]RideHistoryItem, len(items))
 	for i, r := range items {
 		data[i] = RideHistoryItem{Id: r.ID, Status: r.Status, Category: r.Category, FareKes: r.FareKES, PaymentMode: r.PaymentMode, RequestedAt: r.RequestedAt, CompletedAt: r.CompletedAt, CancelledAt: r.CancelledAt}
+		if r.Pickup != nil && r.Dropoff != nil {
+			pickup, dropoff := fromPoint(*r.Pickup), fromPoint(*r.Dropoff)
+			data[i].Pickup, data[i].Dropoff = &pickup, &dropoff
+		}
 	}
 	return ListRideHistory200JSONResponse{Data: data}, nil
 }

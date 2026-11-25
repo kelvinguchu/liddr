@@ -71,6 +71,12 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.maps.compose)
     implementation(libs.google.places)
+    implementation(libs.google.sms.retriever)
+    // The in-app camera for document scans, vehicle photos and the selfie. On-device only.
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))

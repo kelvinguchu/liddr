@@ -1,5 +1,7 @@
 package com.liddr.app.ui.driver
 
+import com.liddr.app.ui.kit.Notices
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.liddr.app.data.Delivery
@@ -45,9 +47,25 @@ data class DriverUiState(
     val delivery: Delivery? = null,
     val shared: SharedRide? = null,
     val busy: Boolean = false,
+    /** Why the account didn't load, or why the application form was refused. Other failures go to the message bar. */
     val error: String? = null,
     val reconnecting: Boolean = false,
+    /** The vehicle list was reopened from the application form, to pick a different vehicle. */
+    val changingVehicle: Boolean = false,
 )
+
+/** What Back does on the driver side. Steps already saved on the server are not steps back. */
+internal enum class DriverBack { LEAVE, CHANGE_VEHICLE, KEEP_VEHICLE }
+
+internal fun driverBack(state: DriverUiState): DriverBack = when (state.screen) {
+    DriverScreen.CATEGORY -> if (state.changingVehicle) DriverBack.KEEP_VEHICLE else DriverBack.LEAVE
+    // The API lets a driver change vehicle until the application is in, or after it is rejected.
+    DriverScreen.VERIFICATION -> when (state.verification?.application?.status) {
+        null, "rejected" -> if (state.verification != null) DriverBack.CHANGE_VEHICLE else DriverBack.LEAVE
+        else -> DriverBack.LEAVE
+    }
+    else -> DriverBack.LEAVE
+}
 
 class DriverViewModel(
     private val api: DriverApi,
@@ -55,6 +73,7 @@ class DriverViewModel(
     private val send: SendApi,
     private val location: DriverLocationControl,
     private val realtime: Realtime,
+    private val notices: Notices,
 ) : ViewModel() {
     private val _ui = MutableStateFlow(DriverUiState())
     val ui: StateFlow<DriverUiState> = _ui.asStateFlow()
@@ -101,32 +120,45 @@ class DriverViewModel(
     }
 
     fun chooseCategory(slug: String) = act {
-        _ui.update { it.copy(profile = api.setCategory(slug)) }
+        _ui.update { it.copy(profile = api.setCategory(slug), changingVehicle = false) }
         refresh()
     }
 
-    fun startApplication(plate: String, fullName: String) = act {
+    /** Back on the driver side, for the steps that can still be changed. */
+    fun back() = when (driverBack(_ui.value)) {
+        DriverBack.CHANGE_VEHICLE -> act {
+            val categories = shared.listVehicleCategories()
+            _ui.update { it.copy(screen = DriverScreen.CATEGORY, categories = categories, changingVehicle = true) }
+        }
+        DriverBack.KEEP_VEHICLE -> _ui.update { it.copy(screen = DriverScreen.VERIFICATION, changingVehicle = false) }
+        DriverBack.LEAVE -> Unit
+    }
+
+    /** The file the driver sent for one document. Throws ProblemException or OfflineException. */
+    suspend fun openDocument(id: String): ByteArray = api.openOwnDocument(id)
+
+    fun startApplication(plate: String, fullName: String) = act(inline = true) {
         api.startApplication(plate, fullName)
         refresh()
     }
 
     fun upload(type: String, contentType: String, bytes: ByteArray, expiresOn: String?) {
-        _ui.update { it.copy(uploading = type, error = null) }
+        _ui.update { it.copy(uploading = type) }
         viewModelScope.launch {
             try {
                 api.uploadDocument(type, contentType, bytes, expiresOn)
                 _ui.update { it.copy(verification = api.getVerification()) }
             } catch (e: ProblemException) {
-                _ui.update { it.copy(error = e.message) }
+                failed(e.message, inline = false)
             } catch (e: OfflineException) {
-                _ui.update { it.copy(error = e.message) }
+                failed(e.message, inline = false)
             } finally {
                 _ui.update { it.copy(uploading = null) }
             }
         }
     }
 
-    fun reportError(message: String) = _ui.update { it.copy(error = message) }
+    fun reportError(message: String) = notices.show(message)
 
     fun pay() = act {
         api.paySubscription()
@@ -246,7 +278,8 @@ class DriverViewModel(
             when {
                 profile.verificationStatus != "approved" -> {
                     val verification = api.getVerification()
-                    _ui.update { it.copy(screen = DriverScreen.VERIFICATION, verification = verification) }
+                    // A background refresh must not close the vehicle list the driver reopened.
+                    _ui.update { if (it.changingVehicle) it.copy(verification = verification) else it.copy(screen = DriverScreen.VERIFICATION, verification = verification) }
                 }
                 profile.subscriptionStatus !in setOf("active", "grace") -> {
                     val subscription = api.getSubscription()
@@ -297,7 +330,8 @@ class DriverViewModel(
         if (latest == "success") {
             refresh()
         } else if (latest in setOf("failed", "cancelled", "timeout")) {
-            _ui.update { it.copy(paying = false, error = "The M-Pesa payment didn't go through. Please try again.") }
+            _ui.update { it.copy(paying = false) }
+            notices.show("The M-Pesa payment didn't go through.", "Try again", ::pay)
         }
     }
 
@@ -321,20 +355,26 @@ class DriverViewModel(
         if (_ui.value.shared != null) _ui.update { it.copy(shared = api.getSharedRide(id)) }
     }
 
-    private fun act(block: suspend () -> Unit) {
+    /** Runs a step the driver started. A failure goes to the message bar, or under the form when [inline]. */
+    private fun act(inline: Boolean = false, block: suspend () -> Unit) {
         if (_ui.value.busy) return
         _ui.update { it.copy(busy = true, error = null) }
         viewModelScope.launch {
             try {
                 block()
             } catch (e: ProblemException) {
-                _ui.update { it.copy(error = e.message) }
+                failed(e.message, inline)
             } catch (e: OfflineException) {
-                _ui.update { it.copy(error = e.message) }
+                failed(e.message, inline)
             } finally {
                 _ui.update { it.copy(busy = false) }
             }
         }
+    }
+
+    private fun failed(message: String?, inline: Boolean) {
+        val text = message ?: "Something went wrong. Please try again."
+        if (inline) _ui.update { it.copy(error = text) } else notices.show(text)
     }
 
     private companion object {

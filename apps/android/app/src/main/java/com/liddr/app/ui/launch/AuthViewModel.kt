@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.liddr.app.data.LiddrApi
 import com.liddr.app.data.OfflineException
 import com.liddr.app.data.ProblemException
+import com.liddr.app.data.SmsCodeReader
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,16 +20,19 @@ data class AuthUiState(
     val challengeId: String? = null,
     val destination: String = "",
     val resendInSeconds: Int = 0,
+    /** A code read from the SMS, shown in the boxes while it is checked. */
+    val autoCode: String? = null,
 )
 
 /** Keeps sign-in moving across screen rotations. */
-class AuthViewModel(private val api: LiddrApi) : ViewModel() {
+class AuthViewModel(private val api: LiddrApi, private val sms: SmsCodeReader? = null) : ViewModel() {
     private val _ui = MutableStateFlow(AuthUiState())
     val ui: StateFlow<AuthUiState> = _ui.asStateFlow()
 
     private var method: AuthMethodUi? = null
     private var role: AccountRoleUi = AccountRoleUi.RIDER
     private var countdown: Job? = null
+    private var listening: Job? = null
 
     fun sendCode(role: AccountRoleUi, method: AuthMethodUi, destination: String) {
         this.role = role
@@ -50,7 +54,8 @@ class AuthViewModel(private val api: LiddrApi) : ViewModel() {
     /** Returns from code entry to change the phone number or email. */
     fun editDestination() {
         countdown?.cancel()
-        _ui.update { it.copy(challengeId = null, error = null, resendInSeconds = 0) }
+        listening?.cancel()
+        _ui.update { it.copy(challengeId = null, error = null, resendInSeconds = 0, autoCode = null) }
     }
 
     fun clearError() = _ui.update { it.copy(error = null) }
@@ -58,14 +63,27 @@ class AuthViewModel(private val api: LiddrApi) : ViewModel() {
     private fun request(destination: String) {
         val sending = method ?: return
         if (_ui.value.busy) return
+        // Listening starts before the request, so a fast SMS isn't missed.
+        if (sending.method == "phone_otp") listenForCode()
         run {
             val challenge = if (sending.method == "phone_otp") {
-                api.requestOtp(destination, role.apiValue)
+                api.requestOtp(destination, role.apiValue, sms?.appHash)
             } else {
                 api.requestEmailOtp(destination)
             }
             _ui.update { it.copy(challengeId = challenge.challengeId, destination = destination) }
             startCountdown(RESEND_SECONDS)
+        }
+    }
+
+    /** Fills in and checks the code when the SMS arrives; typing it still works meanwhile. */
+    private fun listenForCode() {
+        val reader = sms ?: return
+        listening?.cancel()
+        listening = viewModelScope.launch {
+            val code = reader.awaitCode() ?: return@launch
+            _ui.update { it.copy(autoCode = code) }
+            verify(code)
         }
     }
 

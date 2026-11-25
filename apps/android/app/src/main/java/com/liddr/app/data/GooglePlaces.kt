@@ -29,24 +29,17 @@ class GooglePlaceFinder(context: Context, key: String) : PlaceFinder {
             .setCountries("KE")
             .setSessionToken(session)
             .build()
-        val response = try {
-            client.findAutocompletePredictions(request).await()
-        } catch (e: Exception) {
-            throw PlaceSearchUnavailable()
-        }
+        val response = placeLookup { client.findAutocompletePredictions(request).await() }
         return response.autocompletePredictions.map {
-            Place(title = it.getPrimaryText(null).toString(), detail = it.getFullText(null).toString(), point = null, id = it.placeId)
+            val title = it.getPrimaryText(null).toString()
+            Place(title = title, detail = placeDetail(title, it.getFullText(null).toString()), point = null, id = it.placeId)
         }
     }
 
     override suspend fun resolve(place: Place): Place {
         val id = place.id ?: return place
         val request = FetchPlaceRequest.builder(id, listOf(GooglePlace.Field.LOCATION)).setSessionToken(session).build()
-        val found = try {
-            client.fetchPlace(request).await().place.location
-        } catch (e: Exception) {
-            throw PlaceSearchUnavailable()
-        } ?: throw PlaceSearchUnavailable()
+        val found = placeLookup { client.fetchPlace(request).await().place.location } ?: throw PlaceSearchUnavailable()
         startSession() // Choosing a place ends Google's billing session.
         return place.copy(point = Coordinates(found.latitude, found.longitude))
     }
@@ -55,5 +48,6 @@ class GooglePlaceFinder(context: Context, key: String) : PlaceFinder {
 private suspend fun <T> Task<T>.await(): T = suspendCancellableCoroutine { waiter ->
     addOnSuccessListener { waiter.resume(it) }
     addOnFailureListener { waiter.resumeWithException(it) }
-    addOnCanceledListener { waiter.cancel() }
+    // Google dropping the request is a failure, not our cancellation, so the search ends with an error.
+    addOnCanceledListener { waiter.resumeWithException(PlaceSearchUnavailable()) }
 }

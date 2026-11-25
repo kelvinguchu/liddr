@@ -67,7 +67,17 @@ data class Ride(
     val rider: RiderCard? = null,
 )
 
-@Serializable internal data class HistoryItem(val id: String, val status: String)
+/** One of the rider's trips, with where it started and ended (riders only). */
+@Serializable
+data class HistoryItem(
+    val id: String,
+    val pickup: Coordinates? = null,
+    val dropoff: Coordinates? = null,
+    val status: String,
+    val category: String = "",
+    @SerialName("fare_kes") val fareKes: Int = 0,
+    @SerialName("requested_at") val requestedAt: String = "",
+)
 
 @Serializable internal data class RideHistory(val data: List<HistoryItem>)
 

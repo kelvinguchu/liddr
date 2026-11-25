@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Liddr wordmark, drawn from the same shapes as the Canva logo "Liddr logo (Clear)". The wheel mark is the app icon only. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="114dp" android:height="48dp"
+    android:viewportWidth="744" android:viewportHeight="312">
+    <group android:translateX="-16" android:translateY="-100" android:scaleX="4" android:scaleY="4">
+        <path android:fillColor="#FFFFFF" android:pathData="M5.5,28 H14.5 V100 H5.5 Z M29.5,62 H38.5 V100 H29.5 Z M78.5,28 H87.5 V100 H78.5 V98.49 A21.5,21.5 0 1,1 78.5,63.51 Z M53.5,81 A12.5,12.5 0 1,0 78.5,81 A12.5,12.5 0 1,0 53.5,81 Z M128.5,28 H137.5 V100 H128.5 V98.49 A21.5,21.5 0 1,1 128.5,63.51 Z M103.5,81 A12.5,12.5 0 1,0 128.5,81 A12.5,12.5 0 1,0 103.5,81 Z M151.5,100 V74 A18.5,18.5 0 0,1 170,55.5 H182 V64.5 H170 A9.5,9.5 0 0,0 160.5,74 V100 Z" />
+        <path android:fillColor="#2EC4B9" android:pathData="M25.5,42 A8.5,8.5 0 1,1 42.5,42 A8.5,8.5 0 1,1 25.5,42 Z M29.5,42 A4.5,4.5 0 1,0 38.5,42 A4.5,4.5 0 1,0 29.5,42 Z" />
+    </group>
+</vector>
